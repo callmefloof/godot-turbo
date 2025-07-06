@@ -1,5 +1,5 @@
 #include "modules/register_module_types.h"
-#include "thirdparty/flecs/flecs.h"
+#include "thirdparty/flecs/distr/flecs.h"
 
 void initialize_godot_turbo_module(ModuleInitializationLevel p_level);
 void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level);

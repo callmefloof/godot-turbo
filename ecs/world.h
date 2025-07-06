@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../thirdparty/flecs/flecs.h"
+#include "../thirdparty/flecs/distr/flecs.h"
 #include "scene/main/node.h"
+#include "servers/rendering_server.h"
 
 class World : public Node
 {

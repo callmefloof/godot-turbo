@@ -15,7 +15,7 @@ World::~World()
 
 void World::_ready()
 {
-
+    int i = 0;
 }
 
 void World::_process(const double delta)
