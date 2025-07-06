@@ -1,3 +1,3 @@
-[submodule "thirdparty/flecs"]
-	path = thirdparty/flecs
+[submodule "flecs"]
+	path = flecs
 	url = https://github.com/SanderMertens/flecs.git
