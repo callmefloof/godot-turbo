@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "**/frontmatter.json": "jsonc",
+        "**/.frontmatter/config/*.json": "jsonc",
+        "xlocale": "c"
+    }
+}

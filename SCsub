@@ -1,0 +1,16 @@
+Import('env')
+
+module_env = env.Clone()
+
+# Add your module's source files
+module_env.add_source_files(env.modules_sources, [
+    "register_types.cpp",
+    "thirdparty/flecs/flecs.c",
+    "ecs/world.cpp"
+])
+
+# Include the flecs directory for headers
+module_env.Append(CPPPATH=["#modules/godot_turbo/thirdparty/flecs"])
+
+# Optional optimizations
+module_env.Append(CCFLAGS=["-O2"])
