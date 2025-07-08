@@ -18,7 +18,7 @@
 #include "scene/2d/multimesh_instance_2d.h"
 #include "scene/2d/skeleton_2d.h"
 #include "scene/main/canvas_item.h"
-#include "../../object_id_storage.h"
+#include "../object_id_storage.h"
 #include <core/templates/rid.h>
 #include <core/templates/vector.h>
 #include <core/templates/rid_owner.h>

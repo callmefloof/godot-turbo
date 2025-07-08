@@ -5,7 +5,7 @@
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
 #include <servers/rendering_server.h>
-#include "../../object_id_storage.h"
+#include "../../utility/object_id_storage.h"
 
 namespace godot_turbo::components::rendering {
 	struct MeshComponent {
