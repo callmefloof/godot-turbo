@@ -20,11 +20,7 @@ World::~World()
 
 void World::_ready()
 {
-	auto on_ready = world.lookup("OnReady");
-	if (on_ready) {
-		ecs_run(world.c_ptr(), on_ready.id(), 0.0f, nullptr);
-	}
-	on_ready.destruct(); // Prevent reuse
+	
 }
 
 void World::_process(const double delta)
