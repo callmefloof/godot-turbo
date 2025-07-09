@@ -2,7 +2,7 @@
 #include "../../thirdparty/flecs/distr/flecs.h"
 #include <cassert>
 
-namespace godot_turbo::components {
+
 
 template <typename T>
 class SingleComponentModule {
@@ -21,5 +21,3 @@ public:
 		return *component;
 	}
 };
-
-} // namespace godot_turbo::components

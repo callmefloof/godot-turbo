@@ -8,10 +8,12 @@
 
 struct ObjectIDContainer {
 	ObjectID id;
-	RID instance;
+	RID rid;
 	String class_name;
-	ObjectIDContainer(const ObjectID &p_id, const String &p_class_name, const RID& p_instance) :
-			id(p_id), class_name(p_class_name), instance(p_instance) {};
+	bool operator==(const ObjectIDContainer &other) const {
+		return id == other.id && rid == other.rid && class_name == other.class_name;
+	}
+	
 };
 
 class ObjectIDStorage {
@@ -28,15 +30,19 @@ public:
 		}
 		Node* node = Object::cast_to<Node>(p_obj);
 		if (node != nullptr && node->is_inside_tree()) {
-			node->get_tree()->get_current_scene()->remove_child(node);
+			node->get_parent()->remove_child(node);
 		}
-		ObjectIDContainer container(p_obj->get_instance_id(),p_obj->get_class(),p_rid);
+		ObjectIDContainer container;
+
+		container.rid = p_rid;
+		container.class_name = p_obj->get_class();
+		container.id = p_obj->get_instance_id();
 		return object_id_pool.append(container);
 	}
 
 	static inline bool release(const RID &p_instance) {
 		for (Vector<ObjectIDContainer>::Iterator it = object_id_pool.begin(); it != object_id_pool.end(); ++it) {
-			if (it->instance != p_instance) {
+			if (it->rid != p_instance) {
 				continue;
 			}
 			if (!p_instance.is_valid()) {
@@ -49,7 +55,7 @@ public:
 				return object_id_pool.erase(*it);
 			}
 			if (node->is_inside_tree()) {
-				node->get_tree()->get_current_scene()->remove_child(node);
+				node->get_parent()->remove_child(node);
 				node->queue_free();
 				return object_id_pool.erase(*it);
 			}
@@ -73,10 +79,10 @@ public:
 				return object_id_pool.erase(*it);
 			}
 			if (node->is_inside_tree()) {
-				node->get_tree()->get_current_scene()->remove_child(node);
-				node->queue_free();
-				return object_id_pool.erase(*it);
+				node->get_parent()->remove_child(node);	
 			}
+			node->queue_free();
+			return object_id_pool.erase(*it);
 		}
 		return false;
 	}
@@ -92,7 +98,7 @@ public:
 
 	static inline bool has(const RID& p_instance) {
 	for (const ObjectIDContainer &container : object_id_pool) {
-		if (container.instance == p_instance) {
+		if (container.rid == p_instance) {
 			return true;
 		}
 	}
@@ -109,7 +115,7 @@ public:
 
 	static inline ObjectIDContainer *get(const RID &p_instance) {
 		for (Vector<ObjectIDContainer>::Iterator it = object_id_pool.begin(); it != object_id_pool.end(); ++it) {
-			if (it->instance == p_instance) {
+			if (it->rid == p_instance) {
 				return &(*it);
 			}
 		}

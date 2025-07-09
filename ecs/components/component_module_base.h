@@ -2,9 +2,7 @@
 #include "../../thirdparty/flecs/distr/flecs.h"
 #include <cassert>
 
-namespace godot_turbo::components {
-
-template <typename Derived, typename ComponentsStruct>
+template <typename ComponentsStruct>
 class MultiComponentModule {
 protected:
 	static inline ComponentsStruct *components = nullptr;
@@ -20,5 +18,3 @@ public:
 		return *components;
 	}
 };
-
-} // namespace godot_turbo::components

@@ -4,7 +4,6 @@
 #include "core/templates/rid.h"
 #include "servers/physics_server_3d.h"
 
-namespace godot_turbo::components::physics {
 
 	struct Area3DComponent {
 		RID area_id;
@@ -61,10 +60,5 @@ namespace godot_turbo::components::physics {
 				soft_body(world.component<SoftBody3DComponent>("SoftBody3DComponent")),
 				space(world.component<Space3DComponent>("Space3DComponent")) {}
 	};
+using Physics3DComponentModule = MultiComponentModule<Physics3DBaseComponents>;
 
-	class Physics3DComponents
-			: public MultiComponentModule<Physics3DComponents, Physics3DBaseComponents> {
-		// Nothing else needed
-	};
-
-} // namespace godot_turbo::components::physics

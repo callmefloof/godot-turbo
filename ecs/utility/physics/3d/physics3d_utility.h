@@ -1,7 +1,7 @@
 #pragma once
 #include <servers/physics_server_3d.h>
-#include <modules/godot_turbo/ecs/components/physics/3d/3d_physics_components.h>
-#include <modules/godot_turbo/thirdparty/flecs/distr/flecs.h>
+#include "../../../components/physics/3d/3d_physics_components.h"
+#include "../../../../thirdparty/flecs/distr/flecs.h"
 #include <scene/3d/physics/area_3d.h>
 #include <scene/3d/physics/rigid_body_3d.h>
 #include <scene/3d/physics/joints/joint_3d.h>
@@ -12,8 +12,6 @@
 #include <scene/3d/soft_body_3d.h>
 
 
-namespace godot_turbo::utility::physics {
-using namespace godot_turbo::components::physics;
 
 class Physics3DUtility {
 private:
@@ -27,25 +25,25 @@ public:
 	static inline flecs::entity CreateArea3D(flecs::world &world, const String &name, const RID &space_id) {
 		RID area_id = PhysicsServer3D::get_singleton()->area_create();
 		PhysicsServer3D::get_singleton()->area_set_space(area_id, space_id);
-		return world.entity(name).set<Area3DComponent>({ area_id });
+		return world.entity().set<Area3DComponent>({ area_id }).set_name(name.ascii().get_data());
 	}
 
 	static inline flecs::entity CreateBody3D(flecs::world &world, const String &name, const RID &space_id) {
 		RID body_id = PhysicsServer3D::get_singleton()->body_create();
 		PhysicsServer3D::get_singleton()->body_set_space(body_id, space_id);
-		return world.entity(name).set<Body3DComponent>({ body_id });
+		return world.entity().set<Body3DComponent>({ body_id }).set_name(name.ascii().get_data());
 	}
 
 	static inline flecs::entity CreateJoint3D(flecs::world &world, const String &name, const RID &space_id) {
 		RID joint_id = PhysicsServer3D::get_singleton()->joint_create();
 		//PhysicsServer3D::get_singleton()->joint(joint_id, space_id);
-		return world.entity(name).set<Joint3DComponent>({ joint_id });
+		return world.entity().set<Joint3DComponent>({ joint_id }).set_name(name.ascii().get_data());
 	}
 
 	static inline flecs::entity CreateSoftBody3D(flecs::world &world, const String &name, const RID &space_id) {
 		RID soft_body_id = PhysicsServer3D::get_singleton()->soft_body_create();
 		PhysicsServer3D::get_singleton()->soft_body_set_space(soft_body_id, space_id);
-		return world.entity(name).set<SoftBody3DComponent>({ soft_body_id });
+		return world.entity().set<SoftBody3DComponent>({ soft_body_id }).set_name(name.ascii().get_data());
 	}
 
 	/// Create an Area3D entity from a Godot Area3D object
@@ -57,8 +55,9 @@ public:
 		if (!area_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity(area_3d->get_name())
-							  .set<Area3DComponent>({ area_id });
+		auto entity = world.entity()
+							  .set<Area3DComponent>({ area_id })
+							  .set_name(String(area_3d->get_name()).ascii().get_data());
 		ObjectIDStorage::add(area_3d, area_id);
 		return entity;
 	}
@@ -72,9 +71,26 @@ public:
 		if (!body_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity(body_3d->get_name())
-							  .set<Body3DComponent>({ body_id });
+		auto entity = world.entity()
+							  .set<Body3DComponent>({ body_id })
+							  .set_name(String(body_3d->get_name()).ascii().get_data());
 		ObjectIDStorage::add(body_3d, body_id);
+		return entity;
+	}
+
+	
+	static inline flecs::entity CreatePhysicsBody(flecs::world &world, PhysicsBody3D *physics_body) {
+		if (physics_body == nullptr) {
+			ERR_FAIL_V(flecs::entity());
+		}
+		auto body_id = physics_body->get_rid();
+		if (!body_id.is_valid()) {
+			ERR_FAIL_V(flecs::entity());
+		}
+		auto entity = world.entity()
+							  .set<Body3DComponent>({ body_id })
+							  .set_name(String(physics_body->get_name()).ascii().get_data());
+		ObjectIDStorage::add(physics_body, body_id);
 		return entity;
 	}
 
@@ -86,8 +102,9 @@ public:
 		if (!joint_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity(joint_3d->get_name())
-							  .set<Joint3DComponent>({ joint_id });
+		auto entity = world.entity()
+							  .set<Joint3DComponent>({ joint_id })
+							  .set_name(String(joint_3d->get_name()).ascii().get_data());
 		ObjectIDStorage::add(joint_3d, joint_id);
 		return entity;
 	}
@@ -100,19 +117,19 @@ public:
 		if (!soft_body_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity(soft_body_3d->get_name())
-							  .set<SoftBody3DComponent>({ soft_body_id });
+		auto entity = world.entity()
+							  .set<SoftBody3DComponent>({ soft_body_id })
+							  .set_name(String(soft_body_3d->get_name()).ascii().get_data());
 		ObjectIDStorage::add(soft_body_3d, soft_body_id);
 		return entity;
 	}
 
 	static inline flecs::entity CreateSpace3D(flecs::world &world, const String &name) {
 		RID space_id = PhysicsServer3D::get_singleton()->space_create();
-		return world.entity(name).set<Space3DComponent>({ space_id });
+		return world.entity().set<Space3DComponent>({ space_id }).set_name(name.ascii().get_data());
 	}
 
 	static inline flecs::entity CreateSpace3D(flecs::world &world, const RID& space_id, const String &name) {
-		return world.entity(name).set<Space3DComponent>({ space_id });
+		return world.entity().set<Space3DComponent>({ space_id }).set_name(name.ascii().get_data());
 	}
 };
-}; //namespace godot_turbo::utility::physics
