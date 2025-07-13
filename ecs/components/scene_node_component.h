@@ -35,11 +35,17 @@ public:
 
 
 template<typename T = Node>
-struct SceneNodeComponent {
-public:
+struct SceneNodeComponent : ScriptVisibleComponent {
 	ObjectID node_id; // Unique identifier for the node
 	String class_name; // Class name of the node
 	NodeRef<T> node_ref; // Reference to the node
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict["node_id"] = node_id;
+		dict["class_name"] = class_name;
+		dict["node_ref"] = node_ref;
+		return dict;
+	}
 };
 
 template<typename T = Node>

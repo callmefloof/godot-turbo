@@ -200,7 +200,7 @@ public:
 	}
 	
 
-	static flecs::entity CreateSkeleton(const flecs::world &world, const RID &skeleton_id, const String &name) {  
+	static flecs::entity CreateSkeleton(const flecs::world &world, const RID &skeleton_id, const String &name) {
 		return world.entity()  
 				.set<SkeletonComponent>({ skeleton_id })
 				.set_name(name.ascii().get_data());
