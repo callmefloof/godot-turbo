@@ -1,14 +1,8 @@
 #pragma once
-#include "../../thirdparty/flecs/distr/flecs.h"
 #include "core/object/object_id.h"
 #include "core/string/ustring.h"
-#include <core/math/vector2.h>
-#include "component_module_base.h"
 #include "single_component_module.h"
 #include "scene/main/node.h"
-#include "core/object/script_instance.h"
-#include "core/object/script_language.h"
-#include "core/object/script_language_extension.h"
 
 template <typename T>
 struct NodeRef
@@ -18,8 +12,8 @@ private:
 public:
 	ObjectID id; // Unique identifier for the node
 	NodeRef() :
-			node(nullptr), id(ObjectID()) {}
-	NodeRef(ObjectID id) {
+			node(nullptr) {}
+	explicit NodeRef(ObjectID id) {
 		this->id = id;
 		if (id.is_valid()) {
 			node = Object::cast_to<T>(ObjectDB::get_instance(id));

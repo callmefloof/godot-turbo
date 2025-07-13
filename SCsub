@@ -12,5 +12,24 @@ module_env.add_source_files(env.modules_sources, [
 # Include the flecs directory for headers
 module_env.Append(CPPPATH=["#modules/godot_turbo/thirdparty/flecs/distr"])
 
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/rendering"])
+
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/physics/2d"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/physics/3d"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/navigation/2d"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/navigation/3d"])
+
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/rendering"])
+
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/physics/2d"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/physics/3d"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/navigation/2d"])
+module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/navigation/3d"])
+
+
+
 # Optional optimizations
-module_env.Append(CCFLAGS=["-O2"])
+# module_env.Append(CCFLAGS=["-O2"])

@@ -28,26 +28,16 @@ struct Joint2DComponent {
 		}
 	}
 };
-struct Space2DComponent {
-	RID space_id;
-	~Space2DComponent() {
-		if (space_id.is_valid()) {
-			PhysicsServer2D::get_singleton()->free(space_id);
-		}
-	}
-};
 
 struct Physics2DBaseComponents {
 	flecs::component<Area2DComponent> area;
 	flecs::component<Body2DComponent> body;
 	flecs::component<Joint2DComponent> joint;
-	flecs::component<Space2DComponent> space;
 
-	Physics2DBaseComponents(flecs::world &world) :
+	explicit Physics2DBaseComponents(const flecs::world &world) :
 			area(world.component<Area2DComponent>("Area2DComponent")),
 			body(world.component<Body2DComponent>("Body2DComponent")),
-			joint(world.component<Joint2DComponent>("Joint2DComponent")),
-			space(world.component<Space2DComponent>("Space2DComponent")) {}
+			joint(world.component<Joint2DComponent>("Joint2DComponent")){}
 };
 
 using Physics2DComponentModule =  MultiComponentModule<Physics2DBaseComponents>;

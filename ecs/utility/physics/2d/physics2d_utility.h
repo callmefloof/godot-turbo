@@ -18,34 +18,35 @@ private:
 	Physics2DUtility &operator=(Physics2DUtility &&) = delete; // Prevent move assignment
 
 public:
-	static inline flecs::entity CreateArea(flecs::world &world, const String &name, const RID &space_id) {
-		RID area_id = PhysicsServer2D::get_singleton()->area_create();
+	static flecs::entity CreateArea(const flecs::world &world, const String &name, const RID &space_id) {
+		const RID area_id = PhysicsServer2D::get_singleton()->area_create();
 		PhysicsServer2D::get_singleton()->area_set_space(area_id, space_id);
 		return world.entity().set<Area2DComponent>({ area_id }).set_name(name.ascii().get_data());
 	}
 
-	static inline flecs::entity CreateBody(flecs::world &world, const String &name, const RID &space_id) {
-		RID body_id = PhysicsServer2D::get_singleton()->body_create();
+	static flecs::entity CreateBody(const flecs::world &world, const String &name, const RID &space_id) {
+		const RID body_id = PhysicsServer2D::get_singleton()->body_create();
 		PhysicsServer2D::get_singleton()->body_set_space(body_id, space_id);
 		return world.entity().set<Body2DComponent>({ body_id }).set_name(name.ascii().get_data());
 	}
 
-	static inline flecs::entity CreateJoint(flecs::world &world, const String &name, const RID &space_id) {
-		RID joint_id = PhysicsServer2D::get_singleton()->joint_create();
+	static flecs::entity CreateJoint(const flecs::world &world, const String &name, const RID &space_id) {
+		const RID joint_id = PhysicsServer2D::get_singleton()->joint_create();
+		//no way to find to space?
 		//PhysicsServer2D::get_singleton()->joint(joint_id, space_id);
 		return world.entity().set<Joint2DComponent>({ joint_id }).set_name(name.ascii().get_data());
 	}
 
 	/// Create an Area2D entity from a Godot Area2D object
-	static inline flecs::entity CreateArea(flecs::world &world, Area2D *area_2d) {
+	static flecs::entity CreateArea(const flecs::world &world, Area2D *area_2d) {
 		if (area_2d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto area_id = area_2d->get_rid();
+		const RID area_id = area_2d->get_rid();
 		if (!area_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity()
+		const flecs::entity entity = world.entity()
 							  .set<Area2DComponent>({ area_id })
 							  .set_name(String(area_2d->get_name()).ascii().get_data());
 		ObjectIDStorage::add(area_2d, area_id);
@@ -53,56 +54,47 @@ public:
 	}
 
 	/// Create a RigidBody2D entity from a Godot RigidBody2D object
-	static inline flecs::entity CreateRigidBody(flecs::world &world, RigidBody2D *rigid_body) {
+	static flecs::entity CreateRigidBody(const flecs::world &world, RigidBody2D *rigid_body) {
 		if (rigid_body == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto body_id = rigid_body->get_rid();
+		const RID body_id = rigid_body->get_rid();
 		if (!body_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity()
+		const flecs::entity entity = world.entity()
 							  .set<Body2DComponent>({ body_id })
 							  .set_name(String(rigid_body->get_name()).ascii().get_data());
 		ObjectIDStorage::add(rigid_body, body_id);
 		return entity;
 	}
 
-	static inline flecs::entity CreatePhysicsBody(flecs::world& world, PhysicsBody2D* physics_body) {
+	static flecs::entity CreatePhysicsBody(const flecs::world& world, PhysicsBody2D* physics_body) {
 		if (physics_body == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto body_id = physics_body->get_rid();
+		const RID body_id = physics_body->get_rid();
 		if (!body_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity()
+		const flecs::entity entity = world.entity()
 							  .set<Body2DComponent>({ body_id })
 							  .set_name(String(physics_body->get_name()).ascii().get_data());
 		ObjectIDStorage::add(physics_body, body_id);
 		return entity;
 	}
-	static inline flecs::entity CreateJoint(flecs::world &world, Joint2D *joint_2d) {
+	static flecs::entity CreateJoint(const flecs::world &world, Joint2D *joint_2d) {
 		if (joint_2d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto joint_id = joint_2d->get_rid();
+		const RID joint_id = joint_2d->get_rid();
 		if (!joint_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
-		auto entity = world.entity()
+		const flecs::entity entity = world.entity()
 							  .set<Joint2DComponent>({ joint_id })
 							  .set_name(String(joint_2d->get_name()).ascii().get_data());
 		ObjectIDStorage::add(joint_2d, joint_id);
 		return entity;
-	}
-
-	static inline flecs::entity CreateSpace2D(flecs::world &world, const String &name) {
-		RID space_id = PhysicsServer2D::get_singleton()->space_create();
-		return world.entity().set<Space2DComponent>({ space_id }).set_name(name.ascii().get_data());
-	}
-
-	static inline flecs::entity CreateSpace2D(flecs::world &world, const RID &space_id, const String &name) {
-		return world.entity().set<Space2DComponent>({ space_id }).set_name(name.ascii().get_data());
 	}
 };

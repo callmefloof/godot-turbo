@@ -1,11 +1,11 @@
 #pragma once
 #include "../../../thirdparty/flecs/distr/flecs.h"
 #include "../component_module_base.h"
-#include "core/templates/rid.h"
 #include "core/string/ustring.h"
+#include "core/templates/rid.h"
 #include "core/templates/vector.h"
+
 #include <servers/rendering_server.h>
-#include "../../utility/object_id_storage.h"
 
 struct MeshComponent {
 	RID mesh_id;
@@ -23,12 +23,12 @@ struct MeshComponent {
 };
 
 struct MultiMeshComponent {
-	RID multimesh_id;
-	uint32_t instance_count;
+	RID multi_mesh_id;
+	uint32_t instance_count = 0U;
 	~MultiMeshComponent() {
 		// Ensure that the RID is released when the component is destroyed
-		if (multimesh_id.is_valid()) {
-			RenderingServer::get_singleton()->free(multimesh_id);
+		if (multi_mesh_id.is_valid()) {
+			RenderingServer::get_singleton()->free(multi_mesh_id);
 		}
 	}
 };
@@ -103,8 +103,7 @@ struct DirectionalLight2DComponent {
 	}
 };
 
-struct PointLightComponent
-{
+struct PointLightComponent {
 	RID point_light_id;
 	~PointLightComponent() {
 		if (point_light_id.is_valid()) {
@@ -113,11 +112,9 @@ struct PointLightComponent
 	}
 };
 
-struct LightOccluderComponent
-{
+struct LightOccluderComponent {
 	RID light_occluder_id;
-	~LightOccluderComponent()
-	{
+	~LightOccluderComponent() {
 		if (light_occluder_id.is_valid()) {
 			RenderingServer::get_singleton()->free(light_occluder_id);
 		}
@@ -154,17 +151,7 @@ struct VoxelGIComponent {
 struct ScenarioComponent {
 	RID id;
 };
-struct MainScenarioComonent {
-	RID id;
-	String entity_name;
-	// This is the main scenario, used for the main viewport
-	// It is used to set the default environment and camera attributes
-	// It is also used to set the default compositor
-	// It is used to set the default directional light
-	// It is used to set the default omni light
-	// It is used to set the default spot light
-	// It is used to set the default viewport
-};
+
 struct RenderInstanceComponent {
 	RID instance_id;
 	~RenderInstanceComponent() {
@@ -173,15 +160,7 @@ struct RenderInstanceComponent {
 		}
 	}
 };
-struct CanvasComponent {
-	RID canvas_id;
-	~CanvasComponent() {
-		if (canvas_id.is_valid()) {
-			RenderingServer::get_singleton()->canvas_item_clear(canvas_id);
-			RenderingServer::get_singleton()->free(canvas_id);
-		}
-	}
-};
+
 struct CanvasItemComponent {
 	RID canvas_item_id;
 	String class_name;
@@ -195,7 +174,7 @@ struct CanvasItemComponent {
 
 struct RenderingBaseComponents {
 	flecs::component<MeshComponent> mesh;
-	flecs::component<MultiMeshComponent> multimesh;
+	flecs::component<MultiMeshComponent> multi_mesh;
 	flecs::component<MultiMeshInstanceComponent> mesh_instance;
 	flecs::component<ParticlesComponent> particles;
 	flecs::component<ReflectionProbeComponent> probe;
@@ -210,15 +189,14 @@ struct RenderingBaseComponents {
 	flecs::component<SpotLightComponent> spot_light;
 	flecs::component<ViewportComponent> viewport;
 	flecs::component<ScenarioComponent> scenario;
-	flecs::component<MainScenarioComonent> main_scenario;
+
 	flecs::component<VoxelGIComponent> voxel_gi;
 	flecs::component<RenderInstanceComponent> instance;
-	flecs::component<CanvasComponent> canvas;
 	flecs::component<CanvasItemComponent> canvas_item;
 
-	RenderingBaseComponents(flecs::world &world) :
+	explicit RenderingBaseComponents(const flecs::world &world) :
 			mesh(world.component<MeshComponent>("MeshComponent")),
-			multimesh(world.component<MultiMeshComponent>("MultiMeshComponent")),
+			multi_mesh(world.component<MultiMeshComponent>("MultiMeshComponent")),
 			mesh_instance(world.component<MultiMeshInstanceComponent>("MultiMeshInstanceComponent")),
 			particles(world.component<ParticlesComponent>("ParticlesComponent")),
 			probe(world.component<ReflectionProbeComponent>("ReflectionProbeComponent")),
@@ -232,13 +210,10 @@ struct RenderingBaseComponents {
 			omni_light(world.component<OmniLightComponent>("OmniLightComponent")),
 			spot_light(world.component<SpotLightComponent>("SpotLightComponent")),
 			viewport(world.component<ViewportComponent>("ViewportComponent")),
-			voxel_gi(world.component<VoxelGIComponent>("VoxelGIComponent")),
 			scenario(world.component<ScenarioComponent>("ScenarioComponent")),
-			main_scenario(world.component<MainScenarioComonent>("MainScenarioComponent")),
+			voxel_gi(world.component<VoxelGIComponent>("VoxelGIComponent")),
 			instance(world.component<RenderInstanceComponent>("RenderInstanceComponent")),
-			canvas(world.component<CanvasComponent>("CanvasComponent")),
 			canvas_item(world.component<CanvasItemComponent>("CanvasItemComponent")) {}
 };
 
 using RenderingComponentModule = MultiComponentModule<RenderingBaseComponents>;
-	

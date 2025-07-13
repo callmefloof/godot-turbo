@@ -20,6 +20,7 @@
 #include "utility/navigation/2d/navigation2d_utility.h"
 #include "systems/rendering/mesh_render_system.h"
 #include "systems/rendering/mulitmesh_render_system.h"
+#include "../ecs/utility/scene_object_utility.h"
 
 
 
@@ -35,20 +36,17 @@ protected:
 
 public:
 	World(/* args */);
-	~World();
+	~World() override;
 	void init_world();
 	void progress();
 	// Accessor for the underlying Flecs world
 	flecs::world *get_world();
 	// Register a system with the world
 	template <typename System>
-	void register_system(const char *name = nullptr, flecs::entity phase = flecs::OnUpdate) {
+	void register_system(const char *name = nullptr, flecs::entity_t phase = flecs::OnUpdate) {
 		System().register_system(world, name, phase);
 	}
-	// Get the RenderingServer singleton
-	RenderingServer *get_rendering_server() {
-		return RenderingServer::get_singleton();
-	}
+
 };
 
 

@@ -1,9 +1,7 @@
 #pragma once
-#include "../../thirdparty/flecs/distr/flecs.h"
 #include "single_component_module.h"
 #include "core/templates/rid.h"
 #include "core/string/ustring.h"
-#include "servers/rendering_server.h"
 
 template <typename T = Resource>
 struct ResourceComponent {

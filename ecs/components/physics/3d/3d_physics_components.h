@@ -37,28 +37,18 @@
 			}
 		}
 	};
-	struct Space3DComponent {
-		RID space_id;
-		~Space3DComponent() {
-			if (space_id.is_valid()) {
-				PhysicsServer3D::get_singleton()->free(space_id);
-			}
-		}
-	};
 
 	struct Physics3DBaseComponents {
 		flecs::component<Area3DComponent> area;
 		flecs::component<Body3DComponent> body;
 		flecs::component<Joint3DComponent> joint;
 		flecs::component<SoftBody3DComponent> soft_body;
-		flecs::component<Space3DComponent> space;
 
-		Physics3DBaseComponents(flecs::world &world) :
+		explicit Physics3DBaseComponents(const flecs::world &world) :
 				area(world.component<Area3DComponent>("Area3DComponent")),
 				body(world.component<Body3DComponent>("Body3DComponent")),
 				joint(world.component<Joint3DComponent>("Joint3DComponent")),
-				soft_body(world.component<SoftBody3DComponent>("SoftBody3DComponent")),
-				space(world.component<Space3DComponent>("Space3DComponent")) {}
+				soft_body(world.component<SoftBody3DComponent>("SoftBody3DComponent")) {}
 	};
 using Physics3DComponentModule = MultiComponentModule<Physics3DBaseComponents>;
 

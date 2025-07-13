@@ -20,14 +20,6 @@ struct NavLink3DComponent {
 		}
 	}
 };
-struct NavMap3DComponent {
-	RID map_id;
-	~NavMap3DComponent() {
-		if (map_id.is_valid()) {
-			NavigationServer3D::get_singleton()->free(map_id);
-		}
-	}
-};
 struct NavObstacle3DComponent {
 	RID obstacle_id;
 	~NavObstacle3DComponent() {
@@ -56,15 +48,13 @@ struct SourceGeometryParser3DComponent {
 struct Navigation3DBaseComponents {
 	flecs::component<NavAgent3DComponent> agent;
 	flecs::component<NavLink3DComponent> link;
-	flecs::component<NavMap3DComponent> map;
 	flecs::component<NavObstacle3DComponent> obstacle;
 	flecs::component<NavRegion3DComponent> region;
 	flecs::component<SourceGeometryParser3DComponent> source_geometry_parser;
 
-	Navigation3DBaseComponents(flecs::world &world) :
+	explicit Navigation3DBaseComponents(const flecs::world &world) :
 			agent(world.component<NavAgent3DComponent>("NavAgent3DComponent")),
 			link(world.component<NavLink3DComponent>("NavLink3DComponent")),
-			map(world.component<NavMap3DComponent>("NavMap3DComponent")),
 			obstacle(world.component<NavObstacle3DComponent>("NavObstacle3DComponent")),
 			region(world.component<NavRegion3DComponent>("NavRegion3DComponent")),
 			source_geometry_parser(world.component<SourceGeometryParser3DComponent>("SourceGeometryParser3DComponent")) {}

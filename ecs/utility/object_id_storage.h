@@ -1,10 +1,8 @@
 #pragma once
 #include "core/object/object_id.h"
-#include "core/templates/oa_hash_map.h"
 #include "core/object/object.h"
 #include "core/string/ustring.h"
 #include "scene/main/node.h"
-#include "scene/main/scene_tree.h"
 
 struct ObjectIDContainer {
 	ObjectID id;
@@ -19,11 +17,11 @@ struct ObjectIDContainer {
 class ObjectIDStorage {
 
 private:
-	static inline Vector<ObjectIDContainer> object_id_pool;
+	static Vector<ObjectIDContainer> object_id_pool;
 
 public:
 
-	static inline bool add(Object *p_obj, const RID &p_rid)
+	static bool add(Object *p_obj, const RID &p_rid)
 	{
 		if (p_obj == nullptr) {
 			return false;
@@ -40,7 +38,7 @@ public:
 		return object_id_pool.append(container);
 	}
 
-	static inline bool release(const RID &p_instance) {
+	static bool release(const RID &p_instance) {
 		for (Vector<ObjectIDContainer>::Iterator it = object_id_pool.begin(); it != object_id_pool.end(); ++it) {
 			if (it->rid != p_instance) {
 				continue;
@@ -63,7 +61,7 @@ public:
 		return false;
 	}
 
-	static inline bool release(const ObjectID &p_id)
+	static bool release(const ObjectID &p_id)
 	{
 		for (Vector<ObjectIDContainer>::Iterator it = object_id_pool.begin(); it != object_id_pool.end(); ++it) {
 			if (it->id != p_id) {
@@ -72,7 +70,7 @@ public:
 			if (!p_id.is_valid()) {
 				return object_id_pool.erase(*it);
 			}
-			auto obj = ObjectDB::get_instance(p_id);
+			const auto obj = ObjectDB::get_instance(p_id);
 			auto node = Object::cast_to<Node>(obj);
 			if (node == nullptr) {
 				memdelete(obj);
@@ -87,7 +85,7 @@ public:
 		return false;
 	}
 
-	static inline bool has(const ObjectID &p_id) {
+	static bool has(const ObjectID &p_id) {
 		for (const ObjectIDContainer &container : object_id_pool) {
 			if (container.id == p_id) {
 				return true;
@@ -96,7 +94,7 @@ public:
 		return false;
 	}
 
-	static inline bool has(const RID& p_instance) {
+	static bool has(const RID& p_instance) {
 	for (const ObjectIDContainer &container : object_id_pool) {
 		if (container.rid == p_instance) {
 			return true;
@@ -104,19 +102,19 @@ public:
 	}
 	return false;
 	}
-	static inline ObjectIDContainer *get(const ObjectID &p_id) {
+	static ObjectIDContainer *get(const ObjectID &p_id) {
 		for (Vector<ObjectIDContainer>::Iterator it = object_id_pool.begin(); it != object_id_pool.end(); ++it) {
 			if (it->id == p_id) {
-				return &(*it);
+				return &*it;
 			}
 		}
 		return nullptr;
 	}
 
-	static inline ObjectIDContainer *get(const RID &p_instance) {
+	static ObjectIDContainer *get(const RID &p_instance) {
 		for (Vector<ObjectIDContainer>::Iterator it = object_id_pool.begin(); it != object_id_pool.end(); ++it) {
 			if (it->rid == p_instance) {
-				return &(*it);
+				return &*it;
 			}
 		}
 		return nullptr;
