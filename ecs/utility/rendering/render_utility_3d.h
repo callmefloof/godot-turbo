@@ -1,23 +1,25 @@
-#pragma once  
-#include "../../../thirdparty/flecs/distr/flecs.h"  
-#include "../../components/rendering/rendering_components.h"  
-#include "scene/resources/mesh.h"  
-#include "servers/rendering_server.h"
+#pragma once
+#include "../../../thirdparty/flecs/distr/flecs.h"
+#include "../../components/rendering/rendering_components.h"
+#include "../../components/transform_3d_component.h"
+#include "../object_id_storage.h"
+#include "modules/godot_turbo/ecs/components/worldcomponents.h"
+#include "scene/3d/camera_3d.h"
 #include "scene/3d/gpu_particles_3d.h"
+#include "scene/3d/light_3d.h"
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/3d/multimesh_instance_3d.h"
-#include "scene/resources/multimesh.h"
-#include "scene/3d/skeleton_3d.h"
 #include "scene/3d/reflection_probe.h"
+#include "scene/3d/skeleton_3d.h"
 #include "scene/3d/world_environment.h"
-#include "scene/3d/camera_3d.h"
-#include "scene/3d/light_3d.h"
-#include "../object_id_storage.h"
+#include "scene/resources/mesh.h"
+#include "scene/resources/multimesh.h"
+#include "servers/rendering_server.h"
 #include <core/templates/rid.h>
 #include <core/templates/vector.h>
 #include <scene/main/viewport.h>
 #include <cassert>
-#include "../../components/transform_3d_component.h"
+
 #include <scene/3d/voxel_gi.h>
 
 
@@ -30,7 +32,7 @@ private:
 	RenderUtility3D &operator=(RenderUtility3D &&) = delete; // Prevent move assignment
 
 public:
-	static flecs::entity CreateMeshInstance(const flecs::world &world, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id) {
+	static flecs::entity create_mesh_instance(const flecs::world &world, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id) {
 		Vector<RID> material_ids;
 		const uint32_t surface_count = RS::get_singleton()->mesh_get_surface_count(mesh_id);
 		for (uint32_t i = 0; i < surface_count; ++i) {
@@ -47,13 +49,13 @@ public:
 			.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateMeshInstance(const flecs::world &world, const Transform3D &transform, const RID &scenario_id, const String &name) {
+	static flecs::entity create_mesh_instance(const flecs::world &world, const Transform3D &transform, const RID &scenario_id, const String &name) {
 		Vector<RID> material_ids;
 		const RID mesh_id = RS::get_singleton()->mesh_create();
-		return CreateMeshInstance(world, mesh_id, transform, name, scenario_id);
+		return create_mesh_instance(world, mesh_id, transform, name, scenario_id);
 	}
 
-	static flecs::entity CreateMeshInstance(const flecs::world &world, MeshInstance3D* mesh_instance_3d)
+	static flecs::entity create_mesh_instance(const flecs::world &world, MeshInstance3D* mesh_instance_3d)
 	{
 		Vector<RID> material_ids;
 		const Ref<Mesh> mesh = mesh_instance_3d->get_mesh();
@@ -74,7 +76,7 @@ public:
 				.set_name(String(mesh->get_name()).ascii().get_data());
 	}
 
-	static flecs::entity CreateMultiMesh(const flecs::world &world,
+	static flecs::entity create_multi_mesh(const flecs::world &world,
 			const Transform3D &transform,
 			const uint32_t size,
 			const RID &mesh_id,
@@ -101,7 +103,7 @@ public:
 	}
 
 
-	static flecs::entity CreateMultiMesh(const flecs::world &world, MultiMeshInstance3D* multi_mesh_instance) {
+	static flecs::entity create_multi_mesh(const flecs::world &world, MultiMeshInstance3D* multi_mesh_instance) {
 		const RID instance_id = multi_mesh_instance->get_instance();
 		const RID multi_mesh_id = multi_mesh_instance->get_multimesh()->get_rid();
 		const RID mesh_id = multi_mesh_instance->get_multimesh()->get_mesh()->get_rid();
@@ -134,7 +136,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static Vector<flecs::entity> CreateMultiMeshInstances(
+	static Vector<flecs::entity> create_multi_mesh_instances(
 			const flecs::world &world,
 			const Vector<Transform3D> &transform,
 			const flecs::entity& multi_mesh) {
@@ -224,7 +226,7 @@ public:
 				.set_name(String(skeleton_3d->get_name()).ascii().get_data());
 	}
 
-	static flecs::entity CreateEnvironment(const flecs::world &world, const RID &environment_id, const String &name) {
+	static flecs::entity create_environment(const flecs::world &world, const RID &environment_id, const String &name) {
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
 		}
@@ -233,7 +235,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateEnvironment(const flecs::world &world, WorldEnvironment* world_environment) {
+	static flecs::entity create_environment(const flecs::world &world, WorldEnvironment* world_environment) {
 		if (world_environment == nullptr) {
 			ERR_FAIL_COND_V(world_environment == nullptr, flecs::entity());
 		}
@@ -248,14 +250,14 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateCamera(const flecs::world &world, const RID &camera_id,const Transform3D &transform, const String& name) {
+	static flecs::entity create_camera(const flecs::world &world, const RID &camera_id,const Transform3D &transform, const String& name) {
 		return world.entity()  
 				.set<CameraComponent>({ camera_id })
 				.set<Transform3DComponent>({ transform })
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateCamera(const flecs::world &world, const Transform3D &transform, const String &name) {
+	static flecs::entity create_camera(const flecs::world &world, const Transform3D &transform, const String &name) {
 		const RID camera_id = RS::get_singleton()->camera_create();
 		if (!camera_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
@@ -266,7 +268,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateCamera(const flecs::world &world, Camera3D *camera_3d) {
+	static flecs::entity create_camera(const flecs::world &world, Camera3D *camera_3d) {
 		if (camera_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -305,7 +307,7 @@ public:
 	}
 
 
-	static flecs::entity CreateDirectionalLight(const flecs::world &world, const RID &light_id, const Transform3D& transform, const String &name) {
+	static flecs::entity create_directional_light(const flecs::world &world, const RID &light_id, const Transform3D& transform, const String &name) {
 		if (!light_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -319,7 +321,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateDirectionalLight(const flecs::world &world, const Transform3D &transform, const String &name) {
+	static flecs::entity create_directional_light(const flecs::world &world, const Transform3D &transform, const String &name) {
 		const RID directional_light_id = RS::get_singleton()->directional_light_create();
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
@@ -331,7 +333,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateDirectionalLight(const flecs::world &world, DirectionalLight3D *directional_light) {
+	static flecs::entity create_directional_light(const flecs::world &world, DirectionalLight3D *directional_light) {
 		if (directional_light == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -344,14 +346,14 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateOmniLight(const flecs::world &world, const RID &light_id, const Transform3D &transform, const RID &scenario_id) {
+	static flecs::entity create_omni_light(const flecs::world &world, const RID &light_id, const Transform3D &transform, const RID &scenario_id) {
 		return world.entity("OmniLight")
 				.set<OmniLightComponent>({ light_id })
 				.set<Transform3DComponent>({ transform })
 				.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(light_id, scenario_id) });
 	}
 
-	static flecs::entity CreateOmniLight(const flecs::world &world, const Transform3D &transform, const RID &scenario_id) {
+	static flecs::entity create_omni_light(const flecs::world &world, const Transform3D &transform, const RID &scenario_id) {
 		const RID omni_light_id = RS::get_singleton()->omni_light_create();
 		return world.entity("OmniLight")
 				.set<OmniLightComponent>({ omni_light_id })
@@ -359,7 +361,7 @@ public:
 				.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(omni_light_id, scenario_id) });
 	}
 
-	static flecs::entity CreateOmniLight(const flecs::world &world, OmniLight3D *omni_light) {
+	static flecs::entity create_omni_light(const flecs::world &world, OmniLight3D *omni_light) {
 		if (omni_light == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -371,7 +373,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateSpotLight(const flecs::world &world, const RID &light_id, const Transform3D &transform, const String &name) {
+	static flecs::entity create_spot_light(const flecs::world &world, const RID &light_id, const Transform3D &transform, const String &name) {
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
 		}
@@ -382,7 +384,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateSpotLight(const flecs::world &world, const Transform3D &transform, const String &name) {
+	static flecs::entity create_spot_light(const flecs::world &world, const Transform3D &transform, const String &name) {
 		const RID spot_light_id = RS::get_singleton()->spot_light_create();
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
@@ -394,7 +396,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateSpotLight(const flecs::world &world, SpotLight3D *spot_light) {
+	static flecs::entity create_spot_light(const flecs::world &world, SpotLight3D *spot_light) {
 		if (spot_light == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -408,13 +410,13 @@ public:
 
 
 
-	static flecs::entity CreateViewport(const flecs::world &world, const RID &viewport_id, const String &name) {
+	static flecs::entity create_viewport(const flecs::world &world, const RID &viewport_id, const String &name) {
 		return world.entity()
 				.set<ViewportComponent>({ viewport_id })
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateViewport(const flecs::world &world, Viewport *viewport) {
+	static flecs::entity create_viewport(const flecs::world &world, Viewport *viewport) {
 		if (viewport == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -424,7 +426,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateVoxelGI(const flecs::world &world, const RID &voxel_gi_id, const Transform3D& transform, const String &name) {
+	static flecs::entity create_voxel_gi(const flecs::world &world, const RID &voxel_gi_id, const Transform3D& transform, const String &name) {
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
 		}
@@ -435,7 +437,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity_t CreateVoxelGI(const flecs::world &world, const Transform3D &transform, const String &name) {
+	static flecs::entity_t create_voxel_gi(const flecs::world &world, const Transform3D &transform, const String &name) {
 		const RID voxel_gi_id = RS::get_singleton()->voxel_gi_create();
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
@@ -447,7 +449,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateVoxelGI(const flecs::world &world, VoxelGI *voxel_gi) {
+	static flecs::entity create_voxel_gi(const flecs::world &world, VoxelGI *voxel_gi) {
 		if (voxel_gi == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}

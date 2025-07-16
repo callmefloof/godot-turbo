@@ -4,16 +4,19 @@
 #include "single_component_module.h"
 #include <cassert>
 
-struct Transform2DComponent : ScriptVisibleComponent {
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "transform",transform, Variant::TRANSFORM2D);
-	}
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict["transform"] = transform;
-		return dict;
-	}
+struct Transform2DComponent {
 	Transform2D transform;
 };
+
+#define TRANSFORM_3D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(Transform2D, transform)\
+
+#define TRANSFORM_3D_COMPONENT_BINDINGS\
+BIND_PROPERTY(Transform2D, transform, Transform2DComponentRef)\
+
+DEFINE_COMPONENT_PROXY(Transform2DComponentRef, Transform2DComponent,
+TRANSFORM_3D_COMPONENT_PROPERTIES,
+TRANSFORM_3D_COMPONENT_BINDINGS);
+
 using Transform2DComponentModule = SingleComponentModule<Transform2DComponent>;
 

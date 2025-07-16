@@ -11,32 +11,35 @@
 #include "../../../../servers/physics_server_3d.h"
 #include "../../../../servers/navigation_server_2d.h"
 #include "../../../../servers/navigation_server_3d.h"
+#include "component_proxy.h"
 
-struct World2DComponent : ScriptVisibleComponent {
+struct World2DComponent {
 	RID canvas_id;
 	RID navigation_map_id;
 	RID space_id;
 	bool is_valid() const { return canvas_id.is_valid() && navigation_map_id.is_valid() && space_id.is_valid(); }
 	bool is_null() const { return canvas_id.is_null() && navigation_map_id.is_null() && space_id.is_null(); }
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "canvas_id", canvas_id, Variant::RID);
-		SET_SCRIPT_COMPONENT_VALUE(dict, "navigation_map_id", navigation_map_id, Variant::RID);
-		SET_SCRIPT_COMPONENT_VALUE(dict, "space_id", space_id, Variant::RID);
-
-	}
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict["canvas_id"] = canvas_id;
-		dict["navigation_map_id"] = navigation_map_id;
-		dict["space_id"] = space_id;
-		return dict;
-	}
 	virtual ~World2DComponent() {
 		RenderingServer::get_singleton()->free(canvas_id);
 		NavigationServer2D::get_singleton()->free(navigation_map_id);
 		PhysicsServer2D::get_singleton()->free(space_id);
 	}
 };
+
+#define WORLD_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, canvas_id)\
+DEFINE_PROPERTY(RID, navigation_map_id)\
+DEFINE_PROPERTY(RID, space_id)\
+
+#define WORLD_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, canvas_id, World2DComponentRef)\
+BIND_PROPERTY(RID, navigation_map_id, World2DComponentRef)\
+BIND_PROPERTY(RID, space_id, World2DComponentRef)\
+
+DEFINE_COMPONENT_PROXY(World2DComponentRef, World2DComponent,
+WORLD_2D_COMPONENT_PROPERTIES,
+WORLD_2D_COMPONENT_BINDINGS);
+
 using World2DComponentModule = SingleComponentModule<World2DComponent>;
 
 struct World3DComponent {
@@ -71,7 +74,26 @@ struct World3DComponent {
 		PhysicsServer3D::get_singleton()->free(space_id);
 	}
 };
+
+#define WORLD_3D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, camera_attributes_id)\
+DEFINE_PROPERTY(RID, environment_id)\
+DEFINE_PROPERTY(RID, fallback_environment_id)\
+DEFINE_PROPERTY(RID, navigation_map_id)\
+DEFINE_PROPERTY(RID, scenario_id)\
+DEFINE_PROPERTY(RID, space_id)\
+
+#define WORLD_3D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, camera_attributes_id, World3DComponentRef)\
+BIND_PROPERTY(RID, environment_id, World3DComponentRef)\
+BIND_PROPERTY(RID, fallback_environment_id, World3DComponentRef)\
+BIND_PROPERTY(RID, navigation_map_id, World3DComponentRef)\
+BIND_PROPERTY(RID, scenario_id, World3DComponentRef)\
+BIND_PROPERTY(RID, space_id, World3DComponentRef)\
+
+DEFINE_COMPONENT_PROXY(World3DComponentRef, World3DComponent,
+WORLD_3D_COMPONENT_PROPERTIES,
+WORLD_3D_COMPONENT_BINDINGS);
+
 using World3DComponentModule = SingleComponentModule<World3DComponent>;
-
-
 #endif //WORLDCOMPONENTS_H

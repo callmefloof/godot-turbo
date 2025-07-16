@@ -2,90 +2,138 @@
 #include "../../../../thirdparty/flecs/distr/flecs.h"
 #include "../../component_module_base.h"
 #include "core/templates/rid.h"
-#include "modules/godot_turbo/ecs/components/script_visible_component.h"
+#include "modules/godot_turbo/ecs/components/component_proxy.h"
 #include "servers/navigation_server_2d.h"
-struct NavAgent2DComponent  : ScriptVisibleComponent{
-	RID agent_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["agent_id"] = agent_id;
-		return dict;
+#include "../../../flecs_types/flecs_component.h"
+#include "../../../flecs_types/flecs_entity.h"
 
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "agent_id", agent_id, Variant::RID);
-	}
+struct NavAgent2DComponent {
+	RID agent_id;
 	~NavAgent2DComponent() {
 		if (agent_id.is_valid()) {
 			NavigationServer2D::get_singleton()->free(agent_id);
 		}
 	}
 };
-struct NavLink2DComponent  : ScriptVisibleComponent{
+
+#define NAV_AGENT_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, agent_id)\
+
+
+#define NAV_AGENT_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, agent_id, NavAgent2DComponentRef)\
+
+#define NAV_AGENT_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, agent_id))\
+
+#define NAV_AGENT_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(agent_id)\
+
+DEFINE_COMPONENT_PROXY(NavAgent2DComponentRef, NavAgent2DComponent,
+NAV_AGENT_2D_COMPONENT_PROPERTIES,
+NAV_AGENT_2D_COMPONENT_BINDINGS);
+
+struct NavLink2DComponent {
 	RID link_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["link_id"] = link_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "link_id", link_id, Variant::RID);
-	}
 	~NavLink2DComponent() {
 		if (link_id.is_valid()) {
 			NavigationServer2D::get_singleton()->free(link_id);
 		}
 	}
 };
-struct NavObstacle2DComponent  : ScriptVisibleComponent{
+
+#define NAV_LINK_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, link_id)\
+
+
+#define NAV_LINK_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, link_id, NavLink2DComponentRef)\
+
+#define NAV_LINK_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, link_id))\
+
+#define NAV_LINK_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(link_id)\
+
+DEFINE_COMPONENT_PROXY(NavLink2DComponentRef, NavLink2DComponent,
+NAV_LINK_2D_COMPONENT_PROPERTIES,
+NAV_LINK_2D_COMPONENT_BINDINGS);
+
+struct NavObstacle2DComponent {
 	RID obstacle_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["obstacle_id"] = obstacle_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "obstacle_id", obstacle_id, Variant::RID);
-	}
 	~NavObstacle2DComponent() {
 		if (obstacle_id.is_valid()) {
 			NavigationServer2D::get_singleton()->free(obstacle_id);
 		}
 	}
 };
-struct NavRegion2DComponent  : ScriptVisibleComponent {
+
+#define NAV_OBSTACLE_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, obstacle_id)\
+
+
+#define NAV_OBSTACLE_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, obstacle_id, NavObstacle2DComponentRef)\
+
+#define NAV_OBSTACLE_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, obstacle_id))\
+
+#define NAV_OBSTACLE_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(obstacle_id)\
+
+DEFINE_COMPONENT_PROXY(NavObstacle2DComponentRef, NavObstacle2DComponent,
+NAV_OBSTACLE_2D_COMPONENT_PROPERTIES,
+NAV_OBSTACLE_2D_COMPONENT_BINDINGS);
+
+struct NavRegion2DComponent {
 	RID region_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["region_id"] = region_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "region_id", region_id, Variant::RID);
-	}
 	~NavRegion2DComponent() {
 		if (region_id.is_valid()) {
 			NavigationServer2D::get_singleton()->free(region_id);
 		}
 	}
 };
-struct SourceGeometryParser2DComponent : ScriptVisibleComponent {
-	RID source_geometry_parser_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["source_geometry_parser_id"] = source_geometry_parser_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "source_geometry_parser_id",source_geometry_parser_id, Variant::RID);
 
-	}
+#define NAV_REGION_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, region_id)\
+
+#define NAV_REGION_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, region_id, NavRegion2DComponentRef)\
+
+#define NAV_REGION_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, region_id))\
+
+#define NAV_REGION_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(region_id)\
+
+DEFINE_COMPONENT_PROXY(NavRegion2DComponentRef, NavRegion2DComponent,
+NAV_REGION_2D_COMPONENT_PROPERTIES,
+NAV_REGION_2D_COMPONENT_BINDINGS);
+
+struct SourceGeometryParser2DComponent {
+	RID source_geometry_parser_id;
 	~SourceGeometryParser2DComponent() {
 		if (source_geometry_parser_id.is_valid()) {
 			NavigationServer2D::get_singleton()->free(source_geometry_parser_id);
 		}
 	}
 };
+
+#define SOURCE_GEOMETRY_PARSER_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, source_geometry_parser_id)\
+
+#define SOURCE_GEOMETRY_PARSER_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, source_geometry_parser_id, SourceGeometryParser2DComponentRef)\
+
+#define SOURCE_GEOMETRY_PARSER_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, source_geometry_parser_id))\
+
+#define SOURCE_GEOMETRY_PARSER_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(source_geometry_parser_id)\
+
+DEFINE_COMPONENT_PROXY(SourceGeometryParser2DComponentRef, SourceGeometryParser2DComponent,
+SOURCE_GEOMETRY_PARSER_2D_COMPONENT_PROPERTIES,
+SOURCE_GEOMETRY_PARSER_2D_COMPONENT_BINDINGS);
 
 struct Navigation2DBaseComponents {
 	flecs::component<NavAgent2DComponent> agent;

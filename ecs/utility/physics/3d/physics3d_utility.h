@@ -19,7 +19,7 @@ private:
 	Physics3DUtility &operator=(Physics3DUtility &&) = delete; // Prevent move assignment
 
 public:
-	static flecs::entity CreateArea(const flecs::world &world, const String &name, const RID &space_id) {
+	static flecs::entity create_area(const flecs::world &world, const String &name, const RID &space_id) {
 		const RID area_id = PhysicsServer3D::get_singleton()->area_create();
 		PhysicsServer3D::get_singleton()->area_set_space(area_id, space_id);
 		return world.entity().set<Area3DComponent>({ area_id }).set_name(name.ascii().get_data());
@@ -31,20 +31,20 @@ public:
 		return world.entity().set<Body3DComponent>({ body_id }).set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateJoint(const flecs::world &world, const String &name, const RID &space_id) {
+	static flecs::entity create_joint(const flecs::world &world, const String &name, const RID &space_id) {
 		const RID joint_id = PhysicsServer3D::get_singleton()->joint_create();
 		//PhysicsServer3D::get_singleton()->joint(joint_id, space_id);
 		return world.entity().set<Joint3DComponent>({ joint_id }).set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateSoftBody(const flecs::world &world, const String &name, const RID &space_id) {
+	static flecs::entity create_soft_body(const flecs::world &world, const String &name, const RID &space_id) {
 		const RID soft_body_id = PhysicsServer3D::get_singleton()->soft_body_create();
 		PhysicsServer3D::get_singleton()->soft_body_set_space(soft_body_id, space_id);
 		return world.entity().set<SoftBody3DComponent>({ soft_body_id }).set_name(name.ascii().get_data());
 	}
 
 	/// Create an Area3D entity from a Godot Area3D object
-	static flecs::entity CreateArea(const flecs::world &world, Area3D *area_3d) {
+	static flecs::entity create_area(const flecs::world &world, Area3D *area_3d) {
 		if (area_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -60,7 +60,7 @@ public:
 	}
 
 	/// Create a RigidBody3D entity from a Godot RigidBody3D object
-	static flecs::entity CreateRigidBody(const flecs::world &world, RigidBody3D *body_3d) {
+	static flecs::entity create_rigid_body(const flecs::world &world, RigidBody3D *body_3d) {
 		if (body_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -76,7 +76,7 @@ public:
 	}
 
 	
-	static flecs::entity CreatePhysicsBody(const flecs::world &world, PhysicsBody3D *physics_body) {
+	static flecs::entity create_physics_body(const flecs::world &world, PhysicsBody3D *physics_body) {
 		if (physics_body == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -91,7 +91,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateJoint(const flecs::world &world, Joint3D *joint_3d) {
+	static flecs::entity create_joint(const flecs::world &world, Joint3D *joint_3d) {
 		if (joint_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -106,7 +106,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateSoftBody(const flecs::world &world, SoftBody3D *soft_body_3d) {
+	static flecs::entity create_soft_body(const flecs::world &world, SoftBody3D *soft_body_3d) {
 		if (soft_body_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}

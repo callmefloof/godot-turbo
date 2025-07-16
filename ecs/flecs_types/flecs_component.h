@@ -1,54 +1,65 @@
 //
-// Created by Floof on 13-7-2025.
+// Created by Floof on 14-7-2025.
 //
 
-#ifndef FLECSCOMPONENENT_H
-#define FLECSCOMPONENENT_H
+#pragma once
 #include "../../../../core/object/object.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../thirdparty/flecs/distr/flecs.h"
-#include "../../../../core/string/ustring.h"
-#include "../../../../core/variant/dictionary.h"
-#include "../components/script_visible_component.h"
+#include "../../../../core/typedefs.h"
+#include "flecs_component_base.h"
+#include "flecs_entity.h"
+#include "../../thirdparty/nameof/include/nameof.hpp"
 
-
-#include <typeinfo>
-
-template <typename T = ScriptVisibleComponent>
-class FlecsComponent : public RefCounted {
-private:
-	T &component_ref;
-	String component_name;
-	flecs::component<T> component;
-	flecs::world& world;
-	Dictionary component_metadata;
-
+template <typename T>
+class FlecsComponent : public FlecsComponentBase {
+	GDCLASS(FlecsComponent, FlecsComponentBase);
+protected:
+	T* data = nullptr;
 public:
-	static Ref<FlecsComponent> create(String component_type, Dictionary data, Dictionary metadata);
-	static Ref<FlecsComponent> create(String component_type, Dictionary data, Dictionary metadata);
-
-	static Ref<FlecsComponent> create_new_type(String component_type, Dictionary data, Dictionary metadata);
-
-	Dictionary get_component() {}
-	void set_component(String component_type, Dictionary data, Dictionary metadata);
-	void set_component(String component_type, Dictionary data);
-
-	String get_component_name();
-	FlecsComponent();
-	~FlecsComponent() override = default;
+	T* get_data();
+	flecs::entity *get_owner() const;
+	void set_owner(flecs::entity *p_owner);
+	void commit_to_entity(const Ref<FlecsEntity>& entity);
+	void set_data(T* d);
+	flecs::entity* get_component() const override;
+	virtual StringName get_type_name() const override;
+	static void _bind_methods();
 };
 
 template <typename T>
-void FlecsComponent<T>::set_component(String component_type, Dictionary data, Dictionary metadata) {
-	component_name = component_type;
-	component.set_name(component_name);
-	component_metadata = metadata;
+T* FlecsComponent<T>::get_data(){
+	return data;
+}
 
+template <typename T>
+flecs::entity* FlecsComponent<T>::get_owner() const {
+	return owner;
+}
+
+template<typename T>
+void FlecsComponent<T>::set_owner(flecs::entity *p_owner) {owner = p_owner;}
+
+template <typename T>
+void FlecsComponent<T>::commit_to_entity(const Ref<FlecsEntity>& entity) {
+	if (!entity.is_valid() || entity.is_null()) {
+		ERR_PRINT("Entity is not valid");
+	}
+	const flecs::entity e = entity->get_entity();
+	if (data) {
+		e.set<T>(*data);
+	}
 }
 template <typename T>
-String FlecsComponent<T>::get_component_name() {
+void FlecsComponent<T>::set_data(T *d) {
+	data = d;
 }
 template <typename T>
-FlecsComponent<T>::FlecsComponent() {
+flecs::entity *FlecsComponent<T>::get_component() const {
+	return owner->get<T>();
 }
-#endif //FLECSCOMPONENENT_H
+template <typename T>
+void FlecsComponent<T>::_bind_methods() {
+}
+
+template <typename T>
+StringName FlecsComponent<T>::get_type_name() const { return String(get_class_name()) + "<" + NAMEOF_TYPE(T) + ">"; }
+
