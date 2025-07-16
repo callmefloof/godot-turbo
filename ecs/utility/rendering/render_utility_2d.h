@@ -15,6 +15,8 @@
 #include <scene/2d/light_2d.h>
 #include <scene/2d/light_occluder_2d.h>
 #include <scene/2d/mesh_instance_2d.h>
+#include "../flecs_types/flecs_world.h"
+
 
 
 class RenderUtility2D
