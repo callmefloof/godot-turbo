@@ -18,7 +18,7 @@ private:
 	Physics2DUtility &operator=(Physics2DUtility &&) = delete; // Prevent move assignment
 
 public:
-	static flecs::entity CreateArea(const flecs::world &world, const String &name, const RID &space_id) {
+	static flecs::entity create_area(const flecs::world &world, const String &name, const RID &space_id) {
 		const RID area_id = PhysicsServer2D::get_singleton()->area_create();
 		PhysicsServer2D::get_singleton()->area_set_space(area_id, space_id);
 		return world.entity().set<Area2DComponent>({ area_id }).set_name(name.ascii().get_data());
@@ -30,7 +30,7 @@ public:
 		return world.entity().set<Body2DComponent>({ body_id }).set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateJoint(const flecs::world &world, const String &name, const RID &space_id) {
+	static flecs::entity create_joint(const flecs::world &world, const String &name, const RID &space_id) {
 		const RID joint_id = PhysicsServer2D::get_singleton()->joint_create();
 		//no way to find to space?
 		//PhysicsServer2D::get_singleton()->joint(joint_id, space_id);
@@ -38,7 +38,7 @@ public:
 	}
 
 	/// Create an Area2D entity from a Godot Area2D object
-	static flecs::entity CreateArea(const flecs::world &world, Area2D *area_2d) {
+	static flecs::entity create_area(const flecs::world &world, Area2D *area_2d) {
 		if (area_2d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -54,7 +54,7 @@ public:
 	}
 
 	/// Create a RigidBody2D entity from a Godot RigidBody2D object
-	static flecs::entity CreateRigidBody(const flecs::world &world, RigidBody2D *rigid_body) {
+	static flecs::entity create_rigid_body(const flecs::world &world, RigidBody2D *rigid_body) {
 		if (rigid_body == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -69,7 +69,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreatePhysicsBody(const flecs::world& world, PhysicsBody2D* physics_body) {
+	static flecs::entity create_physics_body(const flecs::world& world, PhysicsBody2D* physics_body) {
 		if (physics_body == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -83,7 +83,7 @@ public:
 		ObjectIDStorage::add(physics_body, body_id);
 		return entity;
 	}
-	static flecs::entity CreateJoint(const flecs::world &world, Joint2D *joint_2d) {
+	static flecs::entity create_joint(const flecs::world &world, Joint2D *joint_2d) {
 		if (joint_2d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}

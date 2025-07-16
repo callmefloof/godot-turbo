@@ -1,28 +1,18 @@
 #pragma once
 #include "../../../thirdparty/flecs/distr/flecs.h"
 #include "../component_module_base.h"
-#include "core/string/ustring.h"
-#include "core/templates/rid.h"
-#include "core/templates/vector.h"
-#include "modules/godot_turbo/ecs/components/script_visible_component.h"
+#include "../../../../core/templates/rid.h"
+#include "../../../../core/os/memory.h"
+#include "../../../../core/templates/vector.h"
+#include "../../../../modules/godot_turbo/ecs/components/component_proxy.h"
+#include "../../../../servers/rendering_server.h"
+#include "../../../../core/variant/typed_array.h"
 
-#include <servers/rendering_server.h>
-
-struct MeshComponent : ScriptVisibleComponent{
+struct MeshComponent {
 	RID mesh_id;
-	Vector<RID> material_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["mesh_id"] = mesh_id;
-		dict["material_id"] = material_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "mesh_id", mesh_id, Variant::RID);
-		SET_SCRIPT_COMPONENT_VALUE(dict, "material_id", material_id, Variant::RID);
-	}
-	virtual ~MeshComponent() {
-		for (const RID &mat_id : material_id) {
+	Vector<RID> material_ids;
+	~MeshComponent() {
+		for (const RID &mat_id : material_ids) {
 			if (mat_id.is_valid()) {
 				RenderingServer::get_singleton()->free(mat_id);
 			}
@@ -33,20 +23,23 @@ struct MeshComponent : ScriptVisibleComponent{
 	}
 };
 
-struct MultiMeshComponent : ScriptVisibleComponent {
+#define MESH_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, mesh_id, MeshComponent)\
+DEFINE_PROPERTY_ARRAY(RID, material_ids, MeshComponent)\
+
+
+#define MESH_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, mesh_id, MeshComponentRef)\
+BIND_VECTOR_PROPERTY(RID, material_ids, MeshComponentRef)\
+
+DEFINE_COMPONENT_PROXY(MeshComponentRef, MeshComponent,
+MESH_COMPONENT_PROPERTIES,
+MESH_COMPONENT_BINDINGS);
+
+struct MultiMeshComponent {
 	RID multi_mesh_id;
 	uint32_t instance_count = 0U;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["instance_count"] = instance_count;
-		dict["multi_mesh_id"] = multi_mesh_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "instance_count", instance_count, Variant::INT);
-		SET_SCRIPT_COMPONENT_VALUE(dict, "multi_mesh_id", multi_mesh_id, Variant::RID);
-	}
-	virtual ~MultiMeshComponent() {
+	~MultiMeshComponent() {
 		// Ensure that the RID is released when the component is destroyed
 		if (multi_mesh_id.is_valid()) {
 			RenderingServer::get_singleton()->free(multi_mesh_id);
@@ -54,288 +47,401 @@ struct MultiMeshComponent : ScriptVisibleComponent {
 	}
 };
 
-struct MultiMeshInstanceComponent : ScriptVisibleComponent {
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["index"] = index;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "index", index, Variant::INT);
-	}
+#define MULTI_MESH_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, multi_mesh_id, MultiMeshComponent)\
+DEFINE_PROPERTY(uint32_t, instance_count,MultiMeshComponent)\
+
+
+#define MULTI_MESH_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, multi_mesh_id, MultiMeshComponentRef)\
+BIND_PROPERTY(uint32_t, instance_count, MultiMeshComponentRef)\
+
+
+ DEFINE_COMPONENT_PROXY(MultiMeshComponentRef, MultiMeshComponent,
+ MULTI_MESH_COMPONENT_PROPERTIES,
+ MULTI_MESH_COMPONENT_BINDINGS);
+
+
+struct MultiMeshInstanceComponent {
 	uint32_t index;
 };
 
-struct ParticlesComponent : ScriptVisibleComponent{
+#define MULTI_MESH_INSTANCE_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(uint32_t, index,MultiMeshInstanceComponent )\
+
+
+#define MULTI_MESH_INSTANCE_COMPONENT_BINDINGS\
+BIND_PROPERTY(uint32_t, index, MultiMeshInstanceComponentRef)\
+
+
+DEFINE_COMPONENT_PROXY(MultiMeshInstanceComponentRef, MultiMeshInstanceComponent,
+MULTI_MESH_INSTANCE_COMPONENT_PROPERTIES,
+MULTI_MESH_INSTANCE_COMPONENT_BINDINGS);
+
+struct ParticlesComponent {
 	RID particles_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["particles_id"] = particles_id;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "particles_id", particles_id, Variant::RID);
-	}
-	virtual ~ParticlesComponent() {
+	~ParticlesComponent() {
 		if (particles_id.is_valid()) {
 			RenderingServer::get_singleton()->free(particles_id);
 		}
 	}
 };
-struct ReflectionProbeComponent : ScriptVisibleComponent{
+
+#define PARTICLES_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, particles_id, ParticlesComponent)\
+
+
+#define PARTICLES_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, particles_id, ParticlesComponentRef)\
+
+#define PARTICLES_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, particles_id))\
+
+#define PARTICLES_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(particles_id)\
+
+DEFINE_COMPONENT_PROXY(ParticlesComponentRef, ParticlesComponent,
+PARTICLES_COMPONENT_PROPERTIES,
+PARTICLES_COMPONENT_BINDINGS);
+
+struct ReflectionProbeComponent {
 	RID probe_id;
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict["probe_id"] = probe_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "probe_id", probe_id, Variant::RID);
-	}
-	virtual ~ReflectionProbeComponent() {
+	~ReflectionProbeComponent() {
 		if (probe_id.is_valid()) {
 			RenderingServer::get_singleton()->free(probe_id);
 		}
 	}
 };
-struct SkeletonComponent : ScriptVisibleComponent {
+
+#define REFLECTION_PROBE_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, probe_id, ReflectionProbeComponent)\
+
+
+#define REFLECTION_PROBE_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, probe_id, ReflectionProbeComponentRef)\
+
+#define REFLECTION_PROBE_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, probe_id))\
+
+#define REFLECTION_PROBE_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(probe_id)\
+
+DEFINE_COMPONENT_PROXY(ReflectionProbeComponentRef, ReflectionProbeComponent,
+REFLECTION_PROBE_COMPONENT_PROPERTIES,
+REFLECTION_PROBE_COMPONENT_BINDINGS);
+
+struct SkeletonComponent {
 	RID skeleton_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["skeleton_id"] = skeleton_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "skeleton_id", skeleton_id, Variant::RID);
-	}
-	virtual ~SkeletonComponent() {
+	~SkeletonComponent() {
 		if (skeleton_id.is_valid()) {
 			RenderingServer::get_singleton()->free(skeleton_id);
 		}
 	}
 };
-struct EnvironmentComponent : ScriptVisibleComponent{
+
+#define SKELETON_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, skeleton_id,SkeletonComponent)\
+
+
+#define SKELETON_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, skeleton_id, SkeletonComponentRef)\
+
+#define SKELETON_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, skeleton_id))\
+
+#define SKELETON_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(skeleton_id)\
+
+DEFINE_COMPONENT_PROXY(SkeletonComponentRef, SkeletonComponent,
+SKELETON_COMPONENT_PROPERTIES,
+SKELETON_COMPONENT_BINDINGS);
+
+struct EnvironmentComponent {
 	RID environment_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["environment_id"] = environment_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "environment_id", environment_id, Variant::RID);
-	}
-	virtual ~EnvironmentComponent() {
+	~EnvironmentComponent() {
 		if (environment_id.is_valid()) {
 			RenderingServer::get_singleton()->free(environment_id);
 		}
 	}
 };
-struct CameraComponent : ScriptVisibleComponent{
+
+#define ENVIRONMENT_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, environment_id,EnvironmentComponent)\
+
+
+#define ENVIRONMENT_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, environment_id, EnvironmentComponentRef)\
+
+#define ENVIRONMENT_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, environment_id))\
+
+#define ENVIRONMENT_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(environment_id)\
+
+DEFINE_COMPONENT_PROXY(EnvironmentComponentRef, EnvironmentComponent,
+ENVIRONMENT_COMPONENT_PROPERTIES,
+ENVIRONMENT_COMPONENT_BINDINGS);
+
+struct CameraComponent {
 	RID camera_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["camera_id"] = camera_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "camera_id", camera_id, Variant::RID);
-	}
-	virtual ~CameraComponent() {
+	~CameraComponent() {
 		if (camera_id.is_valid()) {
 			RenderingServer::get_singleton()->free(camera_id);
 		}
 	}
 };
-struct CompositorComponent : ScriptVisibleComponent{
+
+#define CAMERA_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, camera_id,CameraComponent)\
+
+
+#define CAMERA_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, camera_id, CameraComponentRef)\
+
+#define CAMERA_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, camera_id))\
+
+#define CAMERA_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(camera_id)\
+
+DEFINE_COMPONENT_PROXY(CameraComponentRef, CameraComponent,
+CAMERA_COMPONENT_PROPERTIES,
+CAMERA_COMPONENT_BINDINGS);
+
+struct CompositorComponent {
 	RID compositor_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["compositor_id"] = compositor_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "compositor_id", compositor_id, Variant::RID);
-	}
-	virtual ~CompositorComponent() {
+	~CompositorComponent() {
 		if (compositor_id.is_valid()) {
 			RenderingServer::get_singleton()->free(compositor_id);
 		}
 	}
 };
-struct DirectionalLight3DComponent : ScriptVisibleComponent {
+
+#define COMPOSITOR_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, compositor_id,CompositorComponent)\
+
+
+#define COMPOSITOR_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, compositor_id, CompositorComponentRef)\
+
+DEFINE_COMPONENT_PROXY(CompositorComponentRef, CompositorComponent,
+COMPOSITOR_COMPONENT_PROPERTIES,
+COMPOSITOR_COMPONENT_BINDINGS);
+
+struct DirectionalLight3DComponent {
 	RID directional_light_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["directional_light_id"] = directional_light_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "directional_light_id", directional_light_id, Variant::RID);
-	}
-	virtual ~DirectionalLight3DComponent() {
+	~DirectionalLight3DComponent() {
 		if (directional_light_id.is_valid()) {
 			RenderingServer::get_singleton()->free(directional_light_id);
 		}
 	}
 };
 
-struct DirectionalLight2DComponent : ScriptVisibleComponent {
+#define DIRECTIONAL_LIGHT_3D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, directional_light_id,DirectionalLight3DComponent)\
+
+
+#define DIRECTIONAL_LIGHT_3D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, directional_light_id, DirectionalLight3DComponentRef)\
+
+DEFINE_COMPONENT_PROXY(DirectionalLight3DComponentRef, DirectionalLight3DComponent,
+DIRECTIONAL_LIGHT_3D_COMPONENT_PROPERTIES,
+DIRECTIONAL_LIGHT_3D_COMPONENT_BINDINGS);
+
+struct DirectionalLight2DComponent {
 	RID directional_light_id;
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict["directional_light_id"] = directional_light_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "directional_light_id", directional_light_id, Variant::RID);
-	}
-	virtual ~DirectionalLight2DComponent() {
+	~DirectionalLight2DComponent() {
 		if (directional_light_id.is_valid()) {
 			RenderingServer::get_singleton()->free(directional_light_id);
 		}
 	}
 };
 
-struct PointLightComponent : ScriptVisibleComponent{
+#define DIRECTIONAL_LIGHT_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, directional_light_id,DirectionalLight3DComponent)\
+
+
+#define DIRECTIONAL_LIGHT_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, directional_light_id, DirectionalLight2DComponentRef)\
+
+DEFINE_COMPONENT_PROXY(DirectionalLight2DComponentRef, DirectionalLight3DComponent,
+DIRECTIONAL_LIGHT_2D_COMPONENT_PROPERTIES,
+DIRECTIONAL_LIGHT_2D_COMPONENT_BINDINGS);
+
+struct PointLightComponent {
 	RID point_light_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["point_light_id"] = point_light_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "point_light_id", point_light_id, Variant::RID);
-	}
-	virtual ~PointLightComponent() {
+	~PointLightComponent() {
 		if (point_light_id.is_valid()) {
 			RenderingServer::get_singleton()->free(point_light_id);
 		}
 	}
 };
 
-struct LightOccluderComponent : ScriptVisibleComponent {
+#define POINT_LIGHT_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, point_light_id,PointLightComponent)\
+
+
+#define POINT_LIGHT_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, point_light_id, PointLightComponentRef)\
+
+DEFINE_COMPONENT_PROXY(PointLightComponentRef, PointLightComponent,
+POINT_LIGHT_COMPONENT_PROPERTIES,
+POINT_LIGHT_COMPONENT_BINDINGS);
+
+struct LightOccluderComponent {
 	RID light_occluder_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["light_occluder_id"] = light_occluder_id;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "light_occluder_id", light_occluder_id, Variant::RID);
-	}
-	virtual ~LightOccluderComponent() {
+	~LightOccluderComponent() {
 		if (light_occluder_id.is_valid()) {
 			RenderingServer::get_singleton()->free(light_occluder_id);
 		}
 	}
 };
 
-struct OmniLightComponent : ScriptVisibleComponent {
+#define LIGHT_OCCLUDER_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, light_occluder_id,LightOccluderComponent)\
+
+
+#define LIGHT_OCCLUDER_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, light_occluder_id, LightOccluderComponentRef)\
+
+DEFINE_COMPONENT_PROXY(LightOccluderComponentRef, LightOccluderComponent,
+LIGHT_OCCLUDER_COMPONENT_PROPERTIES,
+LIGHT_OCCLUDER_COMPONENT_BINDINGS);
+
+
+struct OmniLightComponent {
 	RID omni_light_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["omni_light_id"] = omni_light_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "omni_light_id", omni_light_id, Variant::RID);
-	}
-	virtual ~OmniLightComponent() {
+	~OmniLightComponent() {
 		if (omni_light_id.is_valid()) {
 			RenderingServer::get_singleton()->free(omni_light_id);
 		}
 	}
 };
-struct SpotLightComponent : ScriptVisibleComponent{
+
+#define OMNI_LIGHT_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, omni_light_id,OmniLightComponent)\
+
+
+#define OMNI_LIGHT_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, omni_light_id, OmniLightComponentRef)\
+
+DEFINE_COMPONENT_PROXY(OmniLightComponentRef, OmniLightComponent,
+OMNI_LIGHT_COMPONENT_PROPERTIES,
+OMNI_LIGHT_COMPONENT_BINDINGS);
+
+struct SpotLightComponent {
 	RID spot_light_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["spot_light_id"] = spot_light_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "spot_light_id", spot_light_id, Variant::RID);
-	}
-	virtual ~SpotLightComponent() {
+	~SpotLightComponent() {
 		if (spot_light_id.is_valid()) {
 			RenderingServer::get_singleton()->free(spot_light_id);
 		}
 	}
 };
-struct ViewportComponent : ScriptVisibleComponent{
+
+#define SPOT_LIGHT_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, spot_light_id,SpotLightComponent)\
+
+
+#define SPOT_LIGHT_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, spot_light_id, SpotLightComponentRef)\
+
+DEFINE_COMPONENT_PROXY(SpotLightComponentRef, SpotLightComponent,
+SPOT_LIGHT_COMPONENT_PROPERTIES,
+SPOT_LIGHT_COMPONENT_BINDINGS);
+
+struct ViewportComponent {
 	RID viewport_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["viewport_id"] = viewport_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "viewport_id", viewport_id, Variant::RID);
-	}
 };
-struct VoxelGIComponent : ScriptVisibleComponent {
+
+#define VIEWPORT_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, viewport_id,ViewportComponent)\
+
+
+#define VIEWPORT_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, viewport_id, ViewportComponentRef)\
+
+DEFINE_COMPONENT_PROXY(ViewportComponentRef, ViewportComponent,
+VIEWPORT_COMPONENT_PROPERTIES,
+VIEWPORT_COMPONENT_BINDINGS);
+
+struct VoxelGIComponent {
 	RID voxel_gi_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["voxel_gi_id"] = voxel_gi_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "voxel_gi_id", voxel_gi_id, Variant::RID);
-	}
-	virtual ~VoxelGIComponent() {
+	~VoxelGIComponent() {
 		if (voxel_gi_id.is_valid()) {
 			RenderingServer::get_singleton()->free(voxel_gi_id);
 		}
 	}
 };
-struct ScenarioComponent : ScriptVisibleComponent{
+
+#define VOXEL_GI_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, voxel_gi_id,VoxelGIComponent)\
+
+
+#define VOXEL_GI_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, voxel_gi_id, VoxelGIComponentRef)\
+
+DEFINE_COMPONENT_PROXY(VoxelGIComponentRef, VoxelGIComponent,
+VOXEL_GI_COMPONENT_PROPERTIES,
+VOXEL_GI_COMPONENT_BINDINGS);
+
+struct ScenarioComponent {
 	RID id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["id"] = id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "id", id, Variant::RID);
-	}
 };
 
-struct RenderInstanceComponent : ScriptVisibleComponent{
+#define SCENARIO_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, id,ScenarioComponent)\
+
+
+#define SCENARIO_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, id, ScenarioComponentRef)\
+
+DEFINE_COMPONENT_PROXY(ScenarioComponentRef, ScenarioComponent,
+SCENARIO_COMPONENT_PROPERTIES,
+SCENARIO_COMPONENT_BINDINGS);
+
+struct RenderInstanceComponent {
 	RID instance_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["instance_id"] = instance_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "instance_id", instance_id, Variant::RID);
-	}
-	virtual ~RenderInstanceComponent() {
+	~RenderInstanceComponent() {
 		if (instance_id.is_valid()) {
 			RenderingServer::get_singleton()->free(instance_id);
 		}
 	}
 };
 
-struct CanvasItemComponent : ScriptVisibleComponent {
+#define RENDER_INSTANCE_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, instance_id,RenderInstanceComponent)\
+
+
+#define RENDER_INSTANCE_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, instance_id, RenderInstanceComponentRef)\
+
+DEFINE_COMPONENT_PROXY(RenderInstanceComponentRef, RenderInstanceComponent,
+RENDER_INSTANCE_COMPONENT_PROPERTIES,
+RENDER_INSTANCE_COMPONENT_BINDINGS);
+
+struct CanvasItemComponent {
 	RID canvas_item_id;
-	String class_name;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["canvas_item_id"] = canvas_item_id;
-		dict["class_name"] = class_name;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "canvas_item_id", canvas_item_id, Variant::RID);
-		SET_SCRIPT_COMPONENT_VALUE(dict, "class_name", class_name, Variant::STRING);
-	}
-	virtual ~CanvasItemComponent() {
+	StringName class_name;
+	~CanvasItemComponent() {
 		if (canvas_item_id.is_valid()) {
 			RenderingServer::get_singleton()->canvas_item_clear(canvas_item_id);
 			RenderingServer::get_singleton()->free(canvas_item_id);
 		}
 	}
 };
+
+#define CANVAS_ITEM_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, canvas_item_id,CanvasItemComponent)\
+DEFINE_PROPERTY(StringName, class_name,CanvasItemComponent)\
+
+
+#define CANVAS_ITEM_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, canvas_item_id, CanvasItemComponentRef)\
+BIND_PROPERTY(StringName, class_name, CanvasItemComponentRef)\
+
+DEFINE_COMPONENT_PROXY(CanvasItemComponentRef, CanvasItemComponent,
+CANVAS_ITEM_COMPONENT_PROPERTIES,
+CANVAS_ITEM_COMPONENT_BINDINGS);
 
 struct RenderingBaseComponents{
 	flecs::component<MeshComponent> mesh;

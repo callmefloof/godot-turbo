@@ -1,32 +1,43 @@
 //
 // Created by Floof on 13-7-2025.
 //
-
-#ifndef ENTITY_H
-#define ENTITY_H
+#pragma once
+#include "../../../../core/io/resource.h"
 #include "../../../../core/object/object.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/variant/dictionary.h"
-
+#include "../../../../core/string/string_name.h"
 #include "../../../../core/string/ustring.h"
-#include "../../../../core/variant/array.h"
+#include "../../../../core/templates/oa_hash_map.h"
+#include "../../../../core/templates/vector.h"
+#include "../../../../core/typedefs.h"
+#include "../../../../core/variant/dictionary.h"
+#include "../../../../core/variant/variant.h"
+#include "../../../../core/object/ref_counted.h"
 #include "../../thirdparty/flecs/distr/flecs.h"
 
-class FlecsEntity : public RefCounted {
-	GDCLASS(FlecsEntity, RefCounted)
-private:
-	flecs::entity entity;
+class FlecsComponentBase;
+
+class FlecsEntity : public Resource {
+	GDCLASS(FlecsEntity, Resource)
+
+protected:
+	static void _bind_methods();
+	flecs::entity& entity;
+	Vector<Ref<FlecsComponentBase>> components;
 public:
-	void set_component(const String& component_type, const Dictionary& data, const Dictionary& metadata);
-	Dictionary get_component();
-	void remove_component(const String& component_type);
-	void remove_all_components();
-	Array get_components();
-	String get_name();
-	void set_name(const String& name);
-	Dictionary get_metadata();
-
-
+	FlecsEntity() : entity() {}
+	virtual ~FlecsEntity() = default;
+	virtual void remove(const Ref<FlecsComponentBase> &comp);
+	virtual void remove_all_components();
+	virtual Ref<FlecsComponentBase> get(const StringName& component_type) const;
+	PackedStringArray get_component_types() const;
+	StringName get_entity_name() const;
+	void set_entity_name(const StringName &name) const;
+	void set_entity(const flecs::entity& p_entity) const;
+	flecs::entity& get_entity() const;
+	virtual void set(const Ref<FlecsComponentBase>& comp);
+	virtual void remove(const StringName &component_type);
+	virtual Ref<FlecsComponentBase> get(const StringName &component_type);
 };
 
-#endif //ENTITY_H
+
+

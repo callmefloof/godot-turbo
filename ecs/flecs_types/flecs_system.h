@@ -4,13 +4,14 @@
 
 #ifndef FLECS_SYSTEM_H
 #define FLECS_SYSTEM_H
+#include "../../../../core/object/object.h"
 #include "../../../../core/object/ref_counted.h"
+#include "../../../../core/io/resource.h"
 
-class FlecsSystem : public RefCounted {
-
+class FlecsSystem : public Resource {
+	GDCLASS(FlecsSystem,Resource)
 	public:
 	FlecsSystem();
-	virtual ~FlecsSystem() = default;
 	static Ref<FlecsSystem> create();
 	void each();
 };

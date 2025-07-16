@@ -1,59 +1,87 @@
 #pragma once
 #include "../../../../thirdparty/flecs/distr/flecs.h"
 #include "../../component_module_base.h"
-#include "core/templates/rid.h"
-#include "modules/godot_turbo/ecs/components/script_visible_component.h"
-#include "servers/physics_server_2d.h"
+#include "../../../../../../core/templates/rid.h"
+#include "../../../../../../core/os/memory.h"
+#include "../../../../../../modules/godot_turbo/ecs/components/component_proxy.h"
+#include "../../../../../../servers/physics_server_2d.h"
+#include "../../../flecs_types/flecs_component.h"
 
-struct Area2DComponent : ScriptVisibleComponent {
+
+struct Area2DComponent {
 	RID area_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["area_id"] = area_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "area_id", area_id, Variant::RID);
-	}
 	~Area2DComponent() {
 		if (area_id.is_valid()) {
 			PhysicsServer2D::get_singleton()->free(area_id);
 		}
 	}
 };
-struct Body2DComponent : ScriptVisibleComponent{
-	RID body_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["body_id"] = body_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "body_id", body_id, Variant::RID);
 
-	}
+#define AREA_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, area_id,Area2DComponent)\
+
+#define AREA_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, area_id, Area2DComponentRef)\
+
+#define AREA_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, area_id))\
+
+#define AREA_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(area_id)\
+
+DEFINE_COMPONENT_PROXY(Area2DComponentRef, Area2DComponent,
+AREA_2D_COMPONENT_PROPERTIES,
+AREA_2D_COMPONENT_BINDINGS);
+
+struct Body2DComponent {
+	RID body_id;
 	~Body2DComponent() {
 		if (body_id.is_valid()) {
 			PhysicsServer2D::get_singleton()->free(body_id);
 		}
 	}
 };
-struct Joint2DComponent : ScriptVisibleComponent {
+
+#define BODY_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, body_id,Body2DComponent)\
+
+#define BODY_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, body_id, Body2DComponentRef)\
+
+#define BODY_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, body_id))\
+
+#define BODY_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(body_id)\
+
+DEFINE_COMPONENT_PROXY(Body2DComponentRef, Body2DComponent,
+BODY_2D_COMPONENT_PROPERTIES,
+BODY_2D_COMPONENT_BINDINGS);
+
+struct Joint2DComponent {
 	RID joint_id;
-	Dictionary to_dict() const override{
-		Dictionary dict;
-		dict["joint_id"] = joint_id;
-		return dict;
-	}
-	void from_dict(Dictionary dict) override {
-		SET_SCRIPT_COMPONENT_VALUE(dict, "joint_id", joint_id, Variant::RID);
-	}
 	~Joint2DComponent() {
 		if (joint_id.is_valid()) {
 			PhysicsServer2D::get_singleton()->free(joint_id);
 		}
 	}
 };
+
+#define JOINT_2D_COMPONENT_PROPERTIES\
+DEFINE_PROPERTY(RID, joint_id,Joint2DComponent)\
+
+#define JOINT_2D_COMPONENT_BINDINGS\
+BIND_PROPERTY(RID, joint_id, Joint2DComponentRef)\
+
+#define JOINT_2D_COMPONENT_FIELDS_TYPES(APPLY_MACRO)\
+APPLY_MACRO((RID, joint_id))\
+
+#define JOINT_2D_COMPONENT_FIELDS_NAMES(APPLY_MACRO)\
+APPLY_MACRO(joint_id)\
+
+DEFINE_COMPONENT_PROXY(Joint2DComponentRef, Joint2DComponent,
+JOINT_2D_COMPONENT_PROPERTIES,
+JOINT_2D_COMPONENT_BINDINGS);
 
 struct Physics2DBaseComponents {
 	flecs::component<Area2DComponent> area;

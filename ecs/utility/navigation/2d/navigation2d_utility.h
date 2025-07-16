@@ -18,32 +18,32 @@ private:
 	Navigation2DUtility(Navigation2DUtility &&) = delete; // Prevent move
 	Navigation2DUtility &operator=(Navigation2DUtility &&) = delete; // Prevent move assignment
 public:
-	static flecs::entity CreateNav2DAgent(const flecs::world &world, const RID &agent, const String &name) {
+	static flecs::entity create_nav_2d_agent(const flecs::world &world, const RID &agent, const String &name) {
 		return world.entity().set<NavAgent2DComponent>({ agent }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DAgent(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_2d_agent(const flecs::world &world, const String &name) {
 		const RID nav_agent_id = NavigationServer2D::get_singleton()->agent_create();
 		return world.entity().set<NavAgent2DComponent>({ nav_agent_id }).set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateNav2DLink(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_2d_link(const flecs::world &world, const String &name) {
 		const RID nav_link_id = NavigationServer2D::get_singleton()->link_create();
 		return world.entity().set<NavLink2DComponent>({ nav_link_id }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DLink(const flecs::world &world, const RID &link, const String &name) {
+	static flecs::entity create_nav_2d_link(const flecs::world &world, const RID &link, const String &name) {
 		return world.entity().set<NavLink2DComponent>({ link }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DObstacle(const flecs::world &world, const RID &obstacle, const String &name) {
+	static flecs::entity create_nav_2d_obstacle(const flecs::world &world, const RID &obstacle, const String &name) {
 		return world.entity().set<NavObstacle2DComponent>({ obstacle }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DObstacle(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_2d_obstacle(const flecs::world &world, const String &name) {
 		const RID nav_obstacle_id = NavigationServer2D::get_singleton()->obstacle_create();
 		return world.entity().set<NavObstacle2DComponent>({ nav_obstacle_id }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DRegion(const flecs::world &world, const RID &region, const String &name) {
+	static flecs::entity create_nav_2d_region(const flecs::world &world, const RID &region, const String &name) {
 		return world.entity().set<NavRegion2DComponent>({ region }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DRegion(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_2d_region(const flecs::world &world, const String &name) {
 		const RID nav_region_id = NavigationServer2D::get_singleton()->region_create();
 		return world.entity().set<NavRegion2DComponent>({ nav_region_id }).set_name(name.ascii().get_data());
 	}
@@ -54,7 +54,7 @@ public:
 		const RID source_geometry_parser_id = NavigationServer2D::get_singleton()->source_geometry_parser_create();
 		return world.entity().set<SourceGeometryParser2DComponent>({ source_geometry_parser_id }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNav2DAgent(const flecs::world &world, NavigationAgent2D *nav_agent) {
+	static flecs::entity create_nav_2d_agent(const flecs::world &world, NavigationAgent2D *nav_agent) {
 		if (nav_agent == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -69,7 +69,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateNav2DLink(const flecs::world &world, NavigationLink2D *nav_link) {
+	static flecs::entity create_nav_2d_link(const flecs::world &world, NavigationLink2D *nav_link) {
 		if (nav_link == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -84,7 +84,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateNav2DObstacle(const flecs::world &world, NavigationObstacle2D *nav_obstacle) {
+	static flecs::entity create_nav_2d_obstacle(const flecs::world &world, NavigationObstacle2D *nav_obstacle) {
 		if (nav_obstacle == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -99,7 +99,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateNav2DRegion(const flecs::world &world, NavigationRegion2D *nav_region) {
+	static flecs::entity create_nav_2d_region(const flecs::world &world, NavigationRegion2D *nav_region) {
 		if (nav_region == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}

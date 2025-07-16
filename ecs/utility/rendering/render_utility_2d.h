@@ -1,4 +1,6 @@
 #pragma once
+#include "../flecs_types/flecs_world.h"
+
 #include "../../../thirdparty/flecs/distr/flecs.h"
 #include "../../components/rendering/rendering_components.h"
 #include "../../components/transform_2d_component.h"
@@ -14,6 +16,7 @@
 #include <scene/2d/light_occluder_2d.h>
 #include <scene/2d/mesh_instance_2d.h>
 
+
 class RenderUtility2D
 {
 private:
@@ -23,12 +26,11 @@ private:
 	RenderUtility2D(RenderUtility2D &&) = delete; // Prevent move
 	RenderUtility2D &operator=(RenderUtility2D &&) = delete; // Prevent move assignment
 public:
-	static flecs::entity CreateMeshInstance(const flecs::world &world, const RID &mesh_id, const Transform2D &transform, const String &name, const RID &canvas_id) {
+	static flecs::entity create_mesh_instance(const flecs::world &world, const RID &mesh_id, const Transform2D &transform, const String &name, const RID &canvas_id) {
 		Vector<RID> material_ids;
-		auto surface_count = RS::get_singleton()->mesh_get_surface_count(mesh_id);
+		const int surface_count = RS::get_singleton()->mesh_get_surface_count(mesh_id);
 		for (int i = 0; i < surface_count; ++i) {
-			RID material_id = RS::get_singleton()->mesh_surface_get_material(mesh_id, i);
-			if (material_id.is_valid()) {
+			if (const RID material_id = RS::get_singleton()->mesh_surface_get_material(mesh_id, i); material_id.is_valid()) {
 				material_ids.push_back(material_id);
 			} else {
 				material_ids.push_back(RID()); // Use an empty RID if no material is set
@@ -48,16 +50,27 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateMeshInstance(const flecs::world &world, const Transform2D &transform,  const String &name) {
+	static flecs::entity create_mesh_instance(const flecs::world &world, const Transform2D &transform,  const String &name) {
 		Vector<RID> material_ids;
 		const RID mesh_id = RS::get_singleton()->mesh_create();
 		if (!world.has<World2DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World2DComponent>(), flecs::entity());
 		}
-		return CreateMeshInstance(world, mesh_id, transform, name, world.get<World2DComponent>().canvas_id);
+		return create_mesh_instance(world, mesh_id, transform, name, world.get<World2DComponent>().canvas_id);
 	}
 
-	static flecs::entity CreateMeshInstance(const flecs::world &world, MeshInstance2D *mesh_instance_2d) {
+	static Ref<FlecsEntity> create_mesh_instance(const Ref<FlecsWorld>& world, const MeshInstance2D *mesh_instance_2d) {
+		if (!world.is_valid() || !world.is_null()) {
+			ERR_FAIL_COND_V(!world.is_valid() || !world.is_null(), Ref<FlecsEntity>());
+		}
+		Ref<FlecsEntity> entity = memnew(FlecsEntity);
+
+		create_mesh_instance(&world->get_world());
+		//entity->set_entity();
+
+	}
+
+	static flecs::entity create_mesh_instance(const flecs::world &world, MeshInstance2D *mesh_instance_2d) {
 		Vector<RID> material_ids;
 		const Ref<Mesh> mesh = mesh_instance_2d->get_mesh();
 		const RID canvas_item = mesh_instance_2d->get_canvas_item();
@@ -80,7 +93,7 @@ public:
 				.set_name(String(mesh_instance_2d->get_name()).ascii().get_data());
 	}
 
-	static flecs::entity CreateMultiMesh(const flecs::world &world,
+	static flecs::entity create_multi_mesh(const flecs::world &world,
 			const Transform2D &transform,
 			const uint32_t size,
 			const RID &mesh_id,
@@ -104,7 +117,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateMultiMesh(const flecs::world &world,
+	static flecs::entity create_multi_mesh(const flecs::world &world,
 			MultiMeshInstance2D *multi_mesh_instance) {
 		const RID mult_mesh_id = multi_mesh_instance->get_multimesh()->get_rid();
 		const Ref<Mesh> mesh = multi_mesh_instance->get_multimesh()->get_mesh();
@@ -127,7 +140,7 @@ public:
 	}
 
 
-	static flecs::entity CreateMultiMeshInstance(
+	static flecs::entity create_multi_mesh_instance(
 			const flecs::world &world,
 			const Transform2D &transform,
 			const uint32_t index,
@@ -138,7 +151,7 @@ public:
 				.set_name(name.ascii().get_data());
 	}
 
-	static Vector<flecs::entity> CreateMultiMeshInstances(
+	static Vector<flecs::entity> create_multi_mesh_instances(
 			const flecs::world &world,
 			const Vector<Transform2D>& transform,
 			const flecs::entity &multi_mesh) {
@@ -146,19 +159,19 @@ public:
 
 		const auto &[multi_mesh_id, instance_count] = multi_mesh.get<MultiMeshComponent>();
 		for (uint32_t i = 0; i < instance_count; ++i) {
-			instances.append(CreateMultiMeshInstance(world, transform[i], i, multi_mesh.name() + " - Instance: #" + String::num_int64(i)));
+			instances.append(create_multi_mesh_instance(world, transform[i], i, multi_mesh.name() + " - Instance: #" + String::num_int64(i)));
 		}
 		return instances;
 	}
 
-	static flecs::entity CreateCamera2D(const flecs::world &world, const RID &camera_id, const Transform2D &transform, const String &name) {
+	static flecs::entity create_camera_2d(const flecs::world &world, const RID &camera_id, const Transform2D &transform, const String &name) {
 		return world.entity()
 			.set<CameraComponent>({ camera_id })
 			.set<Transform2DComponent>({ transform })
 			.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateCamera2D(const flecs::world &world, Camera2D *camera_2d) {
+	static flecs::entity create_camera_2d(const flecs::world &world, Camera2D *camera_2d) {
 		if (camera_2d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -177,7 +190,7 @@ public:
 		return camera;
 	}
 
-	static flecs::entity CreateDirectionalLight(const flecs::world &world, const RID &light_id, const Transform2D &transform,  const String &name) {
+	static flecs::entity create_directional_light(const flecs::world &world, const RID &light_id, const Transform2D &transform,  const String &name) {
 		if (!light_id.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -193,12 +206,12 @@ public:
 		return directional_light;
 	}
 
-	static flecs::entity CreateDirectionalLight(const flecs::world &world, const Transform2D &transform, const String &name) {
+	static flecs::entity create_directional_light(const flecs::world &world, const Transform2D &transform, const String &name) {
 		const RID directional_light_id = RS::get_singleton()->canvas_light_create();
-		return CreateDirectionalLight(world, directional_light_id, transform, name);
+		return create_directional_light(world, directional_light_id, transform, name);
 	}
 
-	static flecs::entity CreateDirectionalLight(const flecs::world &world, DirectionalLight2D *directional_light) {
+	static flecs::entity create_directional_light(const flecs::world &world, DirectionalLight2D *directional_light) {
 		if (directional_light == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -240,15 +253,15 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreatePointLight(const flecs::world &world,  const Transform2D &transform, const String &name) {
+	static flecs::entity create_point_light(const flecs::world &world,  const Transform2D &transform, const String &name) {
 		const RID light_id = RS::get_singleton()->canvas_light_create();
 		if (!light_id.is_valid()) {
 			ERR_FAIL_COND_V(!light_id.is_valid(),flecs::entity());
 		}
-		return CreatePointLight(world, light_id, transform, name);
+		return create_point_light(world, light_id, transform, name);
 	}
 
-	static flecs::entity CreatePointLight(const flecs::world &world,  const RID &light_id, const Transform2D &transform, const String &name) {
+	static flecs::entity create_point_light(const flecs::world &world,  const RID &light_id, const Transform2D &transform, const String &name) {
 		if (!light_id.is_valid()) {
 			ERR_FAIL_COND_V(!light_id.is_valid(),flecs::entity());
 		}
@@ -265,7 +278,7 @@ public:
 		return directional_light;
 	}
 
-	static flecs::entity CreatePointLight(const flecs::world &world, PointLight2D *point_light) {
+	static flecs::entity create_point_light(const flecs::world &world, PointLight2D *point_light) {
 		if (point_light == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -312,7 +325,7 @@ public:
 	}
 
 
-	static flecs::entity CreateCanvasItem(const flecs::world &world, CanvasItem *canvas_item) {
+	static flecs::entity create_canvas_item(const flecs::world &world, CanvasItem *canvas_item) {
 		if (canvas_item == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -328,7 +341,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateCanvasItem(const flecs::world &world, const RID &canvas_item_id,const Transform2D& transform, const String &name, const String &class_name) {
+	static flecs::entity create_canvas_item(const flecs::world &world, const RID &canvas_item_id,const Transform2D& transform, const String &name, const String &class_name) {
 		return world.entity()
 				.set<CanvasItemComponent>({ canvas_item_id, class_name })
 				.set<Transform2DComponent>({ transform })
@@ -337,13 +350,13 @@ public:
 
 
 
-	static flecs::entity CreateSkeleton(const flecs::world &world, const RID &skeleton_id, const String &name) {
+	static flecs::entity create_skeleton(const flecs::world &world, const RID &skeleton_id, const String &name) {
 		return world.entity()
 				.set<SkeletonComponent>({ skeleton_id })
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateSkeleton(const flecs::world &world, Skeleton2D *skeleton_2d) {
+	static flecs::entity create_skeleton(const flecs::world &world, Skeleton2D *skeleton_2d) {
 		const RID skeleton_id = RS::get_singleton()->skeleton_create();
 		if (skeleton_2d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
@@ -364,7 +377,7 @@ public:
 				.set<SkeletonComponent>({ skeleton_id });
 	}
 
-	static flecs::entity CreateLightOccluder(const flecs::world &world, LightOccluder2D *light_occluder)
+	static flecs::entity create_light_occluder(const flecs::world &world, LightOccluder2D *light_occluder)
 	{
 		const String name = light_occluder->get_name();
 		const RID light_occluder_id = RS::get_singleton()->canvas_light_occluder_create();
@@ -390,7 +403,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateLightOccluder(const flecs::world &world, const RID& light_occluder_id, const Transform2D& transform, const RID& canvas_id, const String& name ) {
+	static flecs::entity create_light_occluder(const flecs::world &world, const RID& light_occluder_id, const Transform2D& transform, const RID& canvas_id, const String& name ) {
 		const auto entity = world.entity()
 							  .set<LightOccluderComponent>({ light_occluder_id })
 							  .set<Transform2DComponent>({ transform })
@@ -399,17 +412,17 @@ public:
 		return entity;
 	}
 
-	staticflecs::entity CreateLightOccluder(const flecs::world &world, const Transform2D &transform, const String &name) {
+	static flecs::entity create_light_occluder(const flecs::world &world, const Transform2D &transform, const String &name) {
 		const auto light_occluder_id = RS::get_singleton()->canvas_light_occluder_create();
 		if (!world.has<World2DComponent>()
 			&& world.get<World2DComponent>().is_valid()
 			&& !world.get<World2DComponent>().is_null()) {
 			ERR_FAIL_COND_V(!world.has<World2DComponent>(), flecs::entity());
 		}
-		return CreateLightOccluder(world, light_occluder_id, transform,world.get<World2DComponent>().canvas_id, name);
+		return create_light_occluder(world, light_occluder_id, transform,world.get<World2DComponent>().canvas_id, name);
 	}
 
-	staticflecs::entity CreateGPUParticles2D(const flecs::world &world, const RID canvas_item_id, const RID particles_id, const RID texture_id, const Transform2D &transform,  const String& name) {
+	static flecs::entity create_gpu_particles_2d(const flecs::world &world, const RID canvas_item_id, const RID particles_id, const RID texture_id, const Transform2D &transform,  const String& name) {
 		const auto entity = world.entity()
 		.set<ParticlesComponent>({ particles_id })
 		.set<Transform2DComponent>({ transform })
@@ -425,7 +438,7 @@ public:
 		return entity;
 	}
 
-	staticflecs::entity CreateGPUParticles2D(const flecs::world &world, GPUParticles2D* gpu_particles, uint32_t count = 0, const uint32_t max_depth = 10000) {
+	static flecs::entity create_gpu_particles_2d(const flecs::world &world, GPUParticles2D* gpu_particles, uint32_t count = 0, const uint32_t max_depth = 10000) {
 		count++;
 		if (gpu_particles == nullptr) {
 			ERR_FAIL_COND_V(gpu_particles == nullptr, flecs::entity());
@@ -568,13 +581,13 @@ public:
 		//PackedStringArray get_configuration_warnings() const override;
 
 		RS::get_singleton()->particles_set_seed(new_particles_id, gpu_particles->get_seed());
-		flecs::entity new_gpu_particle_entity = CreateGPUParticles2D(world, canvas_item_id, new_particles_id,texture_id ,gpu_particles->get_transform(), String(gpu_particles->get_name()));
+		flecs::entity new_gpu_particle_entity = create_gpu_particles_2d(world, canvas_item_id, new_particles_id,texture_id ,gpu_particles->get_transform(), String(gpu_particles->get_name()));
 
 		//copied from GPUParticles2D::_attach_sub_emitter
 		const NodePath sub_emitter_path = gpu_particles->get_sub_emitter();
 		if (Node *n = gpu_particles->get_node_or_null(sub_emitter_path)) {
 			if (GPUParticles2D *sen = Object::cast_to<GPUParticles2D>(n); sen && sen != gpu_particles) {
-				flecs::entity particle_child = CreateGPUParticles2D(world, sen, count);
+				flecs::entity particle_child = create_gpu_particles_2d(world, sen, count);
 
 				RS::get_singleton()->particles_set_subemitter(new_particles_id, particle_child.get<ParticlesComponent>().particles_id);
 				particle_child.child(new_gpu_particle_entity);

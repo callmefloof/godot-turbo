@@ -7,7 +7,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
-    ClassDB::register_class<World>();
+    ClassDB::register_class<FlecsWorld>();
 }
 
 void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level) {

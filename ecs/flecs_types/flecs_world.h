@@ -1,29 +1,26 @@
 #pragma once
 
 #include "../../thirdparty/flecs/distr/flecs.h"
-#include "../components/navigation/2d/2d_navigation_components.h"
-#include "../components/navigation/3d/3d_navigation_components.h"
-#include "../components/physics/2d/2d_physics_components.h"
-#include "../components/physics/3d/3d_physics_components.h"
-#include "../components/rendering/rendering_components.h"
-#include "../components/scene_node_component.h"
-#include "../components/transform_2d_component.h"
-#include "../components/transform_3d_component.h"
-#include "../systems/rendering/mesh_render_system.h"
-#include "../systems/rendering/mulitmesh_render_system.h"
-#include "../utility/navigation/2d/navigation2d_utility.h"
-#include "../utility/navigation/3d/navigation3d_utility.h"
-#include "../utility/physics/2d/physics2d_utility.h"
-#include "../utility/physics/3d/physics3d_utility.h"
-#include "../utility/rendering/render_utility_2d.h"
-#include "../utility/rendering/render_utility_3d.h"
-#include "../utility/scene_object_utility.h"
+#include "core/object/object.h"
+#include "core/object/ref_counted.h"
+#include "core/templates/hash_map.h"
+#include "core/variant/dictionary.h"
 #include "flecs_entity.h"
-#include "scene/main/node.h"
-#include "servers/rendering_server.h"
+#include "modules/godot_turbo/ecs/components/script_visible_component.h"
+
+#include <functional>
+#include <typeinfo>
+
+class FlecsComponentBase;
+class FlecsEntity;
+
+struct ComponentTypeInfo {
+	std::function<Ref<FlecsComponentBase>()> creator;
+	std::function<void(const flecs::entity&, Ref<FlecsComponentBase>)> apply;
+};
 
 class FlecsWorld : public FlecsEntity {
-	GDCLASS(FlecsWorld, RefCounted)
+	GDCLASS(FlecsWorld, FlecsEntity)
 private:
 	flecs::world world;
 	ecs_entity_t OnPhysics = ecs_new_w_id(world, EcsPhase);
@@ -33,10 +30,25 @@ protected:
 	static void _bind_methods();
 
 public:
-	FlecsWorld(/* args */);
+	static HashMap<StringName, ComponentTypeInfo> component_registry;
+	FlecsWorld();
+	explicit FlecsWorld(const flecs::world &p_world) : world(p_world) {
+		FlecsEntity::entity = p_world.entity();
+	}
 	~FlecsWorld() override;
 	void init_world();
-	void progress() const;
+	bool progress() const;
+	void register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const;
+
+	void set(const Ref<FlecsComponentBase> &comp) override;
+	Ref<FlecsEntity> entity() const;
+	Ref<FlecsEntity> entity(const StringName &name) const;
+	Ref<FlecsEntity> entity(const StringName &name, const Ref<FlecsComponentBase> &comp) const;
+
+	void remove(const Ref<FlecsComponentBase> &comp) override;
+	void remove(const StringName &component_type) override;
+	void remove_all_components() override;
+
 	// Accessor for the underlying Flecs world
 	flecs::world *get_world();
 	// Register a system with the world
@@ -46,5 +58,3 @@ public:
 	}
 
 };
-
-

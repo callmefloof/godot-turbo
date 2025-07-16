@@ -19,32 +19,32 @@ private:
 	Navigation3DUtility(Navigation3DUtility &&) = delete; // Prevent move
 	Navigation3DUtility &operator=(Navigation3DUtility &&) = delete; // Prevent move assignment
 public:
-	static flecs::entity CreateNavAgent(const flecs::world &world, const RID &agent, const String &name) {
+	static flecs::entity create_nav_agent(const flecs::world &world, const RID &agent, const String &name) {
 		return world.entity().set<NavAgent3DComponent>({ agent }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavAgent(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_agent(const flecs::world &world, const String &name) {
 		const RID nav_agent_id = NavigationServer3D::get_singleton()->agent_create();
 		return world.entity().set<NavAgent3DComponent>({ nav_agent_id }).set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateNavLink(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_link(const flecs::world &world, const String &name) {
 		const RID nav_link_id = NavigationServer3D::get_singleton()->link_create();
 		return world.entity().set<NavLink3DComponent>({ nav_link_id }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavLink(const flecs::world &world, const RID &link, const String &name) {
+	static flecs::entity create_nav_link(const flecs::world &world, const RID &link, const String &name) {
 		return world.entity().set<NavLink3DComponent>({ link }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavObstacle(const flecs::world &world, const RID &obstacle, const String &name) {
+	static flecs::entity create_nav_obstacle(const flecs::world &world, const RID &obstacle, const String &name) {
 		return world.entity().set<NavObstacle3DComponent>({ obstacle }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavObstacle(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_obstacle(const flecs::world &world, const String &name) {
 		const RID nav_obstacle_id = NavigationServer3D::get_singleton()->obstacle_create();
 		return world.entity().set<NavObstacle3DComponent>({ nav_obstacle_id }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavRegion(const flecs::world &world, const RID &region, const String &name) {
+	static flecs::entity create_nav_region(const flecs::world &world, const RID &region, const String &name) {
 		return world.entity().set<NavRegion3DComponent>({ region }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavRegion(const flecs::world &world, const String &name) {
+	static flecs::entity create_nav_region(const flecs::world &world, const String &name) {
 		const RID nav_region_id = NavigationServer3D::get_singleton()->region_create();
 		return world.entity().set<NavRegion3DComponent>({ nav_region_id }).set_name(name.ascii().get_data());
 	}
@@ -55,7 +55,7 @@ public:
 		const RID source_geometry_parser_id = NavigationServer3D::get_singleton()->source_geometry_parser_create();
 		return world.entity().set<SourceGeometryParser3DComponent>({ source_geometry_parser_id }).set_name(name.ascii().get_data());
 	}
-	static flecs::entity CreateNavAgent(const flecs::world &world, NavigationAgent3D *nav_agent) {
+	static flecs::entity create_nav_agent(const flecs::world &world, NavigationAgent3D *nav_agent) {
 		if (nav_agent == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -70,7 +70,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateNavLink(const flecs::world &world, NavigationLink3D *nav_link) {
+	static flecs::entity create_nav_link(const flecs::world &world, NavigationLink3D *nav_link) {
 		if (nav_link == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -87,7 +87,7 @@ public:
 	}
 
 
-	static flecs::entity CreateNavObstacle(const flecs::world &world, NavigationObstacle3D *nav_obstacle) {
+	static flecs::entity create_nav_obstacle(const flecs::world &world, NavigationObstacle3D *nav_obstacle) {
 		if (nav_obstacle == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -102,7 +102,7 @@ public:
 		return entity;
 	}
 
-	static flecs::entity CreateNavRegion(const flecs::world &world, NavigationRegion3D *nav_region) {
+	static flecs::entity create_nav_region(const flecs::world &world, NavigationRegion3D *nav_region) {
 		if (nav_region == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
