@@ -78,12 +78,12 @@ struct World3DComponent {
 };
 
 #define WORLD_3D_COMPONENT_PROPERTIES\
-DEFINE_PROPERTY(RID, camera_attributes_id)\
-DEFINE_PROPERTY(RID, environment_id)\
-DEFINE_PROPERTY(RID, fallback_environment_id)\
-DEFINE_PROPERTY(RID, navigation_map_id)\
-DEFINE_PROPERTY(RID, scenario_id)\
-DEFINE_PROPERTY(RID, space_id)\
+DEFINE_PROPERTY(RID, camera_attributes_id,World3DComponent)\
+DEFINE_PROPERTY(RID, environment_id,World3DComponent)\
+DEFINE_PROPERTY(RID, fallback_environment_id,World3DComponent)\
+DEFINE_PROPERTY(RID, navigation_map_id,World3DComponent)\
+DEFINE_PROPERTY(RID, scenario_id,World3DComponent)\
+DEFINE_PROPERTY(RID, space_id,World3DComponent)\
 
 #define WORLD_3D_COMPONENT_BINDINGS\
 BIND_PROPERTY(RID, camera_attributes_id, World3DComponentRef)\

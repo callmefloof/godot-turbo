@@ -19,6 +19,8 @@ void FlecsWorld::_bind_methods()
 	ClassDB::bind_method(D_METHOD("progress"),&FlecsWorld::progress);
 }
 
+HashMap<StringName, ComponentTypeInfo> FlecsWorld::component_registry;
+
 FlecsWorld::FlecsWorld(/* args */)
 {
 	
@@ -70,13 +72,17 @@ void FlecsWorld::set(const Ref<FlecsComponentBase> &comp) {
 			return;
 		}
 
+
 		// Fill in missing defaults
-		for (auto& [field_name, def] : *schema) {
+		for (auto it = schema->iter(); it.valid; it = schema->next_iter(it) ) {
+			StringName field_name = *it.key;
+			ScriptComponentRegistry::FieldDef def = *it.value;
+
 			if (!data->fields.has(field_name)) {
 				data->fields.insert(field_name, def.default_value);
 			} else {
 				// Optional: Validate type
-				if (data->fields[field_name].get_type() != def.type) {
+				if (data->fields.lookup_ptr(field_name)->get_type() != def.type) {
 					WARN_PRINT("Field '" + String(field_name) + "' has wrong type — expected " + Variant::get_type_name(def.type));
 				}
 			}
@@ -96,14 +102,14 @@ void FlecsWorld::set(const Ref<FlecsComponentBase> &comp) {
 
 /// these are meant for entities
 /// go to bed
-Ref<FlecsEntity> FlecsWorld::entity(const StringName &name) const {
+Ref<FlecsEntity> FlecsWorld::entity(const StringName &p_name) const {
 	Ref<FlecsEntity> flecs_entity = entity();
-	flecs_entity->set_entity_name(name);
+	flecs_entity->set_entity_name(p_name);
 	return flecs_entity;
 }
 
-Ref<FlecsEntity> FlecsWorld::entity(const StringName &name, const Ref<FlecsComponentBase> &comp) const {
-	Ref<FlecsEntity> flecs_entity = entity(name);
+Ref<FlecsEntity> FlecsWorld::entity(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const {
+	Ref<FlecsEntity> flecs_entity = entity(p_name);
 	flecs_entity->set(comp);
 	return flecs_entity;
 }
@@ -112,7 +118,7 @@ void FlecsWorld::remove(const Ref<FlecsComponentBase> &comp) {
 }
 void FlecsWorld::remove(const StringName &component_type) {
 	const char* c_component_type = String(component_type).ascii().get_data();
-	const flecs::entity component = entity.world().lookup(c_component_type);
+	const flecs::entity component = FlecsEntity::entity->world().lookup(c_component_type);
 	if (component.is_valid()) {
 		ERR_PRINT("internal flecs component type is invalid. this likely means it wasn't added.");
 		return;
@@ -145,7 +151,7 @@ flecs::world *FlecsWorld::get_world() {
 }
 
 void FlecsWorld::register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const {
-	if (!script_visible_component_ref.is_valid() || script_visible_component_ref.is_null) {
+	if (!script_visible_component_ref.is_valid() || script_visible_component_ref.is_null()) {
 		ERR_PRINT("component is not valid.");
 		return;
 	}

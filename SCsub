@@ -6,7 +6,10 @@ module_env = env.Clone()
 module_env.add_source_files(env.modules_sources, [
     "register_types.cpp",
     "thirdparty/flecs/distr/flecs.c",
-    "ecs/flecs_types/flecs_world.cpp"
+    "ecs/flecs_types/flecs_world.cpp",
+    "ecs/flecs_types/flecs_entity.cpp",
+    "ecs/flecs_types/flecs_component_base.cpp",
+    "ecs/components/script_component_registry.cpp"
 ])
 
 # Include the flecs directory for headers

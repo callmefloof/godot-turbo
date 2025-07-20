@@ -18,9 +18,10 @@ const OAHashMap<StringName, ScriptComponentRegistry::FieldDef>* ScriptComponentR
 
 OAHashMap<StringName, Variant> ScriptComponentRegistry::create_field_map(const StringName &name) const {
 	OAHashMap<StringName, Variant> result;
-	if (const auto *schema = get_schema(name)) {
-		for (auto &[field_name, def] : *schema) {
-			result.insert(field_name, def.default_value);
+	const OAHashMap<StringName, FieldDef>* schema = get_schema(name);
+	if (schema) {
+		for (OAHashMap<StringName, FieldDef>::Iterator it = schema->iter(); it.valid; it = schema->next_iter(it)) {
+			result.insert(*it.key,it.value->default_value);
 		}
 	}
 	return result;

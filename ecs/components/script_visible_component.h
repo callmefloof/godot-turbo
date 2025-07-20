@@ -4,7 +4,6 @@
 
 #ifndef SCRIPT_VISIBLE_COMPONENT_H
 #define SCRIPT_VISIBLE_COMPONENT_H
-#include "../../../../core/error/error_macros.h"
 #include "../../../../core/object/class_db.h"
 #include "../../../../core/object/object.h"
 #include "../../../../core/object/ref_counted.h"
@@ -13,6 +12,7 @@
 #include "../../../../core/templates/oa_hash_map.h"
 #include "../../../../core/variant/variant.h"
 #include "../flecs_types/flecs_component.h"
+#include "../../../../core/error/error_macros.h"
 #include "script_component_registry.h"
 
 struct ScriptVisibleComponent {
@@ -23,6 +23,8 @@ struct ScriptVisibleComponent {
 //making an exception for templating here
 class ScriptVisibleComponentRef : public FlecsComponent<ScriptVisibleComponent> {
 	GDCLASS(ScriptVisibleComponentRef, FlecsComponent<ScriptVisibleComponent>)
+private:
+	void append_bytes(PackedByteArray &array, const void *data, size_t size) const;
 	public:
 	ScriptVisibleComponentRef() = default;
 	~ScriptVisibleComponentRef() override = default;
@@ -35,6 +37,13 @@ class ScriptVisibleComponentRef : public FlecsComponent<ScriptVisibleComponent> 
 	void apply_to_entity(flecs::entity &e) const override;
 };
 
+inline void append_bytes(PackedByteArray &ba, const void *data, const size_t size) {
+	const int old_size = ba.size();
+	ba.resize(old_size + size);
+	memcpy(ba.ptrw() + old_size, data, size);
+}
+
+
 inline Variant ScriptVisibleComponentRef::get_field_value(const StringName &field_name) const {
 	const auto component = static_cast<ScriptVisibleComponent *>(data);
 	if (component == nullptr) {
@@ -42,8 +51,7 @@ inline Variant ScriptVisibleComponentRef::get_field_value(const StringName &fiel
 		return Variant();
 	}
 	if (component->fields.has(field_name)) {
-		const Variant * value = component->fields.lookup_ptr();
-		if (value) {
+		if (const Variant *value = component->fields.lookup_ptr(field_name)) {
 			return *value;
 		}
 	}
@@ -51,8 +59,7 @@ inline Variant ScriptVisibleComponentRef::get_field_value(const StringName &fiel
 	return Variant();
 }
 inline void ScriptVisibleComponentRef::set(const StringName &field_name, const Variant &value) const {
-	const auto component = static_cast<ScriptVisibleComponent *>(data);
-	if (component && component->fields.has(field_name)) {
+	if (const auto component = static_cast<ScriptVisibleComponent *>(data); component && component->fields.has(field_name)) {
 		*component->fields.lookup_ptr(field_name) = value;
 	}
 	ERR_PRINT("Field type not found.");
@@ -77,8 +84,7 @@ inline Ref<ScriptVisibleComponentRef> ScriptVisibleComponentRef::create_componen
 	comp->name = name;
 
 	// Auto-fill default values based on schema
-	const auto *registry = ScriptComponentRegistry::get_singleton();
-	if (registry) {
+	if (const auto *registry = ScriptComponentRegistry::get_singleton()) {
 		comp->fields = registry->create_field_map(comp->name);
 	}
 	ref->component_type_hash = FlecsComponentBase::type_hash<ScriptVisibleComponent>();
@@ -101,7 +107,9 @@ inline Ref<FlecsComponentBase> ScriptVisibleComponentRef::clone() const {
 }
 inline void ScriptVisibleComponentRef::apply_to_entity(flecs::entity &e) const {
 	if (data) {
-		e.set<ScriptVisibleComponent>(*data);
+		e.set<ScriptVisibleComponent>(*static_cast<ScriptVisibleComponent *>(data));
 	}
 }
+
+
 #endif //SCRIPT_VISIBLE_COMPONENT_H

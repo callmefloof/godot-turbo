@@ -1,9 +1,12 @@
 #pragma once
-#include "../../thirdparty/flecs/distr/flecs.h"
-#include "single_component_module.h"
+#include "../../../../core/math/quaternion.h"
 #include "../../../../core/math/transform_3d.h"
-#include <cassert>
+#include "../../../../core/math/vector3.h"
+#include "../../thirdparty/flecs/distr/flecs.h"
 #include "component_proxy.h"
+#include "single_component_module.h"
+
+#include <cassert>
 
 struct Transform3DComponent {
 	Transform3D transform;

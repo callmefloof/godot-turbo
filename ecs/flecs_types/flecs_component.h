@@ -19,14 +19,14 @@ public:
 	flecs::entity *get_owner() const;
 	static uint64_t get_type_hash_static();
 	void set_owner(flecs::entity *p_owner);
-	void commit_to_entity(const Ref<FlecsEntity> &entity) const override;
-	virtual void set_data(T* d);
-	flecs::entity& get_component() const override;
+	void commit_to_entity(const Ref<FlecsEntity> &p_entity) const override;
+	virtual void set_data(T* p_data);
+	flecs::entity* get_component() const override;
 	StringName get_type_name() const override;
 	void apply_to_entity(flecs::entity& e) const override;
-	void clear_component() const override;
-	PackedByteArray byte_serialize() const override;
-	void byte_deserialize(const PackedByteArray &p_ba) override;
+	void clear_component() override;
+	PackedByteArray byte_serialize() const;
+	void byte_deserialize(const PackedByteArray &p_ba);
 	Ref<FlecsComponentBase> clone() const override;
 	static void _bind_methods();
 
@@ -34,7 +34,7 @@ public:
 
 template <typename T>
 T* FlecsComponent<T>::get_data(){
-	return data;
+	return get_typed_data<T>();
 }
 
 template <typename T>
@@ -68,20 +68,20 @@ void FlecsComponent<T>::set_owner(flecs::entity *p_owner) {
 }
 
 template <typename T>
-void FlecsComponent<T>::commit_to_entity(const Ref<FlecsEntity>& entity) const {
-	if (!entity.is_valid() || entity.is_null()) {
+void FlecsComponent<T>::commit_to_entity(const Ref<FlecsEntity>& p_entity) const {
+	if (!p_entity.is_valid() || p_entity.is_null()) {
 		ERR_PRINT("Entity is not valid");
 	}
-	const flecs::entity e = entity->get_entity();
+	const flecs::entity *e = p_entity->get_entity();
 	if (data) {
-		e.set<T>(*data);
+		e->set<T>(*get_typed_data<T>());
 	}
 }
 template <typename T>
-void FlecsComponent<T>::set_data(T *d) {
-	if (d != nullptr) {
-		data = d;
-		this->data = d; \
+void FlecsComponent<T>::set_data(T *p_data) {
+	if (p_data != nullptr) {
+		data = p_data;
+		this->data = p_data;
 		this->component_type_hash = get_type_hash_static();
 		return;
 	}
@@ -89,7 +89,7 @@ void FlecsComponent<T>::set_data(T *d) {
 }
 
 template <typename T>
-flecs::entity &FlecsComponent<T>::get_component() const {
+flecs::entity *FlecsComponent<T>::get_component() const {
 	return entity;
 }
 template <typename T>
@@ -98,22 +98,22 @@ void FlecsComponent<T>::_bind_methods() {
 
 template <typename T>
 StringName FlecsComponent<T>::get_type_name() const {
-	return get_class()+ "<" + NAMEOF_TYPE(T) + ">";
+	return get_class()+String("<" + String(NAMEOF_TYPE(T).data()) + ">");
 }
 
 template <typename T>
 void FlecsComponent<T>::apply_to_entity(flecs::entity &e) const {
 	if (data) {
-		e.set<T>(*data);
+		e.set<T>(*get_typed_data<T>());
 		return;
 	}
 	ERR_PRINT("data is null");
 }
 
 template <typename T>
-void FlecsComponent<T>::clear_component() const {
+void FlecsComponent<T>::clear_component() {
 	if (data) {
-		data = T{};
+		*static_cast<T *>(data) = T{};
 	}
 }
 

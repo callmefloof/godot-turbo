@@ -11,6 +11,11 @@
 class ScriptComponentRegistry : public RefCounted {
 	GDCLASS(ScriptComponentRegistry, RefCounted);
 
+
+
+	static ScriptComponentRegistry* singleton;
+
+public:
 	struct FieldDef {
 		Variant::Type type = Variant::NIL;
 		Variant default_value;
@@ -18,10 +23,8 @@ class ScriptComponentRegistry : public RefCounted {
 		FieldDef() = default;
 		explicit FieldDef(Variant::Type t, Variant def = Variant()) : type(t), default_value(def) {}
 	};
+private:
 	OAHashMap<StringName, OAHashMap<StringName, FieldDef>> component_schemas;
-
-	static ScriptComponentRegistry* singleton;
-
 public:
 	ScriptComponentRegistry() { singleton = this; }
 	~ScriptComponentRegistry() { singleton = nullptr; }

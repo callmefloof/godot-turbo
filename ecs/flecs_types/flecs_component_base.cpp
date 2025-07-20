@@ -9,6 +9,8 @@ void FlecsComponentBase::_bind_methods() {
 }
 
 StringName FlecsComponentBase::get_type_name() const { return get_class(); }
-flecs::entity &FlecsComponentBase::get_component() const  { return entity; }
+flecs::entity *FlecsComponentBase::get_component() const {
+	return entity;
+}
 
 

@@ -33,7 +33,7 @@ public:
 	static HashMap<StringName, ComponentTypeInfo> component_registry;
 	FlecsWorld();
 	explicit FlecsWorld(const flecs::world &p_world) : world(p_world) {
-		FlecsEntity::entity = p_world.entity();
+		set_entity(p_world.entity());
 	}
 	~FlecsWorld() override;
 	void init_world();
@@ -42,11 +42,11 @@ public:
 
 	void set(const Ref<FlecsComponentBase> &comp) override;
 	Ref<FlecsEntity> entity() const;
-	Ref<FlecsEntity> entity(const StringName &name) const;
-	Ref<FlecsEntity> entity(const StringName &name, const Ref<FlecsComponentBase> &comp) const;
+	Ref<FlecsEntity> entity(const StringName &p_name) const;
+	Ref<FlecsEntity> entity(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const;
 
 	void remove(const Ref<FlecsComponentBase> &comp) override;
-	void remove(const StringName &component_type) override;
+	void remove(const StringName &component_type);
 	void remove_all_components() override;
 
 	// Accessor for the underlying Flecs world

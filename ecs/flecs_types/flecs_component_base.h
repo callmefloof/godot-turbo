@@ -26,10 +26,10 @@ public:
 	~FlecsComponentBase() override = default;
 	static void _bind_methods();
 	virtual StringName get_type_name() const;
-	virtual flecs::entity& get_component() const;
-	virtual void clear_component() const = 0;
+	virtual flecs::entity* get_component() const;
+	virtual void clear_component() = 0;
 	virtual void apply_to_entity(flecs::entity& e) const = 0;
-	virtual void commit_to_entity(const Ref<FlecsEntity>& entity) const = 0;
+	virtual void commit_to_entity(const Ref<FlecsEntity>& p_entity) const = 0;
 	template<typename T>
 	T* get_typed_data() const {
 		if (component_type_hash != type_hash<T>()) {
@@ -40,8 +40,6 @@ public:
 	}
 	virtual bool is_dynamic() const { return false; }
 	virtual void* get_data_ptr() const { return data; }
-	virtual PackedByteArray byte_serialize() const = 0;
-	virtual void byte_deserialize(const PackedByteArray &p_ba) = 0;
 	virtual Ref<FlecsComponentBase> clone() const = 0;
 
 };

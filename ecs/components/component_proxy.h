@@ -127,9 +127,9 @@ public:\
 \
 	static Ref<CLASS> create_component(const Ref<FlecsEntity> &owner){ \
 		auto class_ref = Ref<CLASS>(memnew(CLASS));\
-		const flecs::entity& entity = owner->get_entity();\
-		entity.set<TYPE>({});\
-		class_ref->set_data(&entity.get_mut<TYPE>());\
+		const flecs::entity* entity = owner->get_entity();\
+		entity->set<TYPE>({});\
+		class_ref->set_data(*entity->get_mut<TYPE>());\
 		return class_ref;\
 	}\
 	\
