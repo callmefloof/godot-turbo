@@ -1,30 +1,35 @@
 #pragma once
-
+#include "../../ecs/components/queryable_component.h"
 #include "../../thirdparty/flecs/distr/flecs.h"
 #include "core/object/object.h"
 #include "core/object/ref_counted.h"
 #include "core/templates/hash_map.h"
-#include "core/variant/dictionary.h"
+#include "flecs_component_base.h"
 #include "flecs_entity.h"
-#include "modules/godot_turbo/ecs/components/script_visible_component.h"
-
+#include "modules/godot_turbo/ecs/components/navigation/2d/2d_navigation_components.h"
 #include <functional>
 #include <typeinfo>
+#include "flecs_script_system.h"
+class ScriptVisibleComponentRef;
 
-class FlecsComponentBase;
-class FlecsEntity;
+
+
 
 struct ComponentTypeInfo {
 	std::function<Ref<FlecsComponentBase>()> creator;
 	std::function<void(const flecs::entity&, Ref<FlecsComponentBase>)> apply;
+	flecs::entity_t component_type;
 };
 
 class FlecsWorld : public FlecsEntity {
 	GDCLASS(FlecsWorld, FlecsEntity)
+public:
+
 private:
 	flecs::world world;
 	ecs_entity_t OnPhysics = ecs_new_w_id(world, EcsPhase);
 	ecs_entity_t OnCollisions = ecs_new_w_id(world, EcsPhase);
+	Vector<Ref<FlecsScriptSystem>> script_systems;
 	/* data */
 protected:
 	static void _bind_methods();
@@ -35,26 +40,27 @@ public:
 	explicit FlecsWorld(const flecs::world &p_world) : world(p_world) {
 		set_entity(p_world.entity());
 	}
-	~FlecsWorld() override;
-	void init_world();
-	bool progress() const;
-	void register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const;
 
+
+	~FlecsWorld();
+	void init_world();
+	bool progress();
+	void register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const;
+	void add_script_system(const Array &component_types, const Callable &callable);
 	void set(const Ref<FlecsComponentBase> &comp) override;
 	Ref<FlecsEntity> entity() const;
-	Ref<FlecsEntity> entity(const StringName &p_name) const;
-	Ref<FlecsEntity> entity(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const;
+	Ref<FlecsEntity> entity_n(const StringName &p_name) const;
+	Ref<FlecsEntity> entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const;
 
 	void remove(const Ref<FlecsComponentBase> &comp) override;
 	void remove(const StringName &component_type);
 	void remove_all_components() override;
 
 	// Accessor for the underlying Flecs world
-	flecs::world *get_world();
-	// Register a system with the world
-	template <typename System>
-	void register_system(const char *name = nullptr, flecs::entity_t phase = flecs::OnUpdate) {
-		System().register_system(world, name, phase);
-	}
+	flecs::world& get_world();
+	static Ref<FlecsEntity> wrap_entity(const flecs::entity &e);
 
 };
+
+
+

@@ -2,14 +2,16 @@
 // Created by Floof on 14-7-2025.
 //
 
+
 #pragma once
-#include "../../../../core/object/object.h"
-#include "../../../../core/typedefs.h"
-#include "../../thirdparty/nameof/include/nameof.hpp"
-#include "flecs_component_base.h"
 #include "../../../../core/error/error_macros.h"
 #include "../../../../core/object/ref_counted.h"
-
+#include "../../../../core/typedefs.h"
+#include "../../thirdparty/nameof/include/nameof.hpp"
+#include "flecs_component.h"
+#include "flecs_component_base.h"
+#include "flecs_entity.h"
+class FlecsEntity;
 
 template <typename T>
 class FlecsComponent : public FlecsComponentBase {
@@ -31,6 +33,7 @@ public:
 	static void _bind_methods();
 
 };
+
 
 template <typename T>
 T* FlecsComponent<T>::get_data(){
@@ -90,7 +93,7 @@ void FlecsComponent<T>::set_data(T *p_data) {
 
 template <typename T>
 flecs::entity *FlecsComponent<T>::get_component() const {
-	return entity;
+	return component;
 }
 template <typename T>
 void FlecsComponent<T>::_bind_methods() {
@@ -145,6 +148,8 @@ void FlecsComponent<T>::byte_deserialize(const PackedByteArray &p_ba) {
 
 	memcpy(data, p_ba.ptr(), sizeof(T));
 }
+
+
 template <typename T>
 Ref<FlecsComponentBase> FlecsComponent<T>::clone() const {
 	Ref<FlecsComponent<T>> new_ref;
@@ -158,5 +163,6 @@ Ref<FlecsComponentBase> FlecsComponent<T>::clone() const {
 	}
 	return new_ref;
 }
+
 
 

@@ -9,13 +9,18 @@
 #include "../../../../core/object/object.h"
 #include "../../../../core/string/string_name.h"
 #include "../../thirdparty/flecs/distr/flecs.h"
-#include "flecs_entity.h"
+#include "../../../../core/io/resource.h"
+#include "../../../../core/object/ref_counted.h"
+#include "../../../../core/typedefs.h"
 
-class FlecsComponentBase : public FlecsEntity {
-	GDCLASS(FlecsComponentBase, FlecsEntity);
+class FlecsEntity;
+
+class FlecsComponentBase : public Resource {
+	GDCLASS(FlecsComponentBase, Resource);
 protected:
 	flecs::world *world = nullptr;
 	flecs::entity *owner = nullptr;
+	flecs::entity *component = nullptr;
 	void* data = nullptr;
 	uint64_t component_type_hash = 0;
 	template<typename T>

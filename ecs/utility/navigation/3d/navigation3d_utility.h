@@ -1,16 +1,16 @@
 #pragma once
+#include "../../../../core/string/ustring.h"
+#include "../../../../core/templates/rid.h"
+#include "../../../../scene/3d/navigation_agent_3d.h"
+#include "../../../../scene/3d/navigation_link_3d.h"
+#include "../../../../scene/3d/navigation_obstacle_3d.h"
+#include "../../../../scene/3d/navigation_region_3d.h"
+#include "../../../../servers/navigation_server_3d.h"
 #include "../../../../thirdparty/flecs/distr/flecs.h"
-#include "servers/navigation_server_3d.h"
-#include "core/templates/rid.h"
-#include "core/string/ustring.h"
-#include "../../object_id_storage.h"
 #include "../../../components/navigation/3d/3d_navigation_components.h"
-#include <scene/3d/navigation_agent_3d.h>
-#include <scene/3d/navigation_link_3d.h>
-#include <scene/3d/navigation_region_3d.h>
-#include <scene/3d/navigation_obstacle_3d.h>
+#include "../../object_id_storage.h"
 
-
+class Callable;
 class Navigation3DUtility {
 private:
 	Navigation3DUtility() = default; // Prevent instantiation
@@ -82,7 +82,7 @@ public:
 								.set<NavLink3DComponent>({ link_id })
 								.set_name(String(nav_link->get_name()).ascii().get_data());
 
-		ObjectIDStorage::add(nav_link, link_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(nav_link), link_id);
 		return entity;
 	}
 
@@ -98,7 +98,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<NavObstacle3DComponent>({ obstacle_id })
 							  .set_name(String(nav_obstacle->get_name()).ascii().get_data());
-		ObjectIDStorage::add(nav_obstacle, obstacle_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(nav_obstacle), obstacle_id);
 		return entity;
 	}
 
@@ -114,7 +114,7 @@ public:
 							  .set<NavRegion3DComponent>({ region_id })
 							  .set_name(String(nav_region->get_name()).ascii().get_data());
 
-		ObjectIDStorage::add(nav_region, region_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(nav_region), region_id);
 		return entity;
 	}
 

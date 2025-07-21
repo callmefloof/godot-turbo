@@ -7,6 +7,10 @@
 #include "../../../../core/templates/vector.h"
 #include "../../../../core/variant/variant.h"
 #include "../../../../core/variant/typed_array.h"
+#include "../../../../core/templates/rid.h"
+#include "flecs_component_base.h"
+#include "flecs_entity.h"
+#include "flecs_component.h"
 #include "variant_type_map.h"
 #include <type_traits>
 
@@ -72,14 +76,14 @@ void set_field_value(T* data_field, const Variant &value, const StringName &fiel
 }
 
 #define DEFINE_PROPERTY(type, name, component_type)\
-type get_##name() {\
+type get_##name() const {\
 	auto typed = get_typed_data<component_type>();\
 	if (typed) {\
 		return typed->name;\
 	}\
 	RETURN_DEFAULT(type)\
 }\
-void set_##name(type value) {\
+void set_##name(type value) const {\
 	auto typed = get_typed_data<component_type>();\
 	if (typed) {\
 	typed->name = value;\
@@ -87,7 +91,7 @@ void set_##name(type value) {\
 }
 
 #define DEFINE_PROPERTY_ARRAY(type, name, component_type)\
-TypedArray<type> get_##name() {\
+TypedArray<type> get_##name() const {\
 TypedArray<type> arr;\
 auto typed = get_typed_data<component_type>();\
 if (typed) { \
@@ -97,74 +101,76 @@ arr.push_back(typed->name[i]);\
 } \
 return arr; \
 }\
-void set_##name(const TypedArray<type> &value) {\
+void set_##name(const TypedArray<type> &value)const {\
 auto typed = get_typed_data<component_type>();\
 if (!typed) { return; }\
 typed->name.clear();\
 for (int i = 0; i < value.size(); i++) {\
 typed->name.push_back(value.get(i));\
 }\
-}
+}\
 
-
-#define BIND_PROPERTY(type, name, class_name)\
-ClassDB::bind_method(D_METHOD("get_"#name), &class_name::get_##name);\
-ClassDB::bind_method(D_METHOD("set_"#name, "value"), &class_name::set_##name);\
-::ClassDB::add_property(class_name::get_class_static(), PropertyInfo(VariantTypeMap<type>::value, #name), _scs_create("set_"#name), _scs_create("get_"#name));\
 
 
 #define BIND_VECTOR_PROPERTY(type, name, class_name)\
 ClassDB::bind_method(D_METHOD("get_"#name), &class_name::get_##name);\
 ClassDB::bind_method(D_METHOD("set_"#name), &class_name::set_##name);\
-::ClassDB::add_property(class_name::get_class_static(), PropertyInfo(Variant::ARRAY, #name), _scs_create("set_"#name), _scs_create("get_"#name));\
+::ClassDB::add_property(class_name::get_class_static(), PropertyInfo(Variant::ARRAY, #name), _scs_create("set_"#name), _scs_create("get_"#name))\
+
+
+
+#define BIND_PROPERTY(type, name, class_name)\
+do { \
+	ClassDB::bind_method(D_METHOD("get_" #name), &class_name::get_##name); \
+	ClassDB::bind_method(D_METHOD("set_" #name, "value"), &class_name::set_##name); \
+	::ClassDB::add_property( \
+		class_name::get_class_static(), \
+		PropertyInfo(VariantTypeMap<type>::value, #name), \
+		_scs_create("set_" #name), \
+		_scs_create("get_" #name) \
+	); \
+} while (0)\
+
+
 
 // a macro collection to simplify exposing types to another scripting language
-#define DEFINE_COMPONENT_PROXY(CLASS, TYPE, FIELD_PROPERTIES,FIELD_BINDINGS)\
-class CLASS : public FlecsComponent<TYPE> {\
-public:\
-\
-	FIELD_PROPERTIES\
-\
-	static Ref<CLASS> create_component(const Ref<FlecsEntity> &owner){ \
-		auto class_ref = Ref<CLASS>(memnew(CLASS));\
-		const flecs::entity* entity = owner->get_entity();\
-		entity->set<TYPE>({});\
-		class_ref->set_data(*entity->get_mut<TYPE>());\
-		return class_ref;\
-	}\
-	\
-	static uint64_t get_type_hash_static() { \
-		static int type_marker; \
-		return reinterpret_cast<uint64_t>(&type_marker); \
-	} \
-	Ref<FlecsComponentBase> clone() const { \
-		Ref<CLASS> new_ref;\
-		new_ref.instantiate();\
-		if (data) {\
-			/* Step 1: cast void* to actual type*/\
-		const auto typed = get_typed_data<TYPE>();\
-\
-		/* Step 2: allocate memory and copy*/\
-		TYPE *copied = memnew(TYPE);\
-		*copied = *typed; /* copy the struct contents*/\
-\
-		new_ref->set_data(copied);\
-		}\
-		return new_ref;\
-	}	\
-	void set_data(TYPE* d) { \
-		this->data = d; \
-		this->component_type_hash = get_type_hash_static(); \
-	} \
-	\
-	StringName get_type_name() const override {\
-		return #TYPE;\
-	}\
-	\
-	static void _bind_methods(){ \
-		FIELD_BINDINGS \
-		ClassDB::bind_static_method(CLASS::get_class_static(),"create_component",&CLASS::create_component,"owner");\
-		\
-		ClassDB::bind_method(D_METHOD("get_type_name"), &CLASS::get_type_name);\
-	} \
+#define DEFINE_COMPONENT_PROXY(CLASS, TYPE, FIELD_PROPERTIES, FIELD_BINDINGS) \
+class CLASS : public FlecsComponent<TYPE> { \
+GDCLASS(CLASS,FlecsComponent<TYPE> )\
+public: \
+FIELD_PROPERTIES \
+static Ref<CLASS> create_component(const Ref<FlecsEntity> &owner) { \
+Ref<CLASS> class_ref = Ref<CLASS>(memnew(CLASS)); \
+const flecs::entity* entity = owner->get_entity(); \
+entity->set<TYPE>({}); \
+class_ref->set_data(&entity->get_mut<TYPE>()); \
+return class_ref; \
+} \
+static uint64_t get_type_hash_static() { \
+static int type_marker; \
+return reinterpret_cast<uint64_t>(&type_marker); \
+} \
+Ref<FlecsComponentBase> clone() const override { \
+Ref<CLASS> new_ref; \
+new_ref.instantiate(); \
+if (data) { \
+const auto typed = get_typed_data<TYPE>(); \
+TYPE* copied = memnew(TYPE); \
+*copied = *typed; \
+new_ref->set_data(copied); \
+} \
+return new_ref; \
+} \
+void set_data(TYPE* d) { \
+this->data = d; \
+this->component_type_hash = get_type_hash_static(); \
+} \
+StringName get_type_name() const override { \
+return #TYPE; \
+} \
+static void _bind_methods() { \
+FIELD_BINDINGS; \
+ClassDB::bind_static_method(CLASS::get_class_static(), "create_component", &CLASS::create_component, "owner"); \
+ClassDB::bind_method(D_METHOD("get_type_name"), &CLASS::get_type_name); \
+} \
 };

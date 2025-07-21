@@ -6,10 +6,13 @@
 #endif
 
 #include "flecs_world.h"
-#include "../../../../core/string/string_name.h"
+
 #include "../../../../core/object/ref_counted.h"
+#include "../../../../core/string/string_name.h"
 #include "../../../../core/templates/oa_hash_map.h"
-#include "flecs_component_base.h"
+#include "../../../../core/variant/callable.h"
+#include "flecs_script_system.h"
+#include "modules/godot_turbo/ecs/components/queryable_component.h"
 #include "modules/godot_turbo/ecs/components/script_visible_component.h"
 
 void FlecsWorld::_bind_methods()
@@ -17,6 +20,12 @@ void FlecsWorld::_bind_methods()
 
 	ClassDB::bind_method(D_METHOD("init_world"), &FlecsWorld::init_world);
 	ClassDB::bind_method(D_METHOD("progress"),&FlecsWorld::progress);
+	ClassDB::bind_method(D_METHOD("entity"),&FlecsWorld::entity);
+	ClassDB::bind_method(D_METHOD("entity_n"),&FlecsWorld::entity_n);
+	ClassDB::bind_method(D_METHOD("entity_nc"),&FlecsWorld::entity_nc);
+
+
+
 }
 
 HashMap<StringName, ComponentTypeInfo> FlecsWorld::component_registry;
@@ -36,7 +45,18 @@ void FlecsWorld::init_world() {
 	world.set<flecs::Rest>({});
 }
 
-bool FlecsWorld::progress() const {
+bool FlecsWorld::progress() {
+	for (auto& sys : script_systems) {
+		if (sys.is_null()) {
+			ERR_PRINT("FlecsWorld::progress: null system");
+			continue;
+		};
+		if (!sys.is_valid()) {
+			ERR_PRINT("FlecsWorld::progress: invalid system");
+			continue;
+		}
+		sys->run();
+	}
 	return world.progress();
 }
 
@@ -102,14 +122,16 @@ void FlecsWorld::set(const Ref<FlecsComponentBase> &comp) {
 
 /// these are meant for entities
 /// go to bed
-Ref<FlecsEntity> FlecsWorld::entity(const StringName &p_name) const {
+Ref<FlecsEntity> FlecsWorld::entity_n(const StringName &p_name) const {
 	Ref<FlecsEntity> flecs_entity = entity();
 	flecs_entity->set_entity_name(p_name);
 	return flecs_entity;
 }
 
-Ref<FlecsEntity> FlecsWorld::entity(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const {
-	Ref<FlecsEntity> flecs_entity = entity(p_name);
+Ref<FlecsEntity> FlecsWorld::entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const {
+	Ref<FlecsEntity> flecs_entity = entity();
+	flecs_entity->set_name(p_name);
+	flecs_entity->set_entity_name(p_name);
 	flecs_entity->set(comp);
 	return flecs_entity;
 }
@@ -146,8 +168,13 @@ void FlecsWorld::remove_all_components() {
 	FlecsEntity::remove_all_components();
 }
 
-flecs::world *FlecsWorld::get_world() {
-	return &world;
+flecs::world& FlecsWorld::get_world() {
+	return world;
+}
+
+Ref<FlecsEntity> FlecsWorld::wrap_entity(const flecs::entity &e) {
+	Ref<FlecsEntity> entity = FlecsWorld::wrap_entity(e);
+	return entity;
 }
 
 void FlecsWorld::register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const {
@@ -185,5 +212,19 @@ void FlecsWorld::register_component_type(const StringName &type_name, const Ref<
 			e.set<ScriptVisibleComponent>(*data); // Actually sets component on entity
 		}
 	};
-
 }
+ void FlecsWorld::add_script_system(const Array &component_types, const Callable &callable) {
+	FlecsScriptSystem* sys = memnew(FlecsScriptSystem);
+	sys->set_world(&world);
+	Vector<String> component_names;
+	component_names.resize(component_types.size());
+	int count = 0;
+	for (auto it = component_types.begin(); it != component_types.end(); ++it) {
+		component_names.set(count, *it);
+		count++;
+	}
+	sys->set_required_components(component_names);
+	sys->set_callback(callable);
+	script_systems.append(sys);
+}
+

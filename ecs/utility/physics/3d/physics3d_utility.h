@@ -1,13 +1,14 @@
 #pragma once
-#include <servers/physics_server_3d.h>
+#include "../../../../servers/physics_server_3d.h"
 #include "../../../components/physics/3d/3d_physics_components.h"
 #include "../../../../thirdparty/flecs/distr/flecs.h"
-#include <scene/3d/physics/area_3d.h>
-#include <scene/3d/physics/rigid_body_3d.h>
-#include <scene/3d/physics/joints/joint_3d.h>
-#include <scene/3d/soft_body_3d.h>
-#include <core/templates/rid.h>
-#include <core/string/ustring.h>
+#include "../../../../scene/3d/physics/area_3d.h"
+#include "../../../../scene/3d/physics/rigid_body_3d.h"
+#include "../../../../scene/3d/physics/joints/joint_3d.h"
+#include "../../../../scene/3d/physics/physics_body_3d.h"
+#include "../../../../scene/3d/soft_body_3d.h"
+#include "../../../../core/templates/rid.h"
+#include "../../../../core/string/ustring.h"
 #include "../../object_id_storage.h"
 
 class Physics3DUtility {
@@ -55,7 +56,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<Area3DComponent>({ area_id })
 							  .set_name(String(area_3d->get_name()).ascii().get_data());
-		ObjectIDStorage::add(area_3d, area_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(area_3d), area_id);
 		return entity;
 	}
 
@@ -71,7 +72,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<Body3DComponent>({ body_id })
 							  .set_name(String(body_3d->get_name()).ascii().get_data());
-		ObjectIDStorage::add(body_3d, body_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(body_3d), body_id);
 		return entity;
 	}
 
@@ -87,7 +88,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<Body3DComponent>({ body_id })
 							  .set_name(String(physics_body->get_name()).ascii().get_data());
-		ObjectIDStorage::add(physics_body, body_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(physics_body), body_id);
 		return entity;
 	}
 
@@ -102,7 +103,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<Joint3DComponent>({ joint_id })
 							  .set_name(String(joint_3d->get_name()).ascii().get_data());
-		ObjectIDStorage::add(joint_3d, joint_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(joint_3d), joint_id);
 		return entity;
 	}
 
@@ -117,7 +118,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<SoftBody3DComponent>({ soft_body_id })
 							  .set_name(String(soft_body_3d->get_name()).ascii().get_data());
-		ObjectIDStorage::add(soft_body_3d, soft_body_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(soft_body_3d), soft_body_id);
 		return entity;
 	}
 };

@@ -3,7 +3,6 @@
 //
 #include "flecs_entity.h"
 #include "../../../../core/error/error_macros.h"
-#include "../../../../core/variant/dictionary.h"
 #include "../../../../core/templates/oa_hash_map.h"
 #include "../../../../core/string/ustring.h"
 #include "flecs_component_base.h"

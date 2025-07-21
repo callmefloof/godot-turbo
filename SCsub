@@ -9,7 +9,11 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/flecs_types/flecs_world.cpp",
     "ecs/flecs_types/flecs_entity.cpp",
     "ecs/flecs_types/flecs_component_base.cpp",
-    "ecs/components/script_component_registry.cpp"
+    "ecs/components/script_component_registry.cpp",
+    "ecs/flecs_types/flecs_script_system.cpp",
+    "ecs/flecs_types/flecs_component.cpp",
+    "ecs/components/script_visible_component.cpp"
+
 ])
 
 # Include the flecs directory for headers

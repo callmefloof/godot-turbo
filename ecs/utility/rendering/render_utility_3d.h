@@ -1,30 +1,43 @@
 #pragma once
+#include "../../../../../core/math/vector4.h"
+#include "../../../../core/io/marshalls.h"
+#include "../../../../core/math/color.h"
+#include "../../../../core/math/transform_3d.h"
+#include "../../../../core/math/vector3.h"
+#include "../../../../scene/3d/camera_3d.h"
+#include "../../../../scene/3d/gpu_particles_3d.h"
+#include "../../../../scene/3d/light_3d.h"
+#include "../../../../scene/3d/mesh_instance_3d.h"
+#include "../../../../scene/3d/multimesh_instance_3d.h"
+#include "../../../../scene/3d/reflection_probe.h"
+#include "../../../../scene/3d/skeleton_3d.h"
+#include "../../../../scene/3d/world_environment.h"
+#include "../../../../scene/resources/compositor.h"
+#include "../../../../scene/resources/material.h"
+#include "../../../../scene/resources/mesh.h"
+#include "../../../../scene/resources/multimesh.h"
+#include "../../../../scene/resources/surface_tool.h"
+#include "../../../../core/variant/array.h"
+#include "../../../../core/variant/variant.h"
+#include "../../../../core/math/math_funcs.h"
+
+#include "../../../../../scene/3d/occluder_instance_3d.h"
 #include "../../../thirdparty/flecs/distr/flecs.h"
 #include "../../components/rendering/rendering_components.h"
 #include "../../components/transform_3d_component.h"
+#include "../../ecs/components/worldcomponents.h"
 #include "../object_id_storage.h"
-#include "modules/godot_turbo/ecs/components/worldcomponents.h"
-#include "scene/3d/camera_3d.h"
-#include "scene/3d/gpu_particles_3d.h"
-#include "scene/3d/light_3d.h"
-#include "scene/3d/mesh_instance_3d.h"
-#include "scene/3d/multimesh_instance_3d.h"
-#include "scene/3d/reflection_probe.h"
-#include "scene/3d/skeleton_3d.h"
-#include "scene/3d/world_environment.h"
-#include "scene/resources/mesh.h"
-#include "scene/resources/multimesh.h"
-#include "servers/rendering_server.h"
-#include <core/templates/rid.h>
-#include <core/templates/vector.h>
-#include <scene/main/viewport.h>
+
+#include "../../../../core/templates/rid.h"
+#include "../../../../core/templates/vector.h"
+#include "../../../../scene/main/viewport.h"
+#include "../../../../servers/rendering_server.h"
 #include <cassert>
 
-#include <scene/3d/voxel_gi.h>
+#include "../../../../scene/3d/voxel_gi.h"
 
 
 class RenderUtility3D {
-private:
 	RenderUtility3D() = default; // Prevent instantiation
 	RenderUtility3D(const RenderUtility3D &) = delete; // Prevent copy
 	RenderUtility3D &operator=(const RenderUtility3D &) = delete; // Prevent assignment
@@ -36,8 +49,9 @@ public:
 		Vector<RID> material_ids;
 		const uint32_t surface_count = RS::get_singleton()->mesh_get_surface_count(mesh_id);
 		for (uint32_t i = 0; i < surface_count; ++i) {
-			if (const RID material_id = RS::get_singleton()->mesh_surface_get_material(mesh_id, i); material_id.is_valid()) {
-				material_ids.push_back(material_id);  
+			const RID material_id = RS::get_singleton()->mesh_surface_get_material(mesh_id, i);
+			if (material_id.is_valid()) {
+				material_ids.push_back(material_id);
 			} else {
 				material_ids.push_back(RID()); // Use an empty RID if no material is set
 			}
@@ -62,13 +76,14 @@ public:
 		const RID base = mesh_instance_3d->get_base();
 		const RID instance = mesh_instance_3d->get_instance();
 		for (int i = 0; i < mesh->get_surface_count(); ++i) {
-			if (const Ref<Material> material = mesh->surface_get_material(i); material.is_valid()) {
+			const Ref<Material> material = mesh->surface_get_material(i);
+			if (material.is_valid()) {
 				material_ids.push_back(material->get_rid());
 			} else {
 				material_ids.push_back(RID()); // Use an empty RID if no material is set
 			}
 		}
-		ObjectIDStorage::add(mesh_instance_3d,mesh_instance_3d->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object *>(mesh_instance_3d),mesh_instance_3d->get_instance());
 		return world.entity()
 				.set<MeshComponent>({ base, material_ids })
 				.set<Transform3DComponent>({ mesh_instance_3d->get_transform() })
@@ -116,11 +131,11 @@ public:
 							  .set<RenderInstanceComponent>({ instance_id })
 							  .set<Transform3DComponent>({ transform })
 							  .set_name(name.ascii().get_data());
-		ObjectIDStorage::add(multi_mesh_instance, instance_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(multi_mesh_instance), instance_id);
 		return entity;
 	}
 
-	static flecs::entity CreateMultiMeshInstance(
+	static flecs::entity create_multi_mesh_instance(
 		const flecs::world &world,
 		const Transform3D &transform,
 		const uint32_t index,
@@ -143,13 +158,13 @@ public:
 		Vector<flecs::entity> instances;
 		const auto &[multi_mesh_id, instance_count] = multi_mesh.get<MultiMeshComponent>();
 		for (uint32_t i = 0; i < instance_count; ++i) {
-			instances.append(CreateMultiMeshInstance(world, transform[i], i, multi_mesh_id, multi_mesh.name() + " - Instance: #" + String::num_int64(i)));
+			instances.append(create_multi_mesh_instance(world, transform[i], i, multi_mesh_id, multi_mesh.name() + " - Instance: #" + String::num_int64(i)));
 		}
 		return instances;
 	}
 
 
-	static flecs::entity CreateParticles(
+	static flecs::entity create_particles(
 		const flecs::world &world,
 		const Transform3D &transform,
 		const RID &scenario_id,
@@ -162,7 +177,7 @@ public:
 				.set_name(name.ascii().get_data());  
 	}
 
-	static flecs::entity CreateParticles(const flecs::world &world, GPUParticles3D *gpu_particles_3d) {
+	static flecs::entity create_particles(const flecs::world &world, GPUParticles3D *gpu_particles_3d) {
 		if (gpu_particles_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -176,11 +191,11 @@ public:
 								 .set<RenderInstanceComponent>({ gpu_particles_3d->get_instance() })
 								 .set<Transform3DComponent>({ gpu_particles_3d->get_transform() })
 								 .set_name(String(gpu_particles_3d->get_name()).ascii().get_data());
-		ObjectIDStorage::add(gpu_particles_3d,gpu_particles_3d->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object*>(gpu_particles_3d),gpu_particles_3d->get_instance());
 		return particles;
 	}
 
-	static flecs::entity CreateReflectionProbe(const flecs::world &world, const RID &probe_id, const Transform3D &transform, const String& name) {
+	static flecs::entity create_reflection_probe(const flecs::world &world, const RID &probe_id, const Transform3D &transform, const String& name) {
 		if (!world.has<World3DComponent>()) {
 			ERR_FAIL_COND_V(!world.has<World3DComponent>(), flecs::entity());
 		}
@@ -191,24 +206,24 @@ public:
 				.set_name(name.ascii().get_data());  
 	}
 
-	static flecs::entity CreateReflectionProbe(const flecs::world &world, ReflectionProbe *reflection_probe) {
+	static flecs::entity create_reflection_probe(const flecs::world &world, ReflectionProbe *reflection_probe) {
 		const flecs::entity entity_probe = world.entity()
 									.set<ReflectionProbeComponent>({ reflection_probe->get_base() })
 									.set<Transform3DComponent>({ reflection_probe->get_transform() })
 									.set<RenderInstanceComponent>({ reflection_probe->get_instance() })
 									.set_name(String(reflection_probe->get_name()).ascii().get_data());
-		ObjectIDStorage::add(reflection_probe, reflection_probe->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object*>(reflection_probe), reflection_probe->get_instance());
 		return entity_probe;
 	}
 	
 
-	static flecs::entity CreateSkeleton(const flecs::world &world, const RID &skeleton_id, const String &name) {
+	static flecs::entity create_skeleton(const flecs::world &world, const RID &skeleton_id, const String &name) {
 		return world.entity()  
 				.set<SkeletonComponent>({ skeleton_id })
 				.set_name(name.ascii().get_data());
 	}  
 
-	static flecs::entity CreateSkeleton(const flecs::world &world, Skeleton3D* skeleton_3d) {
+	static flecs::entity create_skeleton(const flecs::world &world, Skeleton3D* skeleton_3d) {
 		const RID skeleton_id = RS::get_singleton()->skeleton_create();
 		if (skeleton_3d == nullptr) {
 			ERR_FAIL_V(flecs::entity());
@@ -275,12 +290,12 @@ public:
 		const flecs::entity camera = world.entity(String(camera_3d->get_name()).ascii().get_data())
 							  .set<CameraComponent>({ camera_3d->get_camera() })
 							  .set<Transform3DComponent>({ camera_3d->get_transform() });
-		ObjectIDStorage::add(camera_3d, camera_3d->get_camera());
+		ObjectIDStorage::add(dynamic_cast<Object*>(camera_3d), camera_3d->get_camera());
 		if (camera_3d->get_compositor().is_null() || camera_3d->get_compositor().is_valid()) {
 			const RID compositor_id = camera_3d->get_compositor()->get_rid();
 			flecs::entity compositor_entity = CreateCompositor(world, compositor_id, camera_3d->get_compositor()->get_name());
 			compositor_entity.child(camera);
-		};
+		}
 		return camera;
 	}
 
@@ -302,7 +317,7 @@ public:
 		const flecs::entity entity = world.entity()
 							  .set<CompositorComponent>({ compositor_id })
 							  .set_name(String(compositor->get_name()).ascii().get_data());
-		ObjectIDStorage::add(compositor, compositor_id);
+		ObjectIDStorage::add(dynamic_cast<Object*>(compositor), compositor_id);
 		return entity;
 	}
 
@@ -342,7 +357,7 @@ public:
 							  .set<Transform3DComponent>({ directional_light->get_transform() })
 							  .set<RenderInstanceComponent>({ directional_light->get_instance() })
 							  .set_name(String(directional_light->get_name()).ascii().get_data());
-		ObjectIDStorage::add(directional_light, directional_light->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object*>(directional_light), directional_light->get_instance());
 		return entity;
 	}
 
@@ -369,7 +384,7 @@ public:
 							  .set<OmniLightComponent>({ omni_light->get_base() })
 							  .set<Transform3DComponent>({ omni_light->get_transform() })
 							  .set<RenderInstanceComponent>({ omni_light->get_instance() });
-		ObjectIDStorage::add(omni_light, omni_light->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object*>(omni_light), omni_light->get_instance());
 		return entity;
 	}
 
@@ -404,7 +419,7 @@ public:
 							  .set<SpotLightComponent>({ spot_light->get_base() })
 							  .set<Transform3DComponent>({ spot_light->get_transform() })
 							  .set<RenderInstanceComponent>({ spot_light->get_instance() });
-		ObjectIDStorage::add(spot_light, spot_light->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object*>(spot_light), spot_light->get_instance());
 		return entity;
 	}
 
@@ -458,22 +473,84 @@ public:
 							  .set<Transform3DComponent>({ voxel_gi->get_transform() })
 							  .set<RenderInstanceComponent>({ voxel_gi->get_instance() })
 							  .set_name(String(voxel_gi->get_name()).ascii().get_data());
-		ObjectIDStorage::add(voxel_gi, voxel_gi->get_instance());
+		ObjectIDStorage::add(dynamic_cast<Object*>(voxel_gi), voxel_gi->get_instance());
 		return entity;
 	}
 
-	static flecs::entity CreateScenario(const flecs::world &world, const RID &scenario_id, const String &name) {
+	static flecs::entity create_scenario(const flecs::world &world, const RID &scenario_id, const String &name) {
 		return world.entity()
 				.set<ScenarioComponent>({ scenario_id })
 				.set_name(name.ascii().get_data());
 	}
 
-	static flecs::entity CreateScenario(const flecs::world &world, const String &name) {
+	static flecs::entity create_scenario(const flecs::world &world, const String &name) {
 		const RID scenario_id = RS::get_singleton()->scenario_create();
 		return world.entity()
 				.set<ScenarioComponent>({ scenario_id })
 				.set_name(name.ascii().get_data());
 	}
 
+	static flecs::entity create_occluder(const flecs::world& world, const String &name) {
+		return create_occluder(world, RS::get_singleton()->occluder_create(), name);
+	}
 
+	static flecs::entity create_occluder(const flecs::world &world, const RID& occluder_id, const String &name) {
+		return world.entity().set<OccluderComponent>({occluder_id}).set_name(name.ascii().get_data());
+	}
+
+	static flecs::entity create_occluder(const flecs::world &world, OccluderInstance3D* occluder_instance) {
+		if (occluder_instance == nullptr) {
+			ERR_FAIL_V(flecs::entity());
+		}
+		const Ref<Occluder3D> occluder = occluder_instance->get_occluder();
+		const flecs::entity entity = world.entity().set<OccluderComponent>({occluder->get_rid()}).set_name(occluder->get_name().ascii().get_data());
+		ObjectIDStorage::add(dynamic_cast<Object *>(occluder_instance), occluder->get_rid());
+		return entity;
+	}
+
+	static bool _bake_material_check(const Ref<Material> &p_material) {
+		StandardMaterial3D *standard_mat = Object::cast_to<StandardMaterial3D>(p_material.ptr());
+		if (standard_mat && standard_mat->get_transparency() != StandardMaterial3D::TRANSPARENCY_DISABLED) {
+			return false;
+		}
+		return true;
+	}
+
+	static void _bake_surface(const Transform3D &p_transform, Array p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, PackedVector3Array &r_vertices, PackedInt32Array &r_indices) {
+		if (!_bake_material_check(p_material)) {
+			return;
+		}
+		ERR_FAIL_COND_MSG(p_surface_arrays.size() != Mesh::ARRAY_MAX, "Invalid surface array.");
+
+		PackedVector3Array vertices = p_surface_arrays[Mesh::ARRAY_VERTEX];
+		PackedInt32Array indices = p_surface_arrays[Mesh::ARRAY_INDEX];
+
+		if (vertices.size() == 0 || indices.size() == 0) {
+			return;
+		}
+
+		Vector3 *vertices_ptr = vertices.ptrw();
+		for (int j = 0; j < vertices.size(); j++) {
+			vertices_ptr[j] = p_transform.xform(vertices_ptr[j]);
+		}
+
+		if (!Math::is_zero_approx(p_simplification_dist) && SurfaceTool::simplify_func) {
+			Vector<float> vertices_f32 = vector3_to_float32_array(vertices.ptr(), vertices.size());
+
+			float error_scale = SurfaceTool::simplify_scale_func(vertices_f32.ptr(), vertices.size(), sizeof(float) * 3);
+			float target_error = p_simplification_dist / error_scale;
+			float error = -1.0f;
+			int target_index_count = MIN(indices.size(), 36);
+
+			const int simplify_options = SurfaceTool::SIMPLIFY_LOCK_BORDER;
+
+			uint32_t index_count = SurfaceTool::simplify_func(
+					(unsigned int *)indices.ptrw(),
+					(unsigned int *)indices.ptr(),
+					indices.size(),
+					vertices_f32.ptr(), vertices.size(), sizeof(float) * 3,
+					target_index_count, target_error, simplify_options, &error);
+			indices.resize(index_count);
+		}
+	}
 };
