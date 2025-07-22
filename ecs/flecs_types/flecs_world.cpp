@@ -12,8 +12,15 @@
 #include "../../../../core/templates/oa_hash_map.h"
 #include "../../../../core/variant/callable.h"
 #include "flecs_script_system.h"
+#include "modules/godot_turbo/ecs/components/navigation/3d/3d_navigation_components.h"
+#include "modules/godot_turbo/ecs/components/physics/2d/2d_physics_components.h"
+#include "modules/godot_turbo/ecs/components/physics/3d/3d_physics_components.h"
 #include "modules/godot_turbo/ecs/components/queryable_component.h"
+#include "modules/godot_turbo/ecs/components/rendering/rendering_components.h"
 #include "modules/godot_turbo/ecs/components/script_visible_component.h"
+#include "modules/godot_turbo/ecs/components/transform_2d_component.h"
+#include "modules/godot_turbo/ecs/components/transform_3d_component.h"
+#include "modules/godot_turbo/ecs/components/worldcomponents.h"
 
 void FlecsWorld::_bind_methods()
 {
@@ -23,6 +30,12 @@ void FlecsWorld::_bind_methods()
 	ClassDB::bind_method(D_METHOD("entity"),&FlecsWorld::entity);
 	ClassDB::bind_method(D_METHOD("entity_n"),&FlecsWorld::entity_n);
 	ClassDB::bind_method(D_METHOD("entity_nc"),&FlecsWorld::entity_nc);
+	ClassDB::bind_method(D_METHOD("set", "comp_ref"),&FlecsWorld::set_component);
+	ClassDB::bind_method(D_METHOD("remove", "comp_ref"),&FlecsWorld::remove);
+	ClassDB::bind_method(D_METHOD("remove_t", "p_name"),&FlecsWorld::remove_t);
+	ClassDB::bind_method(D_METHOD("remove_all_components"),&FlecsWorld::remove_all_components);
+	ClassDB::bind_method(D_METHOD("add_script_system", "component_types","callable"),&FlecsWorld::add_script_system);
+	ClassDB::bind_method(D_METHOD("register_component_type", "type_name","script_visible_component_ref"), &FlecsWorld::register_component_type);
 
 
 
@@ -32,7 +45,16 @@ HashMap<StringName, ComponentTypeInfo> FlecsWorld::component_registry;
 
 FlecsWorld::FlecsWorld(/* args */)
 {
-	
+	RenderingComponentModule::initialize(world);
+	Physics2DComponentModule::initialize(world);
+	Physics3DComponentModule::initialize(world);
+	Navigation2DComponentModule::initialize(world);
+	Navigation3DComponentModule::initialize(world);
+	Transform2DComponentModule::initialize(world);
+	Transform3DComponentModule::initialize(world);
+	World3DComponentModule::initialize(world);
+	World2DComponentModule::initialize(world);
+	ScriptVisibleComponentModule::initialize(world);
 }
 
 FlecsWorld::~FlecsWorld()
@@ -67,16 +89,16 @@ Ref<FlecsEntity> FlecsWorld::entity() const {
 	flecs_entity->set_entity(world.entity());
 	return flecs_entity;
 }
-void FlecsWorld::set(const Ref<FlecsComponentBase> &comp) {
+void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
 
-	if (!comp.is_valid()) {
+	if (!comp_ref.is_valid()) {
 		ERR_PRINT("add_component(): Component is null or invalid.");
 		return;
 	}
 
 	// Handle dynamic script-visible components
-	if (comp->is_dynamic()) {
-		const Ref<ScriptVisibleComponentRef> dyn = comp;
+	if (comp_ref->is_dynamic()) {
+		const Ref<ScriptVisibleComponentRef> dyn = comp_ref;
 		ScriptVisibleComponent* data = dyn->get_data();
 
 		if (!data) {
@@ -116,7 +138,7 @@ void FlecsWorld::set(const Ref<FlecsComponentBase> &comp) {
 	}
 
 	// Static typed component path
-	comp->commit_to_entity(Ref<FlecsEntity>(this));
+	comp_ref->commit_to_entity(Ref<FlecsEntity>(this));
 }
 
 
@@ -128,17 +150,27 @@ Ref<FlecsEntity> FlecsWorld::entity_n(const StringName &p_name) const {
 	return flecs_entity;
 }
 
-Ref<FlecsEntity> FlecsWorld::entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const {
+Ref<FlecsEntity> FlecsWorld::entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &p_comp) const {
 	Ref<FlecsEntity> flecs_entity = entity();
 	flecs_entity->set_name(p_name);
 	flecs_entity->set_entity_name(p_name);
-	flecs_entity->set(comp);
+	flecs_entity->set_component(p_comp);
 	return flecs_entity;
 }
 
-void FlecsWorld::remove(const Ref<FlecsComponentBase> &comp) {
+void FlecsWorld::remove(const Ref<FlecsComponentBase> &comp_ref) {
+	if (comp_ref.is_null()) {
+		ERR_PRINT("FlecsWorld::remove: null comp");
+		return;
+	}
+	if (!comp_ref.is_valid()) {
+		ERR_PRINT("FlecsWorld::remove: invalid comp");
+	}
+	const StringName& comp_type = comp_ref->get_type_name();
+	return remove_t(comp_type);
 }
-void FlecsWorld::remove(const StringName &component_type) {
+
+void FlecsWorld::remove_t(const StringName &component_type) {
 	const char* c_component_type = String(component_type).ascii().get_data();
 	const flecs::entity component = FlecsEntity::entity->world().lookup(c_component_type);
 	if (component.is_valid()) {
@@ -173,7 +205,8 @@ flecs::world& FlecsWorld::get_world() {
 }
 
 Ref<FlecsEntity> FlecsWorld::wrap_entity(const flecs::entity &e) {
-	Ref<FlecsEntity> entity = FlecsWorld::wrap_entity(e);
+	Ref<FlecsEntity> entity = memnew(FlecsEntity);
+	entity->set_entity(e);
 	return entity;
 }
 

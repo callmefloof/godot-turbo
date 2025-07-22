@@ -22,7 +22,7 @@ struct ComponentTypeInfo {
 };
 
 class FlecsWorld : public FlecsEntity {
-	GDCLASS(FlecsWorld, FlecsEntity)
+	GDCLASS(FlecsWorld, FlecsEntity);
 public:
 
 private:
@@ -47,13 +47,13 @@ public:
 	bool progress();
 	void register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const;
 	void add_script_system(const Array &component_types, const Callable &callable);
-	void set(const Ref<FlecsComponentBase> &comp) override;
+	void set_component(const Ref<FlecsComponentBase> &comp_ref) override;
 	Ref<FlecsEntity> entity() const;
 	Ref<FlecsEntity> entity_n(const StringName &p_name) const;
-	Ref<FlecsEntity> entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &comp) const;
+	Ref<FlecsEntity> entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &p_comp) const;
 
-	void remove(const Ref<FlecsComponentBase> &comp) override;
-	void remove(const StringName &component_type);
+	void remove(const Ref<FlecsComponentBase> &comp_ref) override;
+	void remove_t(const StringName &component_type);
 	void remove_all_components() override;
 
 	// Accessor for the underlying Flecs world

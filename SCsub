@@ -11,33 +11,38 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/flecs_types/flecs_component_base.cpp",
     "ecs/components/script_component_registry.cpp",
     "ecs/flecs_types/flecs_script_system.cpp",
-    "ecs/flecs_types/flecs_component.cpp",
     "ecs/components/script_visible_component.cpp"
-
 ])
 
-# Include the flecs directory for headers
-module_env.Append(CPPPATH=["#modules/godot_turbo/thirdparty/flecs/distr"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/flecs_types"])
+# Use env.GetModulePath() for the module's root, or env.Dir('.')
+# Based on common Godot SCons practices, env.GetModulePath() is often available
+# or directly using env.Dir('.') which refers to the current directory of the SCsub.
 
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/rendering"])
+module_env.Append(CPPPATH=[
+    # The current directory of this SCsub (i.e., godot_turbo/)
+    env.Dir('.'), # This is the most robust and standard SCons way.
 
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/physics/2d"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/physics/3d"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/navigation/2d"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/components/navigation/3d"])
+    # Specific third-party library relative to module root
+    env.Dir('thirdparty/flecs/distr'),
 
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/rendering"])
+    # Main ECS subdirectories relative to module root
+    env.Dir('ecs'),
+    env.Dir('ecs/flecs_types'),
+    env.Dir('ecs/components'),
+    env.Dir('ecs/utility'),
 
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/physics/2d"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/physics/3d"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/navigation/2d"])
-module_env.Append(CPPPATH=["#modules/godot_turbo/ecs/utility/navigation/3d"])
-
-
+    # Specific sub-subdirectories (if your #includes are like #include "2d_physics_components.h")
+    env.Dir('ecs/components/rendering'),
+    env.Dir('ecs/components/physics/2d'),
+    env.Dir('ecs/components/physics/3d'),
+    env.Dir('ecs/components/navigation/2d'),
+    env.Dir('ecs/components/navigation/3d'),
+    env.Dir('ecs/utility/rendering'),
+    env.Dir('ecs/utility/physics/2d'),
+    env.Dir('ecs/utility/physics/3d'),
+    env.Dir('ecs/utility/navigation/2d'),
+    env.Dir('ecs/utility/navigation/3d')
+])
 
 # Optional optimizations
 # module_env.Append(CCFLAGS=["-O2"])

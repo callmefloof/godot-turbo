@@ -11,6 +11,7 @@
 #include "flecs_component.h"
 #include "flecs_component_base.h"
 #include "flecs_entity.h"
+#include "../../../../core/variant/variant_utility.h"
 class FlecsEntity;
 
 template <typename T>
@@ -27,8 +28,8 @@ public:
 	StringName get_type_name() const override;
 	void apply_to_entity(flecs::entity& e) const override;
 	void clear_component() override;
-	PackedByteArray byte_serialize() const;
-	void byte_deserialize(const PackedByteArray &p_ba);
+	//PackedByteArray byte_serialize() const;
+	//void byte_deserialize(const PackedByteArray &p_ba);
 	Ref<FlecsComponentBase> clone() const override;
 	static void _bind_methods();
 
@@ -97,6 +98,10 @@ flecs::entity *FlecsComponent<T>::get_component() const {
 }
 template <typename T>
 void FlecsComponent<T>::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("commit_to_entity"), &FlecsComponent::commit_to_entity);
+	//ClassDB::bind_method(D_METHOD("byte_serialize"), &FlecsComponent::byte_serialize);
+	//ClassDB::bind_method(D_METHOD("byte_deserialize", "p_ba"), &FlecsComponent::byte_deserialize);
+	ClassDB::bind_method(D_METHOD("clone"), &FlecsComponent::clone);
 }
 
 template <typename T>
@@ -119,35 +124,42 @@ void FlecsComponent<T>::clear_component() {
 		*static_cast<T *>(data) = T{};
 	}
 }
-
-template <typename T>
-PackedByteArray FlecsComponent<T>::byte_serialize() const {
-	PackedByteArray bytes;
-	if constexpr (std::is_trivially_copyable_v<T>) {
-		bytes.resize(sizeof(T));
-		memcpy(bytes.ptrw(), data, sizeof(T));
-	} else {
-		ERR_PRINT("byte_serialize() only supports trivially copyable types.");
-	}
-	return bytes;
-}
-
-template <typename T>
-void FlecsComponent<T>::byte_deserialize(const PackedByteArray &p_ba) {
-	static_assert(std::is_trivially_copyable_v<T>, "byte_deserialize requires T to be trivially copyable");
-
-	if (p_ba.size() != sizeof(T)) {
-		ERR_PRINT("byte_deserialize: PackedByteArray size mismatch. Expected " + itos(sizeof(T)) + ", got " + itos(p_ba.size()));
-		return;
-	}
-
-	if (!data) {
-		ERR_PRINT("byte_deserialize: data pointer is null.");
-		return;
-	}
-
-	memcpy(data, p_ba.ptr(), sizeof(T));
-}
+// these cannot work due to the usage of RID's in components. I could refactor every RID into an uint64_t representation
+// but that would be tedious
+// template <typename T>
+// PackedByteArray FlecsComponent<T>::byte_serialize() const {
+// 	const Object* obj = this;
+// 	const Variant variant = obj;
+// 	return VariantUtilityFunctions::var_to_bytes_with_objects(variant);
+// }
+// template <typename T>
+// void FlecsComponent<T>::byte_deserialize(const PackedByteArray &p_ba) {
+// 	const Variant variant = VariantUtilityFunctions::bytes_to_var_with_objects(p_ba);
+// 	if (!variant.is_ref_counted()) {
+// 		ERR_PRINT("Failed to deserialize flecs component: variant not refcounted.");
+// 		return;
+// 	}
+// 	if (variant.is_null()) {
+// 		ERR_PRINT("Failed to deserialize flecs component: variant null.");
+// 		return;
+// 	}
+// 	Object* obj = variant;
+// 	if (obj == nullptr) {
+// 		ERR_PRINT("Failed to deserialize flecs component: object is null.");
+// 		return;
+// 	}
+// 	Ref<FlecsComponent<T>> flecs_comp = Object::cast_to<FlecsComponent<T>>(obj);
+// 	if (!flecs_comp.is_valid()) {
+// 		ERR_PRINT("Failed to deserialize flecs component: component object is invalid.");
+// 		return;
+// 	}
+// 	if (flecs_comp.is_null()) {
+// 		ERR_PRINT("Failed to deserialize flecs component: component object is null.");
+// 		return;
+// 	}
+// 	set_data(flecs_comp->get_data());
+// 	return;
+// }
 
 
 template <typename T>

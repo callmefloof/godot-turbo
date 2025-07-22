@@ -4,17 +4,18 @@
 
 #ifndef SCRIPT_VISIBLE_COMPONENT_H
 #define SCRIPT_VISIBLE_COMPONENT_H
+#include "../../../../core/error/error_macros.h"
 #include "../../../../core/object/class_db.h"
 #include "../../../../core/object/object.h"
 #include "../../../../core/object/ref_counted.h"
 #include "../../../../core/os/memory.h"
 #include "../../../../core/string/string_name.h"
 #include "../../../../core/templates/oa_hash_map.h"
+#include "../../../../core/typedefs.h"
 #include "../../../../core/variant/variant.h"
 #include "../flecs_types/flecs_component.h"
-#include "../../../../core/typedefs.h"
-#include "../../../../core/error/error_macros.h"
 #include "script_component_registry.h"
+#include "single_component_module.h"
 class FlecsEntity;
 
 struct ScriptVisibleComponent {
@@ -48,10 +49,11 @@ private:
 };
 
 
-template <>
-inline void FlecsComponent<ScriptVisibleComponent>::byte_deserialize(const PackedByteArray &p_ba) {
-	ERR_PRINT("Not implemented");
-}
+// template <>
+// inline void FlecsComponent<ScriptVisibleComponent>::byte_deserialize(const PackedByteArray &p_ba) {
+// 	ERR_PRINT("Not implemented");
+// }
 
+using ScriptVisibleComponentModule = SingleComponentModule<ScriptVisibleComponent>;
 
 #endif //SCRIPT_VISIBLE_COMPONENT_H

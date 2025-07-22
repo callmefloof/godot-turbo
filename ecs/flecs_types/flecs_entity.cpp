@@ -3,13 +3,27 @@
 //
 #include "flecs_entity.h"
 #include "../../../../core/error/error_macros.h"
+#include "../../../../core/object/ref_counted.h"
 #include "../../../../core/templates/oa_hash_map.h"
 #include "../../../../core/string/ustring.h"
 #include "flecs_component_base.h"
 #include "../components/script_visible_component.h"
+#include "../../../../core/object/class_db.h"
+#include "../../../../core/object/object.h"
 
  void FlecsEntity::_bind_methods() {
 	//fill in methods
+ 	ClassDB::bind_method(D_METHOD("get_component", "component_type"),&FlecsEntity::get_component);
+ 	ClassDB::bind_method(D_METHOD("remove_all_components"),&FlecsEntity::remove_all_components);
+ 	ClassDB::bind_method(D_METHOD("get_component_types"),&FlecsEntity::get_component_types);
+
+ 	ClassDB::bind_method(D_METHOD("get_entity_name"),&FlecsEntity::get_entity_name);
+ 	ClassDB::bind_method(D_METHOD("set_entity_name", "p_name"),&FlecsEntity::set_entity_name);
+ 	ClassDB::bind_method(D_METHOD("set_component", "component_type"),&FlecsEntity::set_component);
+ 	ClassDB::bind_method(D_METHOD("remove", "component_type"),&FlecsEntity::set_component);
+ 	ClassDB::bind_method(D_METHOD("get_component_by_name", "component_type"),&FlecsEntity::get_component_by_name);
+
+
 
 }
  void FlecsEntity::remove(const Ref<FlecsComponentBase> &comp) {
@@ -31,7 +45,7 @@
  void FlecsEntity::remove_all_components() {
 	components.clear();
 }
- Ref<FlecsComponentBase> FlecsEntity::get(const StringName &component_type) const {
+ Ref<FlecsComponentBase> FlecsEntity::get_component(const StringName &component_type) const {
 	for (int i = 0; i < components.size(); i++) {
 		if (!components[i].is_valid()) {
 			ERR_PRINT("component reference has become invalid, skipping index.");
@@ -85,15 +99,15 @@
 	return entity;
 }
 
- void FlecsEntity::set(const Ref<FlecsComponentBase>& comp) {
-	if (!comp.is_valid()) {
+ void FlecsEntity::set_component(const Ref<FlecsComponentBase>& comp_ref) {
+	if (!comp_ref.is_valid()) {
 		ERR_PRINT("add_component(): Component is null or invalid.");
 		return;
 	}
 
 	// Handle dynamic script-visible components
-	if (comp->is_dynamic()) {
-		const Ref<ScriptVisibleComponentRef> dyn = comp;
+	if (comp_ref->is_dynamic()) {
+		const Ref<ScriptVisibleComponentRef> dyn = comp_ref;
 		ScriptVisibleComponent* data = dyn->get_data();
 
 		if (!data) {
@@ -132,7 +146,7 @@
 	}
 
 	// Static typed component path
-	comp->commit_to_entity(Ref<FlecsEntity>(this));
+	comp_ref->commit_to_entity(Ref<FlecsEntity>(this));
 }
 void FlecsEntity::remove(String &component_type) {
 	const char* c_component_type =component_type.ascii().get_data();
@@ -160,7 +174,7 @@ void FlecsEntity::remove(String &component_type) {
 	}
 	ERR_PRINT("component type not found in entity");
 }
-Ref<FlecsComponentBase> FlecsEntity::get(const StringName &component_type) {
+Ref<FlecsComponentBase> FlecsEntity::get_component_by_name(const StringName &component_type) {
 	for (int i = 0; i < components.size(); i++) {
 		if (!components[i].is_valid()) {
 			ERR_PRINT("component reference has become invalid, skipping index.");

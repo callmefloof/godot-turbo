@@ -24,6 +24,9 @@ private:
 	static flecs::query<> get_query(const flecs::world &world, const Vector<String> &component_names);
 	flecs::world *world_ref = nullptr;
 
+protected:
+	static void _bind_methods();
+
 public:
 	void run() const;
 	void set_world(flecs::world *p_world);

@@ -8,6 +8,7 @@ protected:
 	static inline ComponentsStruct *components = nullptr;
 
 public:
+	MultiComponentModule() {}
 	static void initialize(flecs::world &world) {
 		static ComponentsStruct _components(world);
 		components = &_components;
