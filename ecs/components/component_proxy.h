@@ -120,6 +120,16 @@ ClassDB::add_property( \
 #define DEFINE_COMPONENT_PROXY(ClassName, CompType, PROP_DEFS, PROP_BINDS) \
     GDCLASS(ClassName, FlecsComponent<CompType>); \
 public: \
+	\
+	\
+	ClassName(){\
+		\
+		\
+	}\
+	\
+	~ClassName() = default;\
+	\
+	\
     PROP_DEFS \
     \
     /* Create and attach component to entity, returns raw pointer for serializability */ \

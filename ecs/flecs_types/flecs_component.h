@@ -17,25 +17,29 @@ class FlecsEntity;
 template <typename T>
 class FlecsComponent : public FlecsComponentBase {
 	GDCLASS(FlecsComponent, FlecsComponentBase);
+
 public:
-	T* get_data();
+	FlecsComponent();
+	T *get_data();
 	flecs::entity *get_owner() const;
 	static uint64_t get_type_hash_static();
 	void set_owner(flecs::entity *p_owner);
 	void commit_to_entity(const Ref<FlecsEntity> &p_entity) const override;
-	virtual void set_data(T* p_data);
-	flecs::entity* get_component() const override;
+	virtual void set_data(T *p_data);
+	flecs::entity *get_component() const override;
 	StringName get_type_name() const override;
-	void apply_to_entity(flecs::entity& e) const override;
+	void apply_to_entity(flecs::entity &e) const override;
 	void clear_component() override;
 	//PackedByteArray byte_serialize() const;
 	//void byte_deserialize(const PackedByteArray &p_ba);
 	Ref<FlecsComponentBase> clone() const override;
 	static void _bind_methods();
-
 };
 
-
+template <typename T>
+FlecsComponent<T>::FlecsComponent() {
+	FlecsComponentBase::component_type_hash = get_type_hash_static();
+}
 template <typename T>
 T* FlecsComponent<T>::get_data(){
 	return get_typed_data<T>();
