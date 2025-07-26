@@ -9,13 +9,10 @@
 
 #include "../../../../core/object/ref_counted.h"
 #include "../../../../core/string/string_name.h"
-#include "../../../../core/templates/oa_hash_map.h"
-#include "../../../../core/variant/callable.h"
 #include "flecs_script_system.h"
 #include "modules/godot_turbo/ecs/components/navigation/3d/3d_navigation_components.h"
 #include "modules/godot_turbo/ecs/components/physics/2d/2d_physics_components.h"
 #include "modules/godot_turbo/ecs/components/physics/3d/3d_physics_components.h"
-#include "modules/godot_turbo/ecs/components/queryable_component.h"
 #include "modules/godot_turbo/ecs/components/rendering/rendering_components.h"
 #include "modules/godot_turbo/ecs/components/script_component_registry.h"
 #include "modules/godot_turbo/ecs/components/script_visible_component.h"
