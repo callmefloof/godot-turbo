@@ -6,6 +6,8 @@
 #include "../../../../../../modules/godot_turbo/ecs/components/component_proxy.h"
 #include "../../../../../../servers/physics_server_2d.h"
 #include "../../../flecs_types/flecs_component.h"
+#include "../../../core/string/ustring.h"
+
 
 struct Area2DComponent {
 	RID area_id;

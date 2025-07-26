@@ -6,6 +6,7 @@
 #include "../../../../core/typedefs.h"
 #include "../../../../core/variant/variant.h"
 #include "../flecs_types/flecs_component_base.h"
+#include "script_component_registry.h"
 
 template class FlecsComponent<ScriptVisibleComponent>;
 
@@ -38,7 +39,7 @@ void ScriptVisibleComponentRef::append_bytes(PackedByteArray &ba, const void *p_
 		return Variant();
 	}
 	if (script_visible_component->fields.has(field_name)) {
-		if (const Variant *value = script_visible_component->fields.lookup_ptr(field_name)) {
+		if (const Variant *value = script_visible_component->fields.getptr(field_name)) {
 			return *value;
 		}
 	}
@@ -49,7 +50,7 @@ void ScriptVisibleComponentRef::append_bytes(PackedByteArray &ba, const void *p_
 
  	const auto script_visible_component = static_cast<ScriptVisibleComponent *>(FlecsComponentBase::data);
 	if (script_visible_component && script_visible_component->fields.has(field_name)) {
-		*script_visible_component->fields.lookup_ptr(field_name) = value;
+		*script_visible_component->fields.getptr(field_name) = value;
 	}
 	ERR_PRINT("Field type not found.");
 }

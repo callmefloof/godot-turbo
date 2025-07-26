@@ -17,6 +17,7 @@
 #include "modules/godot_turbo/ecs/components/physics/3d/3d_physics_components.h"
 #include "modules/godot_turbo/ecs/components/queryable_component.h"
 #include "modules/godot_turbo/ecs/components/rendering/rendering_components.h"
+#include "modules/godot_turbo/ecs/components/script_component_registry.h"
 #include "modules/godot_turbo/ecs/components/script_visible_component.h"
 #include "modules/godot_turbo/ecs/components/transform_2d_component.h"
 #include "modules/godot_turbo/ecs/components/transform_3d_component.h"
@@ -116,15 +117,15 @@ void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
 
 
 		// Fill in missing defaults
-		for (auto it = schema->iter(); it.valid; it = schema->next_iter(it) ) {
-			StringName field_name = *it.key;
-			ScriptComponentRegistry::FieldDef def = *it.value;
+		for (auto it = schema->begin(); it != schema->end(); ++it ) {
+			StringName field_name = it->key;
+			ScriptComponentRegistry::FieldDef def = it->value;
 
 			if (!data->fields.has(field_name)) {
 				data->fields.insert(field_name, def.default_value);
 			} else {
 				// Optional: Validate type
-				if (data->fields.lookup_ptr(field_name)->get_type() != def.type) {
+				if (data->fields.getptr(field_name)->get_type() != def.type) {
 					WARN_PRINT("Field '" + String(field_name) + "' has wrong type — expected " + Variant::get_type_name(def.type));
 				}
 			}

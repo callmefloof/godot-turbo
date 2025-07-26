@@ -8,19 +8,17 @@
 #include "../../../../core/object/class_db.h"
 #include "../../../../core/object/object.h"
 #include "../../../../core/object/ref_counted.h"
-#include "../../../../core/os/memory.h"
 #include "../../../../core/string/string_name.h"
-#include "../../../../core/templates/oa_hash_map.h"
+#include "../../../../core/templates/a_hash_map.h"
 #include "../../../../core/typedefs.h"
 #include "../../../../core/variant/variant.h"
 #include "../flecs_types/flecs_component.h"
-#include "script_component_registry.h"
 #include "single_component_module.h"
 class FlecsEntity;
 
 struct ScriptVisibleComponent {
 	StringName name;
-	OAHashMap<StringName, Variant> fields;
+	AHashMap<StringName, Variant> fields;
 };
 
 //making an exception for templating here

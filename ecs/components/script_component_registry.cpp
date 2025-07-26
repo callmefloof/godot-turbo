@@ -8,27 +8,27 @@
 
 ScriptComponentRegistry* ScriptComponentRegistry::singleton = nullptr;
 
-void ScriptComponentRegistry::register_component_type(const StringName& name, const OAHashMap<StringName, FieldDef>& fields) {
+void ScriptComponentRegistry::register_component_type(const StringName& name, const AHashMap<StringName, FieldDef>& fields) {
 	component_schemas.insert(name, fields);
 }
 
-const OAHashMap<StringName, ScriptComponentRegistry::FieldDef>* ScriptComponentRegistry::get_schema(const StringName& name) const {
-	return component_schemas.lookup_ptr(name);
+const AHashMap<StringName, ScriptComponentRegistry::FieldDef>* ScriptComponentRegistry::get_schema(const StringName& name) const {
+	return component_schemas.getptr(name);
 }
 
-OAHashMap<StringName, Variant> ScriptComponentRegistry::create_field_map(const StringName &name) const {
-	OAHashMap<StringName, Variant> result;
-	const OAHashMap<StringName, FieldDef>* schema = get_schema(name);
+AHashMap<StringName, Variant> ScriptComponentRegistry::create_field_map(const StringName &name) const {
+	AHashMap<StringName, Variant> result;
+	const AHashMap<StringName, FieldDef>* schema = get_schema(name);
 	if (schema) {
-		for (OAHashMap<StringName, FieldDef>::Iterator it = schema->iter(); it.valid; it = schema->next_iter(it)) {
-			result.insert(*it.key,it.value->default_value);
+		for (AHashMap<StringName,FieldDef>::ConstIterator it = schema->begin(); it != schema->end(); ++it) {
+			result.insert(it->key,it->value.default_value);
 		}
 	}
 	return result;
 }
 
 void ScriptComponentRegistry::register_component_type_from_dict(const StringName &name, const Dictionary &def) {
-	OAHashMap<StringName, FieldDef> schema;
+	AHashMap<StringName, FieldDef> schema;
 	for (const Variant *k = def.next(nullptr); k; k = def.next(k)) {
 		StringName key = *k;
 		Variant value = def[*k];

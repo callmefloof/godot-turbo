@@ -2,7 +2,7 @@
 #define SCRIPT_COMPONENT_REGISTRY_H
 
 #include "../../../../core/object/ref_counted.h"
-#include "../../../../core/templates/oa_hash_map.h"
+#include "../../../../core/templates/a_hash_map.h"
 #include "../../../../core/string/string_name.h"
 #include "../../../../core/variant/variant.h"
 #include "../../../../core/object/object.h"
@@ -24,18 +24,18 @@ public:
 		explicit FieldDef(Variant::Type t, Variant def = Variant()) : type(t), default_value(def) {}
 	};
 private:
-	OAHashMap<StringName, OAHashMap<StringName, FieldDef>> component_schemas;
+	AHashMap<StringName, AHashMap<StringName, FieldDef>> component_schemas;
 public:
 	ScriptComponentRegistry() { singleton = this; }
 	~ScriptComponentRegistry() { singleton = nullptr; }
 
 	static ScriptComponentRegistry* get_singleton() { return singleton; }
 
-	void register_component_type(const StringName& name, const OAHashMap<StringName, FieldDef>& fields);
-	const OAHashMap<StringName, FieldDef>* get_schema(const StringName& name) const;
+	void register_component_type(const StringName& name, const AHashMap<StringName, FieldDef>& fields);
+	const AHashMap<StringName, FieldDef>* get_schema(const StringName& name) const;
 
 	// optional: automatic population
-	OAHashMap<StringName, Variant> create_field_map(const StringName& name) const;
+	AHashMap<StringName, Variant> create_field_map(const StringName& name) const;
 	void register_component_type_from_dict(const StringName& name, const Dictionary& def);
 	static void register_singleton();
 	static void _bind_methods(); // if exposing to script

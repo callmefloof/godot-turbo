@@ -6,6 +6,9 @@
 #include "component_proxy.h"
 #include "node_ref.h"
 #include "single_component_module.h"
+#include "../../../core/string/ustring.h"
+
+
 
 struct SceneNodeComponent {
 	ObjectID node_id; // Unique identifier for the node

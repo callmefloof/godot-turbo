@@ -8,6 +8,7 @@
 #include "../../../../core/string/ustring.h"
 #include "flecs_component_base.h"
 #include "../components/script_visible_component.h"
+#include "../components/script_component_registry.h"
 #include "../../../../core/object/class_db.h"
 #include "../../../../core/object/object.h"
 
@@ -116,7 +117,7 @@
 		}
 
 		const StringName type_name = data->name;
-		const OAHashMap<StringName, ScriptComponentRegistry::FieldDef>* schema = ScriptComponentRegistry::get_singleton()->get_schema(type_name);
+		const AHashMap<StringName, ScriptComponentRegistry::FieldDef>* schema = ScriptComponentRegistry::get_singleton()->get_schema(type_name);
 
 		if (!schema) {
 			ERR_PRINT("add_component(): Unknown script component type: " + type_name);
@@ -124,15 +125,15 @@
 		}
 
 		// Fill in missing defaults
-		for (OAHashMap<StringName, ScriptComponentRegistry::FieldDef>::Iterator it = schema->iter(); it.valid; it = schema->next_iter(it)) {
-			StringName field_name = *it.key;
-			ScriptComponentRegistry::FieldDef def = *it.value;
+		for (AHashMap<StringName, ScriptComponentRegistry::FieldDef>::ConstIterator it = schema->begin(); it != schema->end(); ++it) {
+			StringName field_name = it->key;
+			ScriptComponentRegistry::FieldDef def = it->value;
 
 			if (!data->fields.has(field_name)) {
 				data->fields.insert(field_name, def.default_value);
 			} else {
 				// Optional: Validate type
-				if (data->fields.lookup_ptr(field_name)->get_type() != def.type) {
+				if (data->fields.getptr(field_name)->get_type() != def.type) {
 					WARN_PRINT("Field '" + String(field_name) + "' has wrong type — expected " + Variant::get_type_name(def.type));
 				}
 			}

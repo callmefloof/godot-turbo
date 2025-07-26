@@ -6,6 +6,8 @@
 #include "../../../../thirdparty/flecs/distr/flecs.h"
 #include "../../component_module_base.h"
 #include "servers/navigation_server_3d.h"
+#include "../../../core/string/ustring.h"
+
 
 struct NavAgent3DComponent {
 	RID agent_id;

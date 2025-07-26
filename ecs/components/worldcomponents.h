@@ -15,6 +15,8 @@
 #include "../../../../servers/navigation_server_3d.h"
 #include "component_proxy.h"
 #include "../flecs_types/flecs_component.h"
+#include "../../../core/string/ustring.h"
+
 
 struct World2DComponent {
 	RID canvas_id;

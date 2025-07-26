@@ -6,6 +6,8 @@
 #include "../../../flecs_types/flecs_component.h"
 #include "../../../flecs_types/flecs_entity.h"
 #include "modules/godot_turbo/ecs/components/component_module_base.h"
+#include "../../../core/string/ustring.h"
+
 
 class FlecsEntity;
 

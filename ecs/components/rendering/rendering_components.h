@@ -7,6 +7,7 @@
 #include "../../../servers/rendering_server.h"
 #include "../../../core/variant/typed_array.h"
 #include "../../flecs_types/flecs_entity.h"
+#include "../../../core/string/ustring.h"
 
 struct MeshComponent {
 	RID mesh_id;
