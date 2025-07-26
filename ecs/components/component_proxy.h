@@ -101,8 +101,8 @@ ClassDB::bind_method(D_METHOD("set_" #Name, "value"), &Class::set_##Name); \
 ClassDB::add_property( \
     Class::get_class_static(), \
     PropertyInfo(VariantTypeMap<Type>::value, #Name), \
-    _scs_create("set_" #Name), \
-    _scs_create("get_" #Name) \
+    StringName("set_" #Name), \
+    StringName("get_" #Name) \
 );
 
 #define BIND_ARRAY_PROPERTY(Type, Name, Class) \
@@ -111,8 +111,8 @@ ClassDB::bind_method(D_METHOD("set_" #Name, "value"), &Class::set_##Name); \
 ClassDB::add_property( \
     Class::get_class_static(), \
     PropertyInfo(Variant::ARRAY, #Name), \
-    _scs_create("set_" #Name), \
-    _scs_create("get_" #Name) \
+    StringName("set_" #Name), \
+    StringName("get_" #Name) \
 );
 
 // Component proxy definition using raw pointers

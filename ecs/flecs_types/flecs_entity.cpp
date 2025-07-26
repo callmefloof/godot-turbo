@@ -4,13 +4,11 @@
 #include "flecs_entity.h"
 #include "../../../../core/error/error_macros.h"
 #include "../../../../core/object/ref_counted.h"
-#include "../../../../core/templates/oa_hash_map.h"
 #include "../../../../core/string/ustring.h"
 #include "flecs_component_base.h"
 #include "../components/script_visible_component.h"
 #include "../components/script_component_registry.h"
 #include "../../../../core/object/class_db.h"
-#include "../../../../core/object/object.h"
 
  void FlecsEntity::_bind_methods() {
 	//fill in methods
@@ -40,7 +38,6 @@
 		return;
 	}
 	ERR_PRINT("component type not found in entity");
-
 }
 
  void FlecsEntity::remove_all_components() {
