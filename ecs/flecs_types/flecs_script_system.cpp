@@ -4,19 +4,27 @@
 #include "flecs_script_system.h"
 #include "../../../../core/variant/variant.h"
 #include "../../../../core/variant/array.h"
-#include "../components/queryable_component.h"
 #include "flecs_entity.h"
 #include "flecs_world.h"
 
 flecs::query<> FlecsScriptSystem::get_query(const flecs::world &world, const Vector<String> &component_names) {
-	const char *name = String(component_names.get(0)).ascii().get_data();
-	flecs::query_builder<> query = world.query_builder<>().term_at<QueryableComponent>().with(name);
-	for (auto it = component_names.begin(); component_names.end() != it; it.operator++()) {
-		name = String(*it).ascii().get_data();
-		query.with(name);
+	flecs::query_builder<> query = world.query_builder<>().with(component_names.get(0).ascii().get_data());
+
+	for (int i = 0; i < component_names.size(); i++) {
+		String cname = component_names[i];
+		flecs::id comp_id = world.lookup(cname.ascii().get_data());
+
+		if (!flecs::entity(world, comp_id).is_valid()) {
+			print_line("Invalid component name: %s", cname);
+			continue;
+		}
+
+		query.term().id(comp_id);  // simple presence test
 	}
+
 	query.cache_kind(flecs::QueryCacheAll);
 	return query.build();
+
 }
 
 void FlecsScriptSystem::_bind_methods() {
@@ -28,22 +36,23 @@ void FlecsScriptSystem::_bind_methods() {
 }
 void FlecsScriptSystem::run() const {
 	// Get the query based on required_components
-	if (world_ref == nullptr) {
-		ERR_PRINT("world is null");
-		return;
-	}
-	const flecs::query<> query = get_query(world_ref->get_world(), required_components);
+
+	const flecs::query<> query = get_query(world_ref.get_world(), required_components);
 	query.each([&](flecs::entity e) {
-		const Ref<FlecsEntity> wrapped = FlecsWorld::wrap_entity(e);
+		const Ref<FlecsEntity> wrapped = FlecsWorld::get_entity(e);
 		Array vargs;
 		vargs.append(wrapped); // No need for manual Variant
+		if (!callback.is_valid()) {
+			WARN_PRINT("Callable is not valid!");
+			return;
+		}
 		const Variant ret = callback.callv(vargs);
 	});
 }
-void FlecsScriptSystem::set_world(flecs::world *p_world) {
+void FlecsScriptSystem::set_world(const flecs::world &p_world) {
 	world_ref = p_world;
 }
-flecs::world *FlecsScriptSystem::get_world() const {
+flecs::world& FlecsScriptSystem::get_world() {
 	return world_ref;
 }
 void FlecsScriptSystem::set_required_components(const Vector<String> &p_required_components) {

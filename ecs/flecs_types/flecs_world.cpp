@@ -25,24 +25,20 @@ void FlecsWorld::_bind_methods()
 
 	ClassDB::bind_method(D_METHOD("init_world"), &FlecsWorld::init_world);
 	ClassDB::bind_method(D_METHOD("progress"),&FlecsWorld::progress);
-	ClassDB::bind_method(D_METHOD("entity"),&FlecsWorld::entity);
-	ClassDB::bind_method(D_METHOD("entity_n"),&FlecsWorld::entity_n);
-	ClassDB::bind_method(D_METHOD("entity_nc"),&FlecsWorld::entity_nc);
-	ClassDB::bind_method(D_METHOD("set", "comp_ref"),&FlecsWorld::set_component);
-	ClassDB::bind_method(D_METHOD("remove", "comp_ref"),&FlecsWorld::remove);
-	ClassDB::bind_method(D_METHOD("remove_t", "p_name"),&FlecsWorld::remove_t);
-	ClassDB::bind_method(D_METHOD("remove_all_components"),&FlecsWorld::remove_all_components);
-	ClassDB::bind_method(D_METHOD("add_script_system", "component_types","callable"),&FlecsWorld::add_script_system);
-	ClassDB::bind_method(D_METHOD("register_component_type", "type_name","script_visible_component_ref"), &FlecsWorld::register_component_type);
-
-
-
+	ClassDB::bind_method(D_METHOD("create_entity"),&FlecsWorld::create_entity);
+	ClassDB::bind_method(D_METHOD("create_entity_n"),&FlecsWorld::create_entity_n);
+	ClassDB::bind_method(D_METHOD("create_entity_nc"),&FlecsWorld::create_entity_nc);
+	//ClassDB::bind_method(D_METHOD("set", "comp_ref"),&FlecsWorld::set_component);
+	//ClassDB::bind_method(D_METHOD("remove", "comp_ref"),&FlecsWorld::remove);
+	ClassDB::bind_method(D_METHOD("remove_t", "p_name"), &FlecsWorld::remove_t);
+	//ClassDB::bind_method(D_METHOD("remove_all_components"),&FlecsWorld::remove_all_components);
+	ClassDB::bind_method(D_METHOD("add_script_system", "component_types", "callable"), &FlecsWorld::add_script_system);
+	ClassDB::bind_method(D_METHOD("register_component_type", "type_name", "script_visible_component_ref"), &FlecsWorld::register_component_type);
 }
 
 HashMap<StringName, ComponentTypeInfo> FlecsWorld::component_registry;
 
-FlecsWorld::FlecsWorld(/* args */)
-{
+FlecsWorld::FlecsWorld(/* args */) {
 	RenderingComponentModule::initialize(world);
 	Physics2DComponentModule::initialize(world);
 	Physics3DComponentModule::initialize(world);
@@ -53,6 +49,12 @@ FlecsWorld::FlecsWorld(/* args */)
 	World3DComponentModule::initialize(world);
 	World2DComponentModule::initialize(world);
 	ScriptVisibleComponentModule::initialize(world);
+
+
+
+
+
+
 }
 
 FlecsWorld::~FlecsWorld()
@@ -63,6 +65,7 @@ FlecsWorld::~FlecsWorld()
 void FlecsWorld::init_world() {
 	world.import<flecs::stats>();
 	world.set<flecs::Rest>({});
+
 }
 
 bool FlecsWorld::progress() {
@@ -82,9 +85,11 @@ bool FlecsWorld::progress() {
 
 
 
-Ref<FlecsEntity> FlecsWorld::entity() const {
+Ref<FlecsEntity> FlecsWorld::create_entity() const {
+	ERR_FAIL_COND_V(!world.c_ptr(), Ref<FlecsEntity>()); // flecs::world::is_alive() returns false if uninitialized
+	const flecs::entity raw_entity = world.entity();
 	Ref<FlecsEntity> flecs_entity = memnew(FlecsEntity);
-	flecs_entity->set_entity(world.entity());
+	flecs_entity->set_entity(raw_entity); // <— make sure entity is alive here
 	return flecs_entity;
 }
 void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
@@ -97,14 +102,9 @@ void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
 	// Handle dynamic script-visible components
 	if (comp_ref->is_dynamic()) {
 		const Ref<ScriptVisibleComponentRef> dyn = comp_ref;
-		ScriptVisibleComponent* data = dyn->get_data();
+		ScriptVisibleComponent& data = dyn->get_internal_owner().get_mut<ScriptVisibleComponent>();
 
-		if (!data) {
-			ERR_PRINT("add_component(): ScriptVisibleComponent has no data.");
-			return;
-		}
-
-		const StringName type_name = data->name;
+		const StringName type_name = data.name;
 		const auto* schema = ScriptComponentRegistry::get_singleton()->get_schema(type_name);
 
 		if (!schema) {
@@ -118,11 +118,11 @@ void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
 			StringName field_name = it->key;
 			ScriptComponentRegistry::FieldDef def = it->value;
 
-			if (!data->fields.has(field_name)) {
-				data->fields.insert(field_name, def.default_value);
+			if (!data.fields.has(field_name)) {
+				data.fields.insert(field_name, def.default_value);
 			} else {
 				// Optional: Validate type
-				if (data->fields.getptr(field_name)->get_type() != def.type) {
+				if (data.fields.getptr(field_name)->get_type() != def.type) {
 					WARN_PRINT("Field '" + String(field_name) + "' has wrong type — expected " + Variant::get_type_name(def.type));
 				}
 			}
@@ -130,26 +130,26 @@ void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
 
 		// Set in ECS
 		// ReSharper disable once CppExpressionWithoutSideEffects
-		world.set<ScriptVisibleComponent>(*data);
+		world.set<ScriptVisibleComponent>(data);
 		dyn->set_data(data); // ensures pointer is synced
 		return;
 	}
 
 	// Static typed component path
-	comp_ref->commit_to_entity(Ref<FlecsEntity>(this));
+	components.append(comp_ref);
 }
 
 
 /// these are meant for entities
 /// go to bed
-Ref<FlecsEntity> FlecsWorld::entity_n(const StringName &p_name) const {
-	Ref<FlecsEntity> flecs_entity = entity();
+Ref<FlecsEntity> FlecsWorld::create_entity_n(const StringName &p_name) const {
+	Ref<FlecsEntity> flecs_entity = create_entity();
 	flecs_entity->set_entity_name(p_name);
 	return flecs_entity;
 }
 
-Ref<FlecsEntity> FlecsWorld::entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &p_comp) const {
-	Ref<FlecsEntity> flecs_entity = entity();
+Ref<FlecsEntity> FlecsWorld::create_entity_nc(const StringName &p_name, const Ref<FlecsComponentBase> &p_comp) const {
+	Ref<FlecsEntity> flecs_entity = create_entity();
 	flecs_entity->set_name(p_name);
 	flecs_entity->set_entity_name(p_name);
 	flecs_entity->set_component(p_comp);
@@ -170,7 +170,7 @@ void FlecsWorld::remove(const Ref<FlecsComponentBase> &comp_ref) {
 
 void FlecsWorld::remove_t(const StringName &component_type) {
 	const char* c_component_type = String(component_type).ascii().get_data();
-	const flecs::entity component = FlecsEntity::entity->world().lookup(c_component_type);
+	const flecs::entity component = FlecsEntity::entity.world().lookup(c_component_type);
 	if (component.is_valid()) {
 		ERR_PRINT("internal flecs component type is invalid. this likely means it wasn't added.");
 		return;
@@ -202,7 +202,7 @@ flecs::world& FlecsWorld::get_world() {
 	return world;
 }
 
-Ref<FlecsEntity> FlecsWorld::wrap_entity(const flecs::entity &e) {
+Ref<FlecsEntity> FlecsWorld::get_entity(const flecs::entity &e) {
 	Ref<FlecsEntity> entity = memnew(FlecsEntity);
 	entity->set_entity(e);
 	return entity;
@@ -234,19 +234,15 @@ void FlecsWorld::register_component_type(const StringName &type_name, const Ref<
 				return;
 			}
 			// Cast and set data
-			auto *data = comp->get_typed_data<ScriptVisibleComponent>();
-			if (!data) {
-				ERR_PRINT("Component data is null or type mismatch.");
-				return;
-			}
+			auto data = comp->get_typed_data<ScriptVisibleComponent>();
 			// ReSharper disable once CppExpressionWithoutSideEffects
-			e.set<ScriptVisibleComponent>(*data); // Actually sets component on entity
+			e.set<ScriptVisibleComponent>(data); // Actually sets component on entity
 		}
 	};
 }
  void FlecsWorld::add_script_system(const Array &component_types, const Callable &callable) {
 	FlecsScriptSystem* sys = memnew(FlecsScriptSystem);
-	sys->set_world(&world);
+	sys->set_world(world);
 	Vector<String> component_names;
 	component_names.resize(component_types.size());
 	int count = 0;

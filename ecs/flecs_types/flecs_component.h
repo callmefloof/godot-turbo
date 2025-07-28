@@ -7,67 +7,67 @@
 #include "../../../../core/error/error_macros.h"
 #include "../../../../core/object/ref_counted.h"
 #include "../../../../core/typedefs.h"
+#include "../../../../core/variant/variant_utility.h"
 #include "../../thirdparty/nameof/include/nameof.hpp"
 #include "flecs_component.h"
 #include "flecs_component_base.h"
 #include "flecs_entity.h"
-#include "../../../../core/variant/variant_utility.h"
+#include "type_id_generator.h"
 class FlecsEntity;
 
 template <typename T>
 class FlecsComponent : public FlecsComponentBase {
-	GDCLASS(FlecsComponent, FlecsComponentBase);
-
 public:
-	FlecsComponent();
-	T *get_data();
-	flecs::entity *get_owner() const;
-	static uint64_t get_type_hash_static();
-	void set_owner(flecs::entity *p_owner);
-	void commit_to_entity(const Ref<FlecsEntity> &p_entity) const override;
-	virtual void set_data(T *p_data);
-	flecs::entity *get_component() const override;
+	FlecsComponent() = default;
+	T &get_data() const;
+	Ref<FlecsEntity> get_owner() const;
+	flecs::entity get_internal_owner() const override;
+	void set_flecs_owner(flecs::entity p_owner);
+	void set_owner(const Ref<FlecsEntity> &p_owner);
+	virtual void set_data(T &p_data);
+	flecs::id get_internal_component() const override;
 	StringName get_type_name() const override;
-	void apply_to_entity(flecs::entity &e) const override;
 	void clear_component() override;
 	//PackedByteArray byte_serialize() const;
 	//void byte_deserialize(const PackedByteArray &p_ba);
 	Ref<FlecsComponentBase> clone() const override;
-	static void _bind_methods();
+	static int type_id() {
+		static int id = TypeIDGenerator::get_type_id<T>();
+		return id;
+	}
+	int get_type_id() const override;
+
 };
 
 template <typename T>
-FlecsComponent<T>::FlecsComponent() {
-	FlecsComponentBase::component_type_hash = get_type_hash_static();
-}
-template <typename T>
-T* FlecsComponent<T>::get_data(){
+T& FlecsComponent<T>::get_data() const{
 	return get_typed_data<T>();
 }
 
 template <typename T>
-flecs::entity *FlecsComponent<T>::get_owner() const {
+flecs::entity FlecsComponent<T>::get_internal_owner() const {
 	return owner;
 }
 template <typename T>
-uint64_t FlecsComponent<T>::get_type_hash_static() {
-	static int type_marker;
-	return reinterpret_cast<uint64_t>(&type_marker);
+Ref<FlecsEntity> FlecsComponent<T>::get_owner() const {
+	return gd_owner;
+}
+template <typename T>
+void FlecsComponent<T>::set_owner(const Ref<FlecsEntity> &p_owner) {
+#ifdef DEBUG_ENABLED
+	if (!p_owner.is_valid()) {
+		ERR_PRINT("FlecsComponent::set_owner called with invalid owner Ref");
+	}
+#endif
+	gd_owner = p_owner.is_valid() ? p_owner : nullptr;
+
 }
 
 template <typename T>
-void FlecsComponent<T>::set_owner(flecs::entity *p_owner) {
-	if (owner) {
-		ERR_PRINT("p_owner is null and/or owner is null");
-		return;
-	}
-	if (p_owner == nullptr) {
-		ERR_PRINT("p_owner is null and/or owner is null");
-		return;
-	}
+void FlecsComponent<T>::set_flecs_owner(const flecs::entity p_owner) {
 	const char* c_type_name = String(get_type_name()).ascii().get_data();
-	if (const flecs::entity comp = p_owner->world().lookup(c_type_name)) {
-		if (p_owner->has(comp)) {
+	if (const flecs::entity comp = p_owner.world().lookup(c_type_name)) {
+		if (p_owner.has(comp)) {
 			owner = p_owner;
 		}
 	}
@@ -76,36 +76,18 @@ void FlecsComponent<T>::set_owner(flecs::entity *p_owner) {
 }
 
 template <typename T>
-void FlecsComponent<T>::commit_to_entity(const Ref<FlecsEntity>& p_entity) const {
-	if (!p_entity.is_valid() || p_entity.is_null()) {
-		ERR_PRINT("Entity is not valid");
-	}
-	const flecs::entity *e = p_entity->get_entity();
-	if (data) {
-		e->set<T>(*get_typed_data<T>());
-	}
-}
-template <typename T>
-void FlecsComponent<T>::set_data(T *p_data) {
-	if (p_data != nullptr) {
-		data = p_data;
-		this->data = p_data;
-		this->component_type_hash = get_type_hash_static();
-		return;
-	}
-	ERR_PRINT("Data is null");
+void FlecsComponent<T>::set_data(T &p_data) {
+	owner.set<T>(p_data);
 }
 
 template <typename T>
-flecs::entity *FlecsComponent<T>::get_component() const {
+flecs::id FlecsComponent<T>::get_internal_component() const {
 	return component;
 }
+
 template <typename T>
-void FlecsComponent<T>::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("commit_to_entity"), &FlecsComponent::commit_to_entity);
-	//ClassDB::bind_method(D_METHOD("byte_serialize"), &FlecsComponent::byte_serialize);
-	//ClassDB::bind_method(D_METHOD("byte_deserialize", "p_ba"), &FlecsComponent::byte_deserialize);
-	ClassDB::bind_method(D_METHOD("clone"), &FlecsComponent::clone);
+int FlecsComponent<T>::get_type_id() const {
+	return type_id();
 }
 
 template <typename T>
@@ -114,20 +96,10 @@ StringName FlecsComponent<T>::get_type_name() const {
 }
 
 template <typename T>
-void FlecsComponent<T>::apply_to_entity(flecs::entity &e) const {
-	if (data) {
-		e.set<T>(*get_typed_data<T>());
-		return;
-	}
-	ERR_PRINT("data is null");
+void FlecsComponent<T>::clear_component() {
+	owner.set<T>({});
 }
 
-template <typename T>
-void FlecsComponent<T>::clear_component() {
-	if (data) {
-		*static_cast<T *>(data) = T{};
-	}
-}
 // these cannot work due to the usage of RID's in components. I could refactor every RID into an uint64_t representation
 // but that would be tedious
 // template <typename T>
@@ -170,13 +142,7 @@ template <typename T>
 Ref<FlecsComponentBase> FlecsComponent<T>::clone() const {
 	Ref<FlecsComponent<T>> new_ref;
 	new_ref.instantiate();
-	if (data) {
-		const auto typed = static_cast<T *>(data);
-		/* Step 2: allocate memory and copy*/
-		T *copied = memnew(T);
-		*copied = *typed; /* copy the struct contents*/
-		new_ref->set_data(copied);
-	}
+	new_ref->set_data(get_data());
 	return new_ref;
 }
 

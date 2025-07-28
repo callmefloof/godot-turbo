@@ -70,29 +70,73 @@ void set_field_value(T &field, const Variant &v, const StringName &name) {
     }
 }
 
-// Property macros simplified
 #define DEFINE_PROPERTY(Type, Name, Component) \
 Type get_##Name() const { \
-    if (auto *c = get_typed_data<Component>()) return c->Name; \
-    return default_value<Type>(); \
+if (!owner.is_alive()) { \
+if (!Engine::get_singleton()->is_editor_hint()) { \
+ERR_PRINT("Owner entity is not alive"); \
+} \
+return Type(); \
+} \
+if (!owner.has<Component>()) { \
+if (!Engine::get_singleton()->is_editor_hint()) { \
+ERR_PRINT("Entity does not have component " #Component); \
+} \
+return Type(); \
+} \
+return owner.get<Component>().Name; \
 } \
 void set_##Name(Type val) { \
-    if (auto *c = get_typed_data<Component>()) c->Name = val; \
+if (!owner.is_alive()) { \
+if (!Engine::get_singleton()->is_editor_hint()) { \
+ERR_PRINT("Owner entity is not alive"); \
+} \
+return; \
+} \
+if (!owner.has<Component>()) { \
+if (!Engine::get_singleton()->is_editor_hint()) { \
+ERR_PRINT("Entity does not have component " #Component); \
+} \
+return; \
+} \
+owner.get_mut<Component>().Name = val; \
 }
 
 #define DEFINE_ARRAY_PROPERTY(Type, Name, Component) \
 TypedArray<Type> get_##Name() const { \
-    TypedArray<Type> arr; \
-    if (auto *c = get_typed_data<Component>()) { \
-        for (auto &e : c->Name) arr.push_back(e); \
-    } \
-    return arr; \
+	TypedArray<Type> arr; \
+	if (!owner.is_alive()) { \
+		if (!Engine::get_singleton()->is_editor_hint()) { \
+			ERR_PRINT("Owner entity is not alive"); \
+		} \
+		return arr; \
+	} \
+	if (!owner.has<Component>()) { \
+		if (!Engine::get_singleton()->is_editor_hint()) { \
+		ERR_PRINT("Entity does not have component " #Component); \
+	} \
+	return arr; \
+} \
+auto c = get_typed_data<Component>(); \
+for (auto &e : c.Name) arr.push_back(e); \
+return arr; \
 } \
 void set_##Name(const TypedArray<Type> &arr) { \
-    if (auto *c = get_typed_data<Component>()) { \
-        c->Name.clear(); \
-        for (int i = 0; i < arr.size(); ++i) c->Name.push_back(arr[i]); \
-    } \
+	if (!owner.is_alive()) { \
+	if (!Engine::get_singleton()->is_editor_hint()) { \
+	ERR_PRINT("Owner entity is not alive"); \
+	} \
+	return; \
+	} \
+	if (!owner.has<Component>()) { \
+		if (!Engine::get_singleton()->is_editor_hint()) { \
+			ERR_PRINT("Entity does not have component " #Component); \
+		} \
+		return; \
+	} \
+	auto c = get_typed_data<Component>(); \
+	c.Name.clear(); \
+	for (int i = 0; i < arr.size(); ++i) { c.Name.push_back(arr[i]); } \
 }
 
 #define BIND_PROPERTY(Type, Name, Class) \
@@ -115,48 +159,54 @@ ClassDB::add_property( \
     StringName("get_" #Name) \
 );
 
-// Component proxy definition using raw pointers
+#define COMPONENT_FACTORY(CompType)\
+static Ref<CompType##Ref> create_component(const Ref<FlecsEntity> &p_owner) {\
+	if (!p_owner.is_valid()) {\
+		ERR_FAIL_COND_V_MSG(true, Ref<CompType##Ref>(), "owner is not valid");\
+	}\
+	\
+	Ref<CompType##Ref> inst = Ref<CompType##Ref>(memnew(CompType##Ref));\
+	\
+	inst->set_owner(p_owner);\
+	\
+	flecs::entity ent = p_owner->get_entity();\
+	inst->set_internal_owner(ent);\
+	inst->set_internal_world(ent.world());\
+	\
+	inst->set_component(ent.world().component<CompType>());\
+	\
+	CompType comp;\
+	inst->set_data(comp);\
+	\
+	return inst;\
+}
 
+
+// Component proxy definition using raw pointers
 #define DEFINE_COMPONENT_PROXY(ClassName, CompType, PROP_DEFS, PROP_BINDS) \
-    GDCLASS(ClassName, FlecsComponent<CompType>); \
+    GDCLASS(CompType##Ref, FlecsComponentBase); \
 public: \
 	\
 	\
-	ClassName(){\
-		\
-		\
-	}\
+	CompType##Ref() = default; \
 	\
-	~ClassName() = default;\
+	~CompType##Ref() = default;\
 	\
 	\
     PROP_DEFS \
     \
-    /* Create and attach component to entity, returns raw pointer for serializability */ \
-    static ClassName *create_component(FlecsEntity *owner) { \
-        ClassName *inst = memnew(ClassName); \
-        auto *ent = owner->get_entity(); \
-        ent->set<CompType>({}); \
-        inst->set_data(&ent->get_mut<CompType>()); \
-        return inst; \
-    } \
-    static ClassName *create_component(const Ref<FlecsEntity> &owner) { \
-        return create_component(owner.ptr()); \
-    } \
-    \
+    COMPONENT_FACTORY(CompType)\
     static void _bind_methods() { \
         PROP_BINDS \
 		ClassDB::bind_static_method(\
-			ClassName::get_class_static(),\
+			CompType##Ref::get_class_static(),\
 			"create_component",\
-			static_cast<ClassName *(*)(FlecsEntity *)>(&ClassName::create_component),\
+			&CompType##Ref::create_component,\
 			"owner"\
 		);\
-        ClassDB::bind_method(D_METHOD("get_type_name"), &ClassName::get_type_name); \
     } \
     \
-    CompType *get_data() const { return static_cast<CompType*>(get_data_ptr()); } \
-    void set_data(CompType *d) { FlecsComponent<CompType>::set_data(d); } \
+    void set_data(CompType &d) { FlecsComponent<CompType>::set_data(d); } \
     StringName get_type_name() const { return #CompType; } \
 \
 ;

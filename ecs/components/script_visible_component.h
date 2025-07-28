@@ -13,21 +13,33 @@
 #include "../../../../core/typedefs.h"
 #include "../../../../core/variant/variant.h"
 #include "../flecs_types/flecs_component.h"
+#include "type_id_generator.h"
 #include "single_component_module.h"
 class FlecsEntity;
 
 struct ScriptVisibleComponent {
 	StringName name;
 	AHashMap<StringName, Variant> fields;
+	uint64_t get_virtual_component_type_hash() const {
+		return TypeIDGenerator::get_id_for_string(name);
+	}
+	ScriptVisibleComponent() = default;
+	ScriptVisibleComponent(const ScriptVisibleComponent& rhs) {
+		name = rhs.name;
+		fields = rhs.fields;
+	}
+	ScriptVisibleComponent operator =(const ScriptVisibleComponent &rhs) {
+		name = rhs.name;
+		fields = rhs.fields;
+		return *this;
+	}
 };
 
 //making an exception for templating here
 class ScriptVisibleComponentRef : public FlecsComponent<ScriptVisibleComponent> {
 	GDCLASS(ScriptVisibleComponentRef, FlecsComponent<ScriptVisibleComponent>);
 public:
-	void commit_to_entity(const Ref<FlecsEntity> &p_entity) const override;
-	void set_data(ScriptVisibleComponent *p_data) override;
-	void *get_data_ptr() const override;
+	void set_data(ScriptVisibleComponent &p_data) override;
 	void clear_component() override;
 	StringName get_type_name() const override;
 
@@ -38,12 +50,12 @@ private:
 	ScriptVisibleComponentRef() = default;
 	~ScriptVisibleComponentRef() override = default;
 	Variant get_field_value(const StringName& field_name) const;
-	void set(const StringName& field_name, const Variant& value) const;
+	void set_field(const StringName& field_name, const Variant& value) const;
 	static void _bind_methods();
 	bool is_dynamic() const override;
-	static Ref<ScriptVisibleComponentRef> create_component(const StringName& name);
+	static Ref<ScriptVisibleComponentRef> create_component(const StringName& name, const Ref<FlecsEntity> &p_owner);
 	Ref<FlecsComponentBase> clone() const override;
-	void apply_to_entity(flecs::entity &e) const override;
+	uint64_t get_virtual_component_type_hash() const;
 };
 
 

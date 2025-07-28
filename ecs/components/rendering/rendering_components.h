@@ -417,21 +417,21 @@ class ScenarioComponentRef : public FlecsComponent<ScenarioComponent> {
 };
 
 struct RenderInstanceComponent {
-	RID instance_id;
+	RID render_instance_id;
 	~RenderInstanceComponent() {
-		if (instance_id.is_valid()) {
-			RenderingServer::get_singleton()->free(instance_id);
+		if (render_instance_id.is_valid()) {
+			RenderingServer::get_singleton()->free(render_instance_id);
 		}
 	}
 };
 
 class RenderInstanceComponentRef : public FlecsComponent<RenderInstanceComponent> {
 	#define RENDER_INSTANCE_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, instance_id,RenderInstanceComponent)\
+	DEFINE_PROPERTY(RID, render_instance_id,RenderInstanceComponent)\
 
 
 	#define RENDER_INSTANCE_COMPONENT_BINDINGS\
-	BIND_PROPERTY(RID, instance_id, RenderInstanceComponentRef)\
+	BIND_PROPERTY(RID, render_instance_id, RenderInstanceComponentRef)\
 
 	DEFINE_COMPONENT_PROXY(RenderInstanceComponentRef, RenderInstanceComponent,
 	RENDER_INSTANCE_COMPONENT_PROPERTIES,

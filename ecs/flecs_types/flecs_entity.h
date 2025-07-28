@@ -20,12 +20,11 @@ class FlecsEntity : public Resource {
 
 protected:
 	static void _bind_methods();
-	flecs::entity *entity;
+	flecs::entity entity;
 	Vector<Ref<FlecsComponentBase>> components;
 
 public:
-	FlecsEntity() :
-			entity() {}
+	FlecsEntity() = default;
 	virtual ~FlecsEntity() = default;
 	virtual void remove(const Ref<FlecsComponentBase> &comp);
 	virtual void remove_all_components();
@@ -33,8 +32,8 @@ public:
 	PackedStringArray get_component_types() const;
 	StringName get_entity_name() const;
 	void set_entity_name(const StringName &p_name) const;
-	void set_entity(const flecs::entity &p_entity) const;
-	flecs::entity *get_entity() const;
+	void set_entity(const flecs::entity &p_entity);
+	flecs::entity get_entity() const;
 	virtual void set_component(const Ref<FlecsComponentBase> &comp_ref);
 	virtual void remove(String &component_type);
 	virtual Ref<FlecsComponentBase> get_component_by_name(const StringName &component_type);

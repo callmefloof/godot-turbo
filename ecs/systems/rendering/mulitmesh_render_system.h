@@ -23,8 +23,9 @@ inline void MultiMeshRenderSystem::initialize(const String& system_name) {
 	.multi_threaded()
 	.each([&](const MultiMeshComponent& mmc) {
 		auto q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent>().cache_kind(flecs::QueryCacheDefault).build();
-		q.each([&](const MultiMeshInstanceComponent& mmc, const Transform3DComponent& t) {
-			mmc.
+		q.each([&](const flecs::iter& it) {
+			//auto mmc = it.
+			//auto t3d = it.field<Transform3DComponent>(it);
 		});
 	});
 }

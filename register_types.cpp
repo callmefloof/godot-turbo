@@ -17,7 +17,6 @@
 #include "ecs/components/transform_2d_component.h"
 #include "ecs/components/transform_3d_component.h"
 #include "ecs/components/resource_component.h"
-#include "ecs/components/queryable_component.h"
 #include "ecs/utility/world_utility.h"
 
 
@@ -29,10 +28,70 @@
 
 #ifndef REGISTER_FLECS_COMPONENT_CLASS
 #define REGISTER_FLECS_COMPONENT_CLASS(ClassName)\
-component_register<ClassName>();\
-ClassDB::register_class<FlecsComponent<ClassName>>();\
-ClassDB::register_class<##ClassName##Ref>();
+ClassDB::register_class<ClassName##Ref>();
 #endif
+
+
+//Macro for
+#define INSTANTIATE_TYPED_ACCESSOR(Component) \
+template Component& FlecsComponentBase::get_typed_data<Component>() const;
+
+
+// We need to do this to initalize getting the typed data of a component
+// Rendering Components
+INSTANTIATE_TYPED_ACCESSOR(MeshComponent)
+INSTANTIATE_TYPED_ACCESSOR(MultiMeshComponent)
+INSTANTIATE_TYPED_ACCESSOR(MultiMeshInstanceComponent)
+INSTANTIATE_TYPED_ACCESSOR(ParticlesComponent)
+INSTANTIATE_TYPED_ACCESSOR(ReflectionProbeComponent)
+INSTANTIATE_TYPED_ACCESSOR(SkeletonComponent)
+INSTANTIATE_TYPED_ACCESSOR(EnvironmentComponent)
+INSTANTIATE_TYPED_ACCESSOR(CameraComponent)
+INSTANTIATE_TYPED_ACCESSOR(CompositorComponent)
+INSTANTIATE_TYPED_ACCESSOR(DirectionalLight3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(PointLightComponent)
+INSTANTIATE_TYPED_ACCESSOR(LightOccluderComponent)
+INSTANTIATE_TYPED_ACCESSOR(OmniLightComponent)
+INSTANTIATE_TYPED_ACCESSOR(SpotLightComponent)
+INSTANTIATE_TYPED_ACCESSOR(ViewportComponent)
+INSTANTIATE_TYPED_ACCESSOR(VoxelGIComponent)
+INSTANTIATE_TYPED_ACCESSOR(ScenarioComponent)
+INSTANTIATE_TYPED_ACCESSOR(RenderInstanceComponent)
+INSTANTIATE_TYPED_ACCESSOR(CanvasItemComponent)
+INSTANTIATE_TYPED_ACCESSOR(OccluderComponent)
+
+// Physics Components
+INSTANTIATE_TYPED_ACCESSOR(Area2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(Body2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(Joint2DComponent)
+
+
+INSTANTIATE_TYPED_ACCESSOR(Area3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(Body3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(Joint3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(SoftBody3DComponent)
+
+// Navigation Components
+INSTANTIATE_TYPED_ACCESSOR(NavAgent3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(NavLink3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(NavObstacle3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(NavRegion3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(SourceGeometryParser3DComponent)
+
+
+INSTANTIATE_TYPED_ACCESSOR(NavAgent2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(NavLink2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(NavObstacle2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(NavRegion2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(SourceGeometryParser2DComponent)
+
+// misc
+INSTANTIATE_TYPED_ACCESSOR(SceneNodeComponent)
+INSTANTIATE_TYPED_ACCESSOR(Transform2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(Transform3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(ResourceComponent)
+INSTANTIATE_TYPED_ACCESSOR(World3DComponent)
+INSTANTIATE_TYPED_ACCESSOR(World2DComponent)
 
 
 
@@ -47,6 +106,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	ClassDB::register_class<FlecsScriptSystem>();
 
 	// Rendering Components: 20 - 21-jul-2025
+
 	REGISTER_FLECS_COMPONENT_CLASS(MeshComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(MultiMeshComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(MultiMeshInstanceComponent)
@@ -98,7 +158,6 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(SceneNodeComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(Transform2DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(Transform3DComponent)
-	REGISTER_FLECS_COMPONENT_CLASS(QueryableComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(ResourceComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(World3DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(World2DComponent)
@@ -109,10 +168,6 @@ void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 		return;
 	}
    // Nothing to do here in this example.
-}
-template <class T>
-void component_register() {
-	ClassDB::register_class<FlecsComponent<T>>();
 }
 
 
