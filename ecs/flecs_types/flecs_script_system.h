@@ -8,9 +8,10 @@
 #include "../../../../core/object/object.h"
 #include "../../../../core/string/ustring.h"
 #include "../../../../core/templates/vector.h"
-#include "../../thirdparty/flecs/distr/flecs.h"
-#include "../../../../core/variant/callable.h"
 #include "../../../../core/typedefs.h"
+#include "../../../../core/variant/callable.h"
+#include "../../thirdparty/flecs/distr/flecs.h"
+#include "systems/commands/command.h"
 
 class FlecsEntity;
 class Variant;
@@ -22,15 +23,16 @@ private:
 	Callable callback;
 	Vector<String> required_components;
 	static flecs::query<> get_query(const flecs::world &world, const Vector<String> &component_names);
-	flecs::world *world_ref = nullptr;
+	flecs::world world_ref;
+
 
 protected:
 	static void _bind_methods();
 
 public:
 	void run() const;
-	void set_world(flecs::world *p_world);
-	flecs::world *get_world() const;
+	void set_world(const flecs::world &p_world);
+	flecs::world &get_world();
 	void set_required_components(const Vector<String> &p_required_components);
 	Vector<String> get_required_components() const;
 	void set_callback(const Callable& p_callback);

@@ -29,7 +29,7 @@ class NavAgent2DComponentRef : public FlecsComponent<NavAgent2DComponent> {
 	#define NAV_AGENT_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, agent_id, NavAgent2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavAgent2DComponentRef, NavAgent2DComponent,
+	DEFINE_COMPONENT_PROXY(NavAgent2DComponent,
 	NAV_AGENT_2D_COMPONENT_PROPERTIES,
 	NAV_AGENT_2D_COMPONENT_BINDINGS);
 };
@@ -51,7 +51,7 @@ class NavLink2DComponentRef : public FlecsComponent<NavLink2DComponent> {
 	#define NAV_LINK_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, link_id, NavLink2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavLink2DComponentRef, NavLink2DComponent,
+	DEFINE_COMPONENT_PROXY( NavLink2DComponent,
 	NAV_LINK_2D_COMPONENT_PROPERTIES,
 	NAV_LINK_2D_COMPONENT_BINDINGS);
 };
@@ -74,7 +74,7 @@ class NavObstacle2DComponentRef : public FlecsComponent<NavObstacle2DComponent> 
 	#define NAV_OBSTACLE_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, obstacle_id, NavObstacle2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavObstacle2DComponentRef, NavObstacle2DComponent,
+	DEFINE_COMPONENT_PROXY(NavObstacle2DComponent,
 	NAV_OBSTACLE_2D_COMPONENT_PROPERTIES,
 	NAV_OBSTACLE_2D_COMPONENT_BINDINGS);
 };
@@ -95,7 +95,7 @@ class NavRegion2DComponentRef : public FlecsComponent<NavRegion2DComponent> {
 	#define NAV_REGION_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, region_id, NavRegion2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavRegion2DComponentRef, NavRegion2DComponent,
+	DEFINE_COMPONENT_PROXY(NavRegion2DComponent,
 	NAV_REGION_2D_COMPONENT_PROPERTIES,
 	NAV_REGION_2D_COMPONENT_BINDINGS);
 };
@@ -116,7 +116,7 @@ class SourceGeometryParser2DComponentRef : public FlecsComponent<SourceGeometryP
 	#define SOURCE_GEOMETRY_PARSER_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, source_geometry_parser_id, SourceGeometryParser2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(SourceGeometryParser2DComponentRef, SourceGeometryParser2DComponent,
+	DEFINE_COMPONENT_PROXY(SourceGeometryParser2DComponent,
 	SOURCE_GEOMETRY_PARSER_2D_COMPONENT_PROPERTIES,
 	SOURCE_GEOMETRY_PARSER_2D_COMPONENT_BINDINGS);
 };

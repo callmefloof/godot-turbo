@@ -10,6 +10,8 @@
 #include "modules/godot_turbo/ecs/components/navigation/2d/2d_navigation_components.h"
 #include <functional>
 #include <typeinfo>
+#include "../systems/commands/command.h"
+
 class ScriptVisibleComponentRef;
 
 
@@ -31,6 +33,7 @@ private:
 	ecs_entity_t OnCollisions = ecs_new_w_id(world, EcsPhase);
 	Vector<Ref<FlecsScriptSystem>> script_systems;
 	AHashMap<flecs::entity,Ref<FlecsEntity>> entities;
+	CommandQueue system_command_queue;
 	/* data */
 protected:
 	static void _bind_methods();

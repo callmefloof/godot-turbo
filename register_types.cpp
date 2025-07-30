@@ -1,25 +1,24 @@
 #include "register_types.h"
 
 #include "../../core/object/class_db.h"
-#include "ecs/flecs_types/flecs_world.h"
-#include "ecs/flecs_types/flecs_entity.h"
-#include "ecs/flecs_types/flecs_component.h"
-#include "ecs/flecs_types/flecs_component_base.h"
-#include "ecs/flecs_types/flecs_script_system.h"
-#include "ecs/flecs_types/flecs_world.h"
-#include "ecs/components/physics/2d/2d_physics_components.h"
-#include "ecs/components/physics/3d/3d_physics_components.h"
 #include "ecs/components/navigation/2d/2d_navigation_components.h"
 #include "ecs/components/navigation/3d/3d_navigation_components.h"
+#include "ecs/components/physics/2d/2d_physics_components.h"
+#include "ecs/components/physics/3d/3d_physics_components.h"
 #include "ecs/components/rendering/rendering_components.h"
+#include "ecs/components/resource_component.h"
 #include "ecs/components/scene_node_component.h"
-#include "ecs/components/worldcomponents.h"
 #include "ecs/components/transform_2d_component.h"
 #include "ecs/components/transform_3d_component.h"
-#include "ecs/components/resource_component.h"
+#include "ecs/components/worldcomponents.h"
+#include "ecs/flecs_types/flecs_component.h"
+#include "ecs/flecs_types/flecs_component_base.h"
+#include "ecs/flecs_types/flecs_entity.h"
+#include "ecs/flecs_types/flecs_script_system.h"
+#include "ecs/flecs_types/flecs_world.h"
 #include "ecs/utility/world_utility.h"
-
-
+#include "systems/rendering/mulitmesh_render_system.h"
+#include "visibility_component.h"
 
 #ifndef COMPONENT_REF_CLASS
 #define COMPONENT_REF_CLASS\
@@ -58,7 +57,6 @@ INSTANTIATE_TYPED_ACCESSOR(VoxelGIComponent)
 INSTANTIATE_TYPED_ACCESSOR(ScenarioComponent)
 INSTANTIATE_TYPED_ACCESSOR(RenderInstanceComponent)
 INSTANTIATE_TYPED_ACCESSOR(CanvasItemComponent)
-INSTANTIATE_TYPED_ACCESSOR(OccluderComponent)
 
 // Physics Components
 INSTANTIATE_TYPED_ACCESSOR(Area2DComponent)
@@ -92,6 +90,7 @@ INSTANTIATE_TYPED_ACCESSOR(Transform3DComponent)
 INSTANTIATE_TYPED_ACCESSOR(ResourceComponent)
 INSTANTIATE_TYPED_ACCESSOR(World3DComponent)
 INSTANTIATE_TYPED_ACCESSOR(World2DComponent)
+INSTANTIATE_TYPED_ACCESSOR(VisibilityComponent)
 
 
 
@@ -104,6 +103,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	ClassDB::register_abstract_class<FlecsComponentBase>();
     ClassDB::register_class<FlecsWorld>();
 	ClassDB::register_class<FlecsScriptSystem>();
+	ClassDB::register_runtime_class<FlecsMultiMeshRenderSystem>();
 
 	// Rendering Components: 20 - 21-jul-2025
 
@@ -126,7 +126,6 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(ScenarioComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(RenderInstanceComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(CanvasItemComponent)
-	REGISTER_FLECS_COMPONENT_CLASS(OccluderComponent)
 
 	// Physics Components
 	REGISTER_FLECS_COMPONENT_CLASS(Area2DComponent)
@@ -161,6 +160,8 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(ResourceComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(World3DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(World2DComponent)
+	REGISTER_FLECS_COMPONENT_CLASS(VisibilityComponent)
+
 }
 
 void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level) {

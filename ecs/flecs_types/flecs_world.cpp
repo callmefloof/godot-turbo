@@ -19,6 +19,7 @@
 #include "modules/godot_turbo/ecs/components/transform_2d_component.h"
 #include "modules/godot_turbo/ecs/components/transform_3d_component.h"
 #include "modules/godot_turbo/ecs/components/worldcomponents.h"
+#include "systems/rendering/mulitmesh_render_system.h"
 
 void FlecsWorld::_bind_methods()
 {
@@ -69,7 +70,7 @@ void FlecsWorld::init_world() {
 }
 
 bool FlecsWorld::progress() {
-	for (auto& sys : script_systems) {
+	for (auto &sys : script_systems) {
 		if (sys.is_null()) {
 			ERR_PRINT("FlecsWorld::progress: null system");
 			continue;
@@ -80,7 +81,11 @@ bool FlecsWorld::progress() {
 		}
 		sys->run();
 	}
-	return world.progress();
+	const bool progress = world.progress();
+
+
+
+	return progress;
 }
 
 

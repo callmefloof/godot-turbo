@@ -19,6 +19,7 @@ template <typename T>
 class FlecsComponent : public FlecsComponentBase {
 public:
 	FlecsComponent() = default;
+	~FlecsComponent() override = default;
 	T &get_data() const;
 	Ref<FlecsEntity> get_owner() const;
 	flecs::entity get_internal_owner() const override;

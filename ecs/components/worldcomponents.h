@@ -43,7 +43,7 @@ class World2DComponentRef : public FlecsComponent<World2DComponent> {
 	BIND_PROPERTY(RID, navigation_map_id, World2DComponentRef)\
 	BIND_PROPERTY(RID, space_id, World2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(World2DComponentRef, World2DComponent,
+	DEFINE_COMPONENT_PROXY(World2DComponent,
 	WORLD_2D_COMPONENT_PROPERTIES,
 	WORLD_2D_COMPONENT_BINDINGS);
 };
@@ -102,7 +102,7 @@ class World3DComponentRef : public FlecsComponent<World3DComponent> {
 	BIND_PROPERTY(RID, scenario_id, World3DComponentRef)\
 	BIND_PROPERTY(RID, space_id, World3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(World3DComponentRef, World3DComponent,
+	DEFINE_COMPONENT_PROXY(World3DComponent,
 	WORLD_3D_COMPONENT_PROPERTIES,
 	WORLD_3D_COMPONENT_BINDINGS);
 };

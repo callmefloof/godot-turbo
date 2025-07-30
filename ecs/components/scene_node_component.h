@@ -27,7 +27,7 @@ class SceneNodeComponentRef : public FlecsComponent<SceneNodeComponent> {
 	BIND_PROPERTY(StringName, class_name, SceneNodeComponentRef)\
 	BIND_PROPERTY(Ref<NodeRef>, node_ref, SceneNodeComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(SceneNodeComponentRef,SceneNodeComponent, SCENE_NODE_COMPONENT_PROPERTIES, SCENE_NODE_COMPONENT_BINDINGS);
+	DEFINE_COMPONENT_PROXY(SceneNodeComponent, SCENE_NODE_COMPONENT_PROPERTIES, SCENE_NODE_COMPONENT_BINDINGS);
 };
 
 template<typename T = Node>

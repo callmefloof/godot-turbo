@@ -25,7 +25,7 @@ class NavAgent3DComponentRef : public FlecsComponent<NavAgent3DComponent> {
 	#define NAV_AGENT_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, agent_id, NavAgent3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavAgent3DComponentRef, NavAgent3DComponent,
+	DEFINE_COMPONENT_PROXY(NavAgent3DComponent,
 	NAV_AGENT_3D_COMPONENT_PROPERTIES,
 	NAV_AGENT_3D_COMPONENT_BINDINGS);
 };
@@ -46,7 +46,7 @@ class NavLink3DComponentRef : public FlecsComponent<NavLink3DComponent> {
 	#define NAV_LINK_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, link_id, NavLink3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavLink3DComponentRef, NavLink3DComponent,
+	DEFINE_COMPONENT_PROXY(NavLink3DComponent,
 	NAV_LINK_3D_COMPONENT_PROPERTIES,
 	NAV_LINK_3D_COMPONENT_BINDINGS);
 };
@@ -67,7 +67,7 @@ class NavObstacle3DComponentRef : public FlecsComponent<NavObstacle3DComponent> 
 	#define NAV_OBSTACLE_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, obstacle_id, NavObstacle3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavObstacle3DComponentRef, NavObstacle3DComponent,
+	DEFINE_COMPONENT_PROXY(NavObstacle3DComponent,
 	NAV_OBSTACLE_3D_COMPONENT_PROPERTIES,
 	NAV_OBSTACLE_3D_COMPONENT_BINDINGS);
 };
@@ -88,7 +88,7 @@ class NavRegion3DComponentRef : public FlecsComponent<NavRegion3DComponent> {
 	#define NAV_REGION_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, region_id, NavRegion3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(NavRegion3DComponentRef, NavRegion3DComponent,
+	DEFINE_COMPONENT_PROXY(NavRegion3DComponent,
 	NAV_REGION_3D_COMPONENT_PROPERTIES,
 	NAV_REGION_3D_COMPONENT_BINDINGS);
 };
@@ -109,7 +109,7 @@ class SourceGeometryParser3DComponentRef : public FlecsComponent<SourceGeometryP
 	#define SOURCE_GEOMETRY_PARSER_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, source_geometry_parser_id, SourceGeometryParser3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(SourceGeometryParser3DComponentRef, SourceGeometryParser3DComponent,
+	DEFINE_COMPONENT_PROXY(SourceGeometryParser3DComponent,
 	SOURCE_GEOMETRY_PARSER_3D_COMPONENT_PROPERTIES,
 	SOURCE_GEOMETRY_PARSER_3D_COMPONENT_BINDINGS);
 };

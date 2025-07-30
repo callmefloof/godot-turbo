@@ -183,7 +183,7 @@ static Ref<CompType##Ref> create_component(const Ref<FlecsEntity> &p_owner) {\
 
 
 // Component proxy definition using raw pointers
-#define DEFINE_COMPONENT_PROXY(ClassName, CompType, PROP_DEFS, PROP_BINDS) \
+#define DEFINE_COMPONENT_PROXY(CompType, PROP_DEFS, PROP_BINDS) \
     GDCLASS(CompType##Ref, FlecsComponentBase); \
 public: \
 	\

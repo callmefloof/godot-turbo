@@ -1,17 +1,27 @@
 #pragma once
+#include "../../../../../core/templates/rid.h"
+#include "../../../../../servers/rendering_server.h"
 #include "../../../thirdparty/flecs/distr/flecs.h"
-#include "../component_module_base.h"
-#include "../../../core/templates/rid.h"
-#include "../../../core/os/memory.h"
-#include "../../../core/templates/vector.h"
-#include "../../../servers/rendering_server.h"
-#include "../../../core/variant/typed_array.h"
 #include "../../flecs_types/flecs_entity.h"
-#include "../../../core/string/ustring.h"
+#include "../component_module_base.h"
+#include "../../../../../core/os/memory.h"
+#include "../../../../../core/math/transform_3d.h"
+#include "../../../../../core/math/vector2.h"
+#include "../../../../../core/math/projection.h"
+
+#include "../../../../../core/object/object.h"
+
+#include "../../../../../core/variant/typed_array.h"
+#include "../../../../../core/string/ustring.h"
+#include "../../../../../core/templates/vector.h"
+#include "../../flecs_types/flecs_component.h"
+#include "../component_proxy.h"
 
 struct MeshComponent {
 	RID mesh_id;
 	Vector<RID> material_ids;
+	MeshComponent() = default;
+	MeshComponent(const RID& id, const Vector<RID>& material_ids) : mesh_id(id) , material_ids(material_ids) {}
 	~MeshComponent() {
 		for (const RID &mat_id : material_ids) {
 			if (mat_id.is_valid()) {
@@ -37,7 +47,7 @@ class MeshComponentRef : public FlecsComponent<MeshComponent> {
 	BIND_ARRAY_PROPERTY(RID, material_ids, MeshComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(MeshComponentRef, MeshComponent,
+	DEFINE_COMPONENT_PROXY(MeshComponent,
 			MESH_COMPONENT_PROPERTIES,
 			MESH_COMPONENT_BINDINGS)
 };
@@ -67,7 +77,7 @@ class MultiMeshComponentRef : public FlecsComponent<MultiMeshComponent> {
 	BIND_PROPERTY(uint32_t, instance_count, MultiMeshComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(MultiMeshComponentRef, MultiMeshComponent,
+	DEFINE_COMPONENT_PROXY(MultiMeshComponent,
 	MULTI_MESH_COMPONENT_PROPERTIES,
 	MULTI_MESH_COMPONENT_BINDINGS);
 };
@@ -84,7 +94,7 @@ class MultiMeshInstanceComponentRef : public FlecsComponent<MultiMeshInstanceCom
 	BIND_PROPERTY(uint32_t, index, MultiMeshInstanceComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(MultiMeshInstanceComponentRef, MultiMeshInstanceComponent,
+	DEFINE_COMPONENT_PROXY(MultiMeshInstanceComponent,
 	MULTI_MESH_INSTANCE_COMPONENT_PROPERTIES,
 	MULTI_MESH_INSTANCE_COMPONENT_BINDINGS);
 };
@@ -106,7 +116,7 @@ class ParticlesComponentRef : public FlecsComponent<ParticlesComponent> {
 	#define PARTICLES_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, particles_id, ParticlesComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(ParticlesComponentRef, ParticlesComponent,
+	DEFINE_COMPONENT_PROXY(ParticlesComponent,
 	PARTICLES_COMPONENT_PROPERTIES,
 	PARTICLES_COMPONENT_BINDINGS);
 };
@@ -130,7 +140,7 @@ class ReflectionProbeComponentRef : public FlecsComponent<ReflectionProbeCompone
 	BIND_PROPERTY(RID, probe_id, ReflectionProbeComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(ReflectionProbeComponentRef, ReflectionProbeComponent,
+	DEFINE_COMPONENT_PROXY(ReflectionProbeComponent,
 	REFLECTION_PROBE_COMPONENT_PROPERTIES,
 	REFLECTION_PROBE_COMPONENT_BINDINGS);
 };
@@ -152,7 +162,7 @@ class SkeletonComponentRef : public FlecsComponent<SkeletonComponent> {
 	#define SKELETON_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, skeleton_id, SkeletonComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(SkeletonComponentRef, SkeletonComponent,
+	DEFINE_COMPONENT_PROXY(SkeletonComponent,
 	SKELETON_COMPONENT_PROPERTIES,
 	SKELETON_COMPONENT_BINDINGS);
 };
@@ -175,13 +185,20 @@ class EnvironmentComponentRef : public FlecsComponent<EnvironmentComponent> {
 	BIND_PROPERTY(RID, environment_id, EnvironmentComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(EnvironmentComponentRef, EnvironmentComponent,
+	DEFINE_COMPONENT_PROXY(EnvironmentComponent,
 	ENVIRONMENT_COMPONENT_PROPERTIES,
 	ENVIRONMENT_COMPONENT_BINDINGS);
 };
 
 struct CameraComponent {
 	RID camera_id;
+	Vector<Plane> frustum;
+	Vector3 position;
+	float far;
+	float near;
+	Projection projection;
+	Vector2 camera_offset;
+	CameraComponent() = default;
 	~CameraComponent() {
 		if (camera_id.is_valid()) {
 			RenderingServer::get_singleton()->free(camera_id);
@@ -193,13 +210,25 @@ class CameraComponentRef : public FlecsComponent<CameraComponent> {
 
 	#define CAMERA_COMPONENT_PROPERTIES\
 	DEFINE_PROPERTY(RID, camera_id,CameraComponent)\
+	DEFINE_ARRAY_PROPERTY(Plane,frustum,CameraComponent)\
+	DEFINE_PROPERTY(Vector3,position,CameraComponent)\
+	DEFINE_PROPERTY(float,far,CameraComponent)\
+	DEFINE_PROPERTY(float,near,CameraComponent)\
+	DEFINE_PROPERTY(Projection,projection,CameraComponent)\
+	DEFINE_PROPERTY(Vector2,camera_offset,CameraComponent)\
 
 
 	#define CAMERA_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, camera_id, CameraComponentRef)\
+	BIND_ARRAY_PROPERTY(Plane,frustum,CameraComponentRef)\
+	BIND_PROPERTY(Vector3,position,CameraComponentRef)\
+	BIND_PROPERTY(float,far,CameraComponentRef)\
+	BIND_PROPERTY(float,near,CameraComponentRef)\
+	BIND_PROPERTY(Projection,projection,CameraComponentRef)\
+	BIND_PROPERTY(Vector2,camera_offset,CameraComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(CameraComponentRef, CameraComponent,
+	DEFINE_COMPONENT_PROXY(CameraComponent,
 	CAMERA_COMPONENT_PROPERTIES,
 	CAMERA_COMPONENT_BINDINGS);
 };
@@ -221,7 +250,7 @@ class CompositorComponentRef : public FlecsComponent<CompositorComponent> {
 	#define COMPOSITOR_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, compositor_id, CompositorComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(CompositorComponentRef, CompositorComponent,
+	DEFINE_COMPONENT_PROXY(CompositorComponent,
 	COMPOSITOR_COMPONENT_PROPERTIES,
 	COMPOSITOR_COMPONENT_BINDINGS);
 };
@@ -244,7 +273,7 @@ class DirectionalLight3DComponentRef : public FlecsComponent<DirectionalLight3DC
 	#define DIRECTIONAL_LIGHT_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, directional_light_id, DirectionalLight3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(DirectionalLight3DComponentRef, DirectionalLight3DComponent,
+	DEFINE_COMPONENT_PROXY(DirectionalLight3DComponent,
 	DIRECTIONAL_LIGHT_3D_COMPONENT_PROPERTIES,
 	DIRECTIONAL_LIGHT_3D_COMPONENT_BINDINGS);
 };
@@ -266,7 +295,7 @@ class DirectionalLight2DComponentRef : public FlecsComponent<DirectionalLight2DC
 	#define DIRECTIONAL_LIGHT_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, directional_light_id, DirectionalLight2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(DirectionalLight2DComponentRef, DirectionalLight2DComponent,
+	DEFINE_COMPONENT_PROXY(DirectionalLight2DComponent,
 	DIRECTIONAL_LIGHT_2D_COMPONENT_PROPERTIES,
 	DIRECTIONAL_LIGHT_2D_COMPONENT_BINDINGS);
 };
@@ -288,7 +317,7 @@ class PointLightComponentRef : public FlecsComponent<PointLightComponent> {
 	#define POINT_LIGHT_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, point_light_id, PointLightComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(PointLightComponentRef, PointLightComponent,
+	DEFINE_COMPONENT_PROXY(PointLightComponent,
 	POINT_LIGHT_COMPONENT_PROPERTIES,
 	POINT_LIGHT_COMPONENT_BINDINGS);
 };
@@ -310,7 +339,7 @@ class LightOccluderComponentRef : public FlecsComponent<LightOccluderComponent> 
 	#define LIGHT_OCCLUDER_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, light_occluder_id, LightOccluderComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(LightOccluderComponentRef, LightOccluderComponent,
+	DEFINE_COMPONENT_PROXY(LightOccluderComponent,
 	LIGHT_OCCLUDER_COMPONENT_PROPERTIES,
 	LIGHT_OCCLUDER_COMPONENT_BINDINGS);
 };
@@ -332,7 +361,7 @@ class OmniLightComponentRef : public FlecsComponent<OmniLightComponent> {
 	#define OMNI_LIGHT_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, omni_light_id, OmniLightComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(OmniLightComponentRef, OmniLightComponent,
+	DEFINE_COMPONENT_PROXY(OmniLightComponent,
 	OMNI_LIGHT_COMPONENT_PROPERTIES,
 	OMNI_LIGHT_COMPONENT_BINDINGS);
 };
@@ -355,7 +384,7 @@ class SpotLightComponentRef : public FlecsComponent<SpotLightComponent> {
 	#define SPOT_LIGHT_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, spot_light_id, SpotLightComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(SpotLightComponentRef, SpotLightComponent,
+	DEFINE_COMPONENT_PROXY(SpotLightComponent,
 	SPOT_LIGHT_COMPONENT_PROPERTIES,
 	SPOT_LIGHT_COMPONENT_BINDINGS);
 };
@@ -372,7 +401,7 @@ class ViewportComponentRef : public FlecsComponent<ViewportComponent> {
 	#define VIEWPORT_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, viewport_id, ViewportComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(ViewportComponentRef, ViewportComponent,
+	DEFINE_COMPONENT_PROXY(ViewportComponent,
 	VIEWPORT_COMPONENT_PROPERTIES,
 	VIEWPORT_COMPONENT_BINDINGS);
 };
@@ -394,7 +423,7 @@ class VoxelGIComponentRef : public FlecsComponent<VoxelGIComponent> {
 	#define VOXEL_GI_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, voxel_gi_id, VoxelGIComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(VoxelGIComponentRef, VoxelGIComponent,
+	DEFINE_COMPONENT_PROXY(VoxelGIComponent,
 	VOXEL_GI_COMPONENT_PROPERTIES,
 	VOXEL_GI_COMPONENT_BINDINGS);
 };
@@ -411,7 +440,7 @@ class ScenarioComponentRef : public FlecsComponent<ScenarioComponent> {
 	#define SCENARIO_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, id, ScenarioComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(ScenarioComponentRef, ScenarioComponent,
+	DEFINE_COMPONENT_PROXY(ScenarioComponent,
 	SCENARIO_COMPONENT_PROPERTIES,
 	SCENARIO_COMPONENT_BINDINGS);
 };
@@ -433,7 +462,7 @@ class RenderInstanceComponentRef : public FlecsComponent<RenderInstanceComponent
 	#define RENDER_INSTANCE_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, render_instance_id, RenderInstanceComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(RenderInstanceComponentRef, RenderInstanceComponent,
+	DEFINE_COMPONENT_PROXY(RenderInstanceComponent,
 	RENDER_INSTANCE_COMPONENT_PROPERTIES,
 	RENDER_INSTANCE_COMPONENT_BINDINGS);
 };
@@ -459,31 +488,32 @@ class CanvasItemComponentRef : public FlecsComponent<CanvasItemComponent> {
 	BIND_PROPERTY(RID, canvas_item_id, CanvasItemComponentRef)\
 	BIND_PROPERTY(StringName, class_name, CanvasItemComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(CanvasItemComponentRef, CanvasItemComponent,
+	DEFINE_COMPONENT_PROXY(CanvasItemComponent,
 	CANVAS_ITEM_COMPONENT_PROPERTIES,
 	CANVAS_ITEM_COMPONENT_BINDINGS);
 };
 
-struct OccluderComponent {
+
+
+
+
+struct ScreenTriangle;
+
+struct FrustumCulled { /* tag component */ };
+struct Occluded { /* tag component */ };
+struct Occluder {
 	RID occluder_id;
-	~OccluderComponent() {
-		if (occluder_id.is_valid()) {
-			RenderingServer::get_singleton()->free(occluder_id);
-		}
-	}
+	Vector<ScreenTriangle> screen_triangles;
+	PackedVector3Array vertices;
+	PackedInt32Array indices;
+};
+struct Occludee {
+	AABB worldAABB;
+	AABB aabb;
+	Occludee() = default;
+	~Occludee() = default;
 };
 
-class OccluderComponentRef : public FlecsComponent<OccluderComponent> {
-	#define OCCLUDER_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, occluder_id,OccluderComponent)\
-
-	#define OCCLUDER_COMPONENT_BINDINGS\
-	BIND_PROPERTY(RID, occluder_id, OccluderComponentRef)\
-
-	DEFINE_COMPONENT_PROXY(OccluderComponentRef, OccluderComponent,
-	OCCLUDER_COMPONENT_PROPERTIES,
-	OCCLUDER_COMPONENT_BINDINGS);
-};
 
 struct RenderingBaseComponents{
 	flecs::component<MeshComponent> mesh;
@@ -505,7 +535,10 @@ struct RenderingBaseComponents{
 	flecs::component<VoxelGIComponent> voxel_gi;
 	flecs::component<RenderInstanceComponent> instance;
 	flecs::component<CanvasItemComponent> canvas_item;
-	flecs::component<OccluderComponent> occluder;
+	flecs::component<Occluder> occluder;
+	flecs::component<Occludee> occludee;
+	flecs::component<FrustumCulled> frustum_culled;
+	flecs::component<Occluded> occluded;
 
 	explicit RenderingBaseComponents(const flecs::world &world) :
 			mesh(world.component<MeshComponent>("MeshComponent")),
@@ -527,7 +560,11 @@ struct RenderingBaseComponents{
 			voxel_gi(world.component<VoxelGIComponent>("VoxelGIComponent")),
 			instance(world.component<RenderInstanceComponent>("RenderInstanceComponent")),
 			canvas_item(world.component<CanvasItemComponent>("CanvasItemComponent")),
-			occluder(world.component<OccluderComponent>("OccluderComponent")) {}
+			occluder(world.component<Occluder>("Occluder")),
+			occludee(world.component<Occludee>("Occludee")),
+			frustum_culled(world.component<FrustumCulled>("FrustumCulled")),
+			occluded(world.component<Occluded>("Occluded"))
+			{}
 };
 
 using RenderingComponentModule = MultiComponentModule<RenderingBaseComponents>;

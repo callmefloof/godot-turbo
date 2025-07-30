@@ -27,7 +27,7 @@ class ResourceComponentRef : public FlecsComponent<ResourceComponent> {
 	BIND_PROPERTY(StringName, resource_name, ResourceComponentRef)\
 	BIND_PROPERTY(bool, is_script_type, ResourceComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(ResourceComponentRef, ResourceComponent, RESOURCE_COMPONENT_PROPERTIES, RESOURCE_COMPONENT_BINDINGS);
+	DEFINE_COMPONENT_PROXY(ResourceComponent, RESOURCE_COMPONENT_PROPERTIES, RESOURCE_COMPONENT_BINDINGS);
 };
 
 

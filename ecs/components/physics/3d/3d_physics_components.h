@@ -5,10 +5,7 @@
 #include "../../../flecs_types/flecs_entity.h"
 #include "../../component_module_base.h"
 #include "../../../core/os/memory.h"
-#include "../../../flecs_types/flecs_entity.h"
 #include "../../../core/string/ustring.h"
-#include "servers/physics_server_3d.h"
-
 
 struct Area3DComponent {
 	RID area_id;
@@ -26,7 +23,7 @@ class Area3DComponentRef : public FlecsComponent<Area3DComponent> {
 	#define AREA_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, area_id, Area3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(Area3DComponentRef, Area3DComponent,
+	DEFINE_COMPONENT_PROXY(Area3DComponent,
 	AREA_3D_COMPONENT_PROPERTIES,
 	AREA_3D_COMPONENT_BINDINGS);
 
@@ -49,7 +46,7 @@ class Body3DComponentRef : public FlecsComponent<Body3DComponent> {
 	#define BODY_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, body_id, Body3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(Body3DComponentRef, Body3DComponent,
+	DEFINE_COMPONENT_PROXY(Body3DComponent,
 	BODY_3D_COMPONENT_PROPERTIES,
 	BODY_3D_COMPONENT_BINDINGS);
 };
@@ -70,7 +67,7 @@ class Joint3DComponentRef : public FlecsComponent<Joint3DComponent> {
 	#define JOINT_3D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, joint_id, Joint3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(Joint3DComponentRef, Joint3DComponent,
+	DEFINE_COMPONENT_PROXY(Joint3DComponent,
 	JOINT_3D_COMPONENT_PROPERTIES,
 	JOINT_3D_COMPONENT_BINDINGS);
 };
@@ -94,7 +91,7 @@ class SoftBody3DComponentRef : public FlecsComponent<SoftBody3DComponent> {
 	BIND_PROPERTY(RID, soft_body_id, SoftBody3DComponentRef)\
 
 
-	DEFINE_COMPONENT_PROXY(SoftBody3DComponentRef, SoftBody3DComponent,
+	DEFINE_COMPONENT_PROXY(SoftBody3DComponent,
 	SOFT_BODY_3D_COMPONENT_PROPERTIES,
 	SOFT_BODY_3D_COMPONENT_BINDINGS);
 };

@@ -25,7 +25,7 @@ class Area2DComponentRef : public FlecsComponent<Area2DComponent> {
 	#define AREA_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, area_id, Area2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(Area2DComponentRef, Area2DComponent,
+	DEFINE_COMPONENT_PROXY(Area2DComponent,
 	AREA_2D_COMPONENT_PROPERTIES,
 	AREA_2D_COMPONENT_BINDINGS);
 };
@@ -46,7 +46,7 @@ class Body2DComponentRef : public FlecsComponent<Body2DComponent> {
 	#define BODY_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, body_id, Body2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(Body2DComponentRef, Body2DComponent,
+	DEFINE_COMPONENT_PROXY(Body2DComponent,
 	BODY_2D_COMPONENT_PROPERTIES,
 	BODY_2D_COMPONENT_BINDINGS);
 };
@@ -67,7 +67,7 @@ class Joint2DComponentRef : public FlecsComponent<Joint2DComponent> {
 	#define JOINT_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, joint_id, Joint2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(Joint2DComponentRef, Joint2DComponent,
+	DEFINE_COMPONENT_PROXY(Joint2DComponent,
 	JOINT_2D_COMPONENT_PROPERTIES,
 	JOINT_2D_COMPONENT_BINDINGS);
 };
