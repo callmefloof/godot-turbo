@@ -19,6 +19,16 @@
 #include "ecs/utility/world_utility.h"
 #include "systems/rendering/mulitmesh_render_system.h"
 #include "visibility_component.h"
+#include "ecs/utility/scene_object_utility.h"
+#include "ecs/utility/resource_object_utility.h"
+
+#include "ecs/utility/navigation/2d/navigation2d_utility.h"
+#include "ecs/utility/navigation/3d/navigation3d_utility.h"
+#include "ecs/utility/physics/2d/physics2d_utility.h"
+#include "ecs/utility/physics/3d/physics3d_utility.h"
+
+#include "ecs/utility/rendering/2d/render_utility_2d.h"
+#include "ecs/utility/rendering/3d/render_utility_3d.h"
 
 #ifndef COMPONENT_REF_CLASS
 #define COMPONENT_REF_CLASS\
@@ -103,7 +113,20 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	ClassDB::register_abstract_class<FlecsComponentBase>();
     ClassDB::register_class<FlecsWorld>();
 	ClassDB::register_class<FlecsScriptSystem>();
-	ClassDB::register_runtime_class<FlecsMultiMeshRenderSystem>();
+	ClassDB::register_runtime_class<FlecsSystem>();
+	ClassDB::register_runtime_class<RenderSystem>();
+	ClassDB::register_runtime_class<MultiMeshRenderSystem>();
+	ClassDB::register_runtime_class<OcclusionSystem>();
+	ClassDB::register_class<RenderUtility2D>();
+	ClassDB::register_class<RenderUtility3D>();
+	ClassDB::register_class<Physics3DUtility>();
+	ClassDB::register_class<Physics2DUtility>();
+	ClassDB::register_class<Navigation2DUtility>();
+	ClassDB::register_class<Navigation3DUtility>();
+	ClassDB::register_class<World3DUtility>();
+	ClassDB::register_class<World2DUtility>();
+	ClassDB::register_class<SceneObjectUtility>();
+	ClassDB::register_class<ResourceObjectUtility>();
 
 	// Rendering Components: 20 - 21-jul-2025
 

@@ -3,15 +3,15 @@
 //
 #ifndef NODE_REF_H
 #define NODE_REF_H
-#include "../../../../scene/main/node.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/object/object_id.h"
-#include "../../../../core/object/object.h"
-#include "../../../../core/typedefs.h"
-#include "../../../../core/variant/dictionary.h"
+#include "scene/main/node.h"
+#include "core/object/ref_counted.h"
+#include "core/object/object_id.h"
+#include "core/object/object.h"
+#include "core/typedefs.h"
+#include "core/variant/dictionary.h"
 
-#include "../../../../core/string/ustring.h"
-#include "../../thirdparty/flecs/distr/flecs.h"
+#include "core/string/ustring.h"
+#include "thirdparty/flecs/distr/flecs.h"
 
 class NodeRef : public RefCounted {
 	GDCLASS(NodeRef, RefCounted)

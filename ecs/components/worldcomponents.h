@@ -5,17 +5,17 @@
 #ifndef WORLDCOMPONENTS_H
 #define WORLDCOMPONENTS_H
 #include "single_component_module.h"
-#include "../../../../core/templates/rid.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/os/memory.h"
-#include "../../../../servers/rendering_server.h"
-#include "../../../../servers/physics_server_2d.h"
-#include "../../../../servers/physics_server_3d.h"
-#include "../../../../servers/navigation_server_2d.h"
-#include "../../../../servers/navigation_server_3d.h"
+#include "core/templates/rid.h"
+#include "core/object/ref_counted.h"
+#include "core/os/memory.h"
+#include "servers/rendering_server.h"
+#include "servers/physics_server_2d.h"
+#include "servers/physics_server_3d.h"
+#include "servers/navigation_server_2d.h"
+#include "servers/navigation_server_3d.h"
 #include "component_proxy.h"
 #include "../flecs_types/flecs_component.h"
-#include "../../../core/string/ustring.h"
+#include "core/string/ustring.h"
 
 
 struct World2DComponent {

@@ -2,9 +2,9 @@
 // Created by Floof on 21-7-2025.
 //
 #include "script_visible_component.h"
-#include "../../../../core/object/object.h"
-#include "../../../../core/typedefs.h"
-#include "../../../../core/variant/variant.h"
+#include "core/object/object.h"
+#include "core/typedefs.h"
+#include "core/variant/variant.h"
 #include "../flecs_types/flecs_component_base.h"
 #include "script_component_registry.h"
 

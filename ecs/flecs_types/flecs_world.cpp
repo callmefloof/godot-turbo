@@ -37,9 +37,10 @@ void FlecsWorld::_bind_methods()
 	ClassDB::bind_method(D_METHOD("register_component_type", "type_name", "script_visible_component_ref"), &FlecsWorld::register_component_type);
 }
 
+
 HashMap<StringName, ComponentTypeInfo> FlecsWorld::component_registry;
 
-FlecsWorld::FlecsWorld(/* args */) {
+FlecsWorld::FlecsWorld(/* args */) : pipeline_manager(world) {
 	RenderingComponentModule::initialize(world);
 	Physics2DComponentModule::initialize(world);
 	Physics3DComponentModule::initialize(world);
@@ -50,12 +51,6 @@ FlecsWorld::FlecsWorld(/* args */) {
 	World3DComponentModule::initialize(world);
 	World2DComponentModule::initialize(world);
 	ScriptVisibleComponentModule::initialize(world);
-
-
-
-
-
-
 }
 
 FlecsWorld::~FlecsWorld()
@@ -97,8 +92,8 @@ Ref<FlecsEntity> FlecsWorld::create_entity() const {
 	flecs_entity->set_entity(raw_entity); // <— make sure entity is alive here
 	return flecs_entity;
 }
+	 
 void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
-
 	if (!comp_ref.is_valid()) {
 		ERR_PRINT("add_component(): Component is null or invalid.");
 		return;
@@ -144,9 +139,6 @@ void FlecsWorld::set_component(const Ref<FlecsComponentBase> &comp_ref) {
 	components.append(comp_ref);
 }
 
-
-/// these are meant for entities
-/// go to bed
 Ref<FlecsEntity> FlecsWorld::create_entity_n(const StringName &p_name) const {
 	Ref<FlecsEntity> flecs_entity = create_entity();
 	flecs_entity->set_entity_name(p_name);
@@ -207,10 +199,32 @@ flecs::world& FlecsWorld::get_world() {
 	return world;
 }
 
-Ref<FlecsEntity> FlecsWorld::get_entity(const flecs::entity &e) {
-	Ref<FlecsEntity> entity = memnew(FlecsEntity);
-	entity->set_entity(e);
-	return entity;
+Ref<FlecsEntity> FlecsWorld::add_entity(const flecs::entity &e) {
+	if (!e.is_valid()) {
+		ERR_PRINT("FlecsWorld::get_entity: entity is not valid. Returning nullptr.");
+		return Ref<FlecsEntity>();
+	}
+	if(world != e.world()) {
+		ERR_PRINT("FlecsWorld::get_entity: entity does not belong to this world. Returning nullptr.");
+		return Ref<FlecsEntity>();
+	}
+	Ref<FlecsEntity> new_entity = memnew(FlecsEntity);
+	auto entity_iter = entities.insert(e, new_entity);
+	new_entity->set_entity(e);
+	new_entity->set_name(e.name().c_str());
+	return new_entity;
+}
+
+void FlecsWorld::init_render_system() {
+	multi_mesh_render_system.set_world(this);
+	flecs::entity main_camera;
+	occlusion_system.set_world(this);
+	
+	occlusion_system.set_main_camera(main_camera);
+	multi_mesh_render_system.create_frustum_culling(system_command_queue, pipeline_manager);
+	occlusion_system.create_occlusion_culling(system_command_queue, pipeline_manager);
+	multi_mesh_render_system.create_rendering(system_command_queue, pipeline_manager);
+
 }
 
 void FlecsWorld::register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const {
@@ -247,7 +261,7 @@ void FlecsWorld::register_component_type(const StringName &type_name, const Ref<
 }
  void FlecsWorld::add_script_system(const Array &component_types, const Callable &callable) {
 	FlecsScriptSystem* sys = memnew(FlecsScriptSystem);
-	sys->set_world(world);
+	sys->set_world(this);
 	Vector<String> component_names;
 	component_names.resize(component_types.size());
 	int count = 0;
@@ -255,8 +269,7 @@ void FlecsWorld::register_component_type(const StringName &type_name, const Ref<
 		component_names.set(count, *it);
 		count++;
 	}
-	sys->set_required_components(component_names);
-	sys->set_callback(callable);
+	sys->init(this,component_names,callable);
 	script_systems.append(sys);
 }
 

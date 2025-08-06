@@ -4,8 +4,8 @@
 
 #ifndef TYPE_ID_GENERATOR_H
 #define TYPE_ID_GENERATOR_H
-#include "../../../core/string/string_name.h"
-#include "../../../core/templates/a_hash_map.h"
+#include "core/string/string_name.h"
+#include "core/templates/a_hash_map.h"
 
 class TypeIDGenerator {
 public:

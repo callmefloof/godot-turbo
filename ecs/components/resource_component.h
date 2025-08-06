@@ -1,8 +1,8 @@
 #pragma once
 #include "../flecs_types/flecs_component.h"
 #include "component_proxy.h"
-#include "../../../../core/string/ustring.h"
-#include "../../../../core/templates/rid.h"
+#include "core/string/ustring.h"
+#include "core/templates/rid.h"
 #include "single_component_module.h"
 
 struct ResourceComponent {
@@ -11,8 +11,6 @@ struct ResourceComponent {
 	StringName resource_name; // Name of the resource
 	bool is_script_type; // Flag to indicate if the resource is a GDScript type
 };
-
-
 
 class ResourceComponentRef : public FlecsComponent<ResourceComponent> {
 	#define RESOURCE_COMPONENT_PROPERTIES\
@@ -29,7 +27,6 @@ class ResourceComponentRef : public FlecsComponent<ResourceComponent> {
 
 	DEFINE_COMPONENT_PROXY(ResourceComponent, RESOURCE_COMPONENT_PROPERTIES, RESOURCE_COMPONENT_BINDINGS);
 };
-
 
 using ResourceComponentModule = SingleComponentModule<ResourceComponent>; // Specialization for ResourceComponent
 

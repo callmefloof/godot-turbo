@@ -4,12 +4,12 @@
 
 #ifndef VISIBILITY_COMPONENT_H
 #define VISIBILITY_COMPONENT_H
-#include "../../../../core/object/ref_counted.h"
+#include "core/object/ref_counted.h"
 #include "../flecs_types/flecs_component.h"
 #include "single_component_module.h"
 #include "component_proxy.h"
-#include "../../../../core/config/engine.h"
-#include "../../../../core/os/memory.h"
+#include "core/config/engine.h"
+#include "core/os/memory.h"
 
 #include <cassert>
 

@@ -3,7 +3,7 @@
 //
 #ifndef TILE_OCCLUSION_MANAGER_H
 #define TILE_OCCLUSION_MANAGER_H
-#include "../../../../../../core/templates/vector.h"
+#include "core/templates/vector.h"
 #include "../../thirdparty/concurrentqueue/concurrentqueue.h"
 #include "tile.h"
 #include <atomic>

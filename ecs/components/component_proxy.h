@@ -2,13 +2,13 @@
 // Refactored to use raw pointers instead of Ref<T>
 #pragma once
 
-#include "../../../../core/object/ref_counted.h"  // RefCounted
-#include "../../../../core/object/class_db.h"    // ClassDB
-#include "../../../../core/object/object.h"
-#include "../../../../core/templates/vector.h"
-#include "../../../../core/variant/variant.h"
-#include "../../../../core/variant/typed_array.h"
-#include "../../../../core/templates/rid.h"
+#include "core/object/ref_counted.h"  // RefCounted
+#include "core/object/class_db.h"    // ClassDB
+#include "core/object/object.h"
+#include "core/templates/vector.h"
+#include "core/variant/variant.h"
+#include "core/variant/typed_array.h"
+#include "core/templates/rid.h"
 #include "flecs_component_base.h"
 #include "flecs_entity.h"
 #include "flecs_component.h"
@@ -100,6 +100,7 @@ ERR_PRINT("Entity does not have component " #Component); \
 return; \
 } \
 owner.get_mut<Component>().Name = val; \
+owner.modified<Component>();\
 }
 
 #define DEFINE_ARRAY_PROPERTY(Type, Name, Component) \
@@ -137,6 +138,7 @@ void set_##Name(const TypedArray<Type> &arr) { \
 	auto c = get_typed_data<Component>(); \
 	c.Name.clear(); \
 	for (int i = 0; i < arr.size(); ++i) { c.Name.push_back(arr[i]); } \
+	owner.modified<Component>();\
 }
 
 #define BIND_PROPERTY(Type, Name, Class) \
@@ -175,8 +177,17 @@ static Ref<CompType##Ref> create_component(const Ref<FlecsEntity> &p_owner) {\
 	\
 	inst->set_component(ent.world().component<CompType>());\
 	\
-	CompType comp;\
-	inst->set_data(comp);\
+	if(ent.has<CompType>()) {\
+		inst->set_data(ent.get_mut<CompType>());\
+	}\
+	else {\
+		CompType comp;\
+		inst->set_data(comp);\
+	}\
+	\
+	if(!p_owner->has_component(#CompType)){\
+		p_owner->set_component(inst);\
+	}\
 	\
 	return inst;\
 }

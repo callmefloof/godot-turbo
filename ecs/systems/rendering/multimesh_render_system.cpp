@@ -1,48 +1,55 @@
 //
 // Created by Floof on 28-7-2025.
 //
-#include "../../../../../core/math/aabb.h"
-#include "../../../../../core/math/basis.h"
-#include "../../../../../core/math/vector3.h"
-#include "../../../../../core/math/plane.h"
-
-#include "../../../../../core/math/vector2i.h"
-#include "../../../../../scene/resources/3d/world_3d.h"
-#include "../../../../../core/os/os.h"
-#include "../../../../../servers/rendering_server.h"
-#include "../../components/rendering/rendering_components.h"
-#include "../../components/transform_3d_component.h"
+#include "core/math/aabb.h"
+#include "core/math/plane.h"
+#include "ecs/components/worldcomponents.h"
+#include "core/os/os.h"
+#include "servers/rendering_server.h"
+#include "ecs/components/transform_3d_component.h"
 #include "../commands/command.h"
 #include "mulitmesh_render_system.h"
-#include "occlusion/tile.h"
+#include "ecs/components/rendering/rendering_components.h"
+#include "ecs/components/visibility_component.h"
 
-void FlecsMultiMeshRenderSystem::create_rendering(CommandQueue& command_queue) const {
+void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, PipelineManager& pipeline_manager) const {
 	if (!main_camera.has<CameraComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: CameraComponent not found");
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: CameraComponent not found");
 		return;
 	}
-	if (!world.has<World3D>()) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: World3D not found");
+	if (!world.has<World3DComponent>()) {
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: World3D not found");
 		return;
 	}
 	const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
 	if (cam_camera_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: cam_camera_ref not found");
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: cam_camera_ref not found");
 		return;
 	}
 	const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
 	if (cam_transform_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: cam_transform_ref not found");
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: cam_transform_ref not found");
 		return;
 	}
-	world.system<const MultiMeshComponent>()
-			.name("MultiMeshRenderSystem")
+	if(!world.lookup("MultiMeshRenderSystem::Occludee::Cull")){
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: MultiMeshRenderSystem::Occludee::Cull not found");
+		return;
+	}
+	flecs::system multi_mesh_render_system = world.system<const MultiMeshComponent>()
+			.name("MultiMeshRenderSystem::Render")
 			.multi_threaded()
+			.cache_kind(flecs::QueryCacheAuto)
+			.with<VisibilityComponent>()
+			.without<FrustumCulled>()
+			.without<Occluded>()
 			.each([&](flecs::entity multi_mesh, const MultiMeshComponent &mmc) {
 				auto q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
-								 .with(flecs::ChildOf, multi_mesh)
-								 .cache_kind(flecs::QueryCacheDefault)
-								 .build();
+								.with(flecs::ChildOf, multi_mesh)
+								.with<VisibilityComponent>()
+								.without<FrustumCulled>()
+								.without<Occluded>()
+								.cache_kind(flecs::QueryCacheAuto)
+								.build();
 
 				q.each([&](flecs::entity child, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform_comp, const VisibilityComponent &visibility_comp) {
 					if (visibility_comp.visible) {
@@ -60,37 +67,40 @@ void FlecsMultiMeshRenderSystem::create_rendering(CommandQueue& command_queue) c
 					}
 				});
 			});
+	pipeline_manager.add_to_pipeline(multi_mesh_render_system, flecs::OnUpdate, "OcclusionSystem::Occludee::Cull");
 
 }
 
 
- void FlecsMultiMeshRenderSystem::create_frustum_culling(CommandQueue &command_queue) const {
+ void MultiMeshRenderSystem::create_frustum_culling(CommandQueue &command_queue, PipelineManager& pipeline_manager) const {
 	if (!main_camera.has<CameraComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: CameraComponent not found");
+		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: CameraComponent not found");
 		return;
 	}
-	if (!world.has<World3D>()) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: World3D not found");
+	if (!world.has<World3DComponent>()) {
+		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: World3D not found");
 		return;
 	}
 	const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
 	if (cam_camera_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: cam_camera_ref not found");
+		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: cam_camera_ref not found");
 		return;
 	}
 	const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
 	if (cam_transform_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: cam_transform_ref not found");
+		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: cam_transform_ref not found");
 		return;
 	}
-	world.system<const MultiMeshComponent, const MeshComponent>()
-			.name("MultiMeshRenderSystem")
+	auto frustum_culling_system = world.system<const MultiMeshComponent, const MeshComponent>()
+			.name("MultiMeshRenderSystem::FrustumCulling")
 			.multi_threaded()
-			.each([&](flecs::entity multi_mesh, const MultiMeshComponent &mmc, const MeshComponent &mesh_comp) {
-				auto q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
-								 .with(flecs::ChildOf, multi_mesh)
-								 .cache_kind(flecs::QueryCacheDefault)
-								 .build();
+			.cache_kind(flecs::QueryCacheAuto)
+			.each([&](flecs::entity entity, const MultiMeshComponent &mmc, const MeshComponent &mesh_comp) {
+				
+				static flecs::query q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
+								.with(flecs::ChildOf, entity)
+								.cache_kind(flecs::QueryCacheDefault)
+								.build();
 
 				q.each([&](flecs::entity child, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform, const VisibilityComponent &visibility_comp) {
 					if (!visibility_comp.visible) {
@@ -117,110 +127,17 @@ void FlecsMultiMeshRenderSystem::create_rendering(CommandQueue& command_queue) c
 					});
 				});
 			});
-}
-void FlecsMultiMeshRenderSystem::create_occlusion_culling(CommandQueue &command_queue) {
-	if (!main_camera.has<CameraComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: CameraComponent not found");
-		return;
-	}
-	if (!world.has<World3D>()) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: World3D not found");
-		return;
-	}
-	const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
-	if (cam_camera_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: cam_camera_ref not found");
-		return;
-	}
-	const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
-	if (cam_transform_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::initialize: cam_transform_ref not found");
-		return;
-	}
-	world.system<Occluder>("Occluder::Update")
-	.multi_threaded()
-	.without<FrustumCulled>()
-	.each([&](flecs::entity entity, Occluder& occ ) {
-		tile_occlusion_manager.reset(window_size.width, window_size.height);
-		if ((!entity.parent().has<Transform3DComponent>() && !entity.parent().has<VisibilityComponent>()) || entity.parent().has<FrustumCulled>()) {
-			return;
-		}
-		if (!entity.get<VisibilityComponent>().visible) {
-			return;
-		}
-		const auto& transform = entity.parent().get<Transform3DComponent>();
-
-		PackedVector3Array world_vertices = PackedVector3Array();
-		world_vertices.resize(occ.vertices.size());
-		for (int i = 0; i < world_vertices.size(); i++) {
-				world_vertices.set(i,world_vertices[i] + transform.transform.get_origin());
-		}
-		occ.screen_triangles.clear();
-		occ.screen_triangles = ScreenTriangle::convert_to_screen_triangles(world_vertices, occ.indices, cam_transform_ref->transform,cam_camera_ref->projection, cam_camera_ref->camera_offset);
-	});
-
-	world.system<Occludee>("Occludee::Update")
-	.multi_threaded()
-	.without<FrustumCulled>()
-	.with<Transform3DComponent>()
-	.with<VisibilityComponent>()
-	.each([](flecs::entity entity, Occludee& occludee){
-		const auto& transform = entity.parent().get<Transform3DComponent>();
-		occludee.worldAABB.position = occludee.aabb.position + transform.transform.get_origin();
-		occludee.worldAABB.size = transform.transform.get_basis().get_scale()*occludee.aabb.size;
-	});
-
-	world.system<const Occluder>("Occluder::Binning")
-	.multi_threaded()
-	.without<FrustumCulled>()
-	.each([&](flecs::entity entity, const Occluder& occ) {
-		if ((!entity.parent().has<Transform3DComponent>() && !entity.parent().has<VisibilityComponent>()) || entity.parent().has<FrustumCulled>()) {
-			return;
-		}
-		if (!entity.get<VisibilityComponent>().visible) {
-			return;
-		}
-		tile_occlusion_manager.bin_triangles(occ.screen_triangles);
-	});
-
-	world.system("Occluder::Rasterize").run([=](flecs::iter& it) {
-		tile_occlusion_manager.rasterize_all_bins_parallel(OS::get_singleton()->get_processor_count());
-	});
-
-	world.system<Occludee>("Occludee::Cull")
-	.multi_threaded()
-	.without<FrustumCulled>()
-	.each([=](flecs::entity entity, Occludee& occludee){
-		if (!tile_occlusion_manager.is_visible(ScreenAABB::aabb_to_screen_aabb(occludee.worldAABB,window_size, cam_camera_ref->projection, cam_transform_ref->transform,cam_camera_ref->camera_offset))) {
-			entity.add<Occluded>();
-		}else {
-			entity.remove<Occluded>();
-		}
-	});
-
-
+	pipeline_manager.add_to_pipeline(frustum_culling_system, flecs::OnUpdate);
 }
 
-
-void FlecsMultiMeshRenderSystem::create(CommandQueue& command_queue) const {
-	create_frustum_culling( command_queue);
-	create_rendering( command_queue);
+void MultiMeshRenderSystem::_bind_methods() {
+ 	ClassDB::bind_static_method(get_class_static(),"get_singleton",&MultiMeshRenderSystem::get_singleton);
 }
 
-void FlecsMultiMeshRenderSystem::_bind_methods() {
- 	ClassDB::bind_static_method(get_class_static(),"get_singleton",&FlecsMultiMeshRenderSystem::get_singleton);
-}
-
-FlecsMultiMeshRenderSystem *FlecsMultiMeshRenderSystem::get_singleton() {
- 	if (!Engine::get_singleton()->has_singleton("FlecsMultiMeshRenderSystem")) {
- 		Engine::get_singleton()->add_singleton(Engine::Singleton("FlecsMultiMeshRenderSystem",memnew(FlecsMultiMeshRenderSystem), "MultiMeshRenderSystem"));
+MultiMeshRenderSystem *MultiMeshRenderSystem::get_singleton() {
+ 	if (!Engine::get_singleton()->has_singleton("MultiMeshRenderSystem")) {
+ 		Engine::get_singleton()->add_singleton(Engine::Singleton("MultiMeshRenderSystem",memnew(MultiMeshRenderSystem), "MultiMeshRenderSystem"));
  	}
- 	static FlecsMultiMeshRenderSystem* singleton = cast_to<FlecsMultiMeshRenderSystem>(Engine::get_singleton()->get_singleton_object("FlecsMultiMeshRenderSystem"));
+ 	static MultiMeshRenderSystem* singleton = cast_to<MultiMeshRenderSystem>(Engine::get_singleton()->get_singleton_object("MultiMeshRenderSystem"));
  	return singleton;
-}
-Vector2i FlecsMultiMeshRenderSystem::get_window_size() const {
-	return window_size;
-}
-void FlecsMultiMeshRenderSystem::set_window_size(const Vector2i &p_window_size) {
-	this->window_size = p_window_size;
 }

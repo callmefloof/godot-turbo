@@ -4,33 +4,29 @@
 
 #ifndef VARIANT_TYPE_MAP_H
 #define VARIANT_TYPE_MAP_H
-#include "../../core/object/ref_counted.h"
-#include "../../core/variant/dictionary.h"
-#include "../../core/variant/variant.h"
-#include "../../core/variant/callable.h"
-#include "../../core/math/aabb.h"
-#include "../../core/math/rect2.h"
-#include "../../core/math/rect2i.h"
-#include "../../core/math/color.h"
-#include "../../core/math/transform_3d.h"
-#include "../../core/math/transform_2d.h"
-#include "../../core/io/resource.h"
-#include "../../core/templates/rid.h"
-#include "../../core/object/object.h"
-#include "../../core/math/vector2i.h"
-#include "../../core/math/vector2.h"
-#include "../../core/math/vector3.h"
-#include "../../core/math/vector3i.h"
-#include "../../core/math/vector4.h"
-#include "../../core/math/vector4i.h"
-#include "../../core/math/basis.h"
-#include "../../core/math/quaternion.h"
-#include "../../core/string/string_name.h"
-#include "../../core/string/ustring.h"
-
-
-
-
+#include "core/object/ref_counted.h"
+#include "core/variant/dictionary.h"
+#include "core/variant/variant.h"
+#include "core/variant/callable.h"
+#include "core/math/aabb.h"
+#include "core/math/rect2.h"
+#include "core/math/rect2i.h"
+#include "core/math/color.h"
+#include "core/math/transform_3d.h"
+#include "core/math/transform_2d.h"
+#include "core/io/resource.h"
+#include "core/templates/rid.h"
+#include "core/object/object.h"
+#include "core/math/vector2i.h"
+#include "core/math/vector2.h"
+#include "core/math/vector3.h"
+#include "core/math/vector3i.h"
+#include "core/math/vector4.h"
+#include "core/math/vector4i.h"
+#include "core/math/basis.h"
+#include "core/math/quaternion.h"
+#include "core/string/string_name.h"
+#include "core/string/ustring.h"
 
 template<typename T>
 struct VariantTypeMap{

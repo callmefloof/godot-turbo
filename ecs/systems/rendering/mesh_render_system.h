@@ -1,22 +1,21 @@
 #pragma once
-#include "../../../thirdparty/flecs/distr/flecs.h"
-#include "../../components/transform_3d_component.h"
-#include "../../components/rendering/rendering_components.h"
+#include "thirdparty/flecs/distr/flecs.h"
+#include "ecs/components/transform_3d_component.h"
+#include "ecs/components/rendering/rendering_components.h"
 #include "servers/rendering_server.h"
+#include "render_system.h"
+#include "../commands/command.h"
+#include "../pipeline_manager.h"
 
-class MeshRenderSystem
+class MeshRenderSystem : public RenderSystem
 {
 
 protected:
-	RenderingServer *rendering_server;
 	flecs::world &world;
 public:
 	explicit MeshRenderSystem(flecs::world& world) :
-			rendering_server(RenderingServer::get_singleton()),
-			world(world){
-		assert(rendering_server != nullptr && "RenderingServer must not be null");
-	}
-	void register_system() const {
+			world(world){}
+	void register_system(CommandQueue& command_queue, PipelineManager& pipeline_manager) const {
 		world.system<const RenderInstanceComponent, const MeshComponent, const Transform3DComponent>("MeshRenderSystem")
 				.kind(flecs::OnUpdate)
 				.run([this](const flecs::iter it) {
@@ -29,7 +28,7 @@ public:
 						const auto &mesh = meshes[i];
 						const auto &[transform] = transforms[i];
 
-						rendering_server->instance_set_transform(instance_id, transform);
+						RS::get_singleton()->instance_set_transform(instance_id, transform);
 					}
 				});
 	}

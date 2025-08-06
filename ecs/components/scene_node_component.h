@@ -1,12 +1,12 @@
 #pragma once
-#include "../../../../core/object/object_id.h"
-#include "../../../../core/os/memory.h"
-#include "../../../../scene/main/node.h"
+#include "core/object/object_id.h"
+#include "core/os/memory.h"
+#include "scene/main/node.h"
 #include "../flecs_types/flecs_component.h"
 #include "component_proxy.h"
 #include "node_ref.h"
 #include "single_component_module.h"
-#include "../../../core/string/ustring.h"
+#include "core/string/ustring.h"
 
 
 

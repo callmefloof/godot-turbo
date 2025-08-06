@@ -4,14 +4,14 @@
 
 #ifndef FLECS_COMPONENT_BASE_H
 #define FLECS_COMPONENT_BASE_H
-#include "../../../../core/error/error_macros.h"
-#include "../../../../core/object/class_db.h"
-#include "../../../../core/object/object.h"
-#include "../../../../core/string/string_name.h"
+#include "core/error/error_macros.h"
+#include "core/object/class_db.h"
+#include "core/object/object.h"
+#include "core/string/string_name.h"
 #include "../../thirdparty/flecs/distr/flecs.h"
-#include "../../../../core/io/resource.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/typedefs.h"
+#include "core/io/resource.h"
+#include "core/object/ref_counted.h"
+#include "core/typedefs.h"
 #include <cassert>
 
 class FlecsEntity;

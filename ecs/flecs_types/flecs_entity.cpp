@@ -2,13 +2,13 @@
 // Created by Floof on 16-7-2025.
 //
 #include "flecs_entity.h"
-#include "../../../../core/error/error_macros.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/string/ustring.h"
+#include "core/error/error_macros.h"
+#include "core/object/ref_counted.h"
+#include "core/string/ustring.h"
 #include "flecs_component_base.h"
 #include "../components/script_visible_component.h"
 #include "../components/script_component_registry.h"
-#include "../../../../core/object/class_db.h"
+#include "core/object/class_db.h"
 
  void FlecsEntity::_bind_methods() {
 	//fill in methods
@@ -60,7 +60,21 @@
 	ERR_PRINT("component type not found. returning nullptr");
 	return Ref<FlecsComponentBase>();
 }
- PackedStringArray FlecsEntity::get_component_types() const {
+bool FlecsEntity::has_component(const StringName &component_type) const {
+	for (int i = 0; i < components.size(); i++) {
+		if (!components[i].is_valid()) {
+			continue;
+		}
+		if (components[i].is_null()) {
+			continue;
+		}
+		if (components[i]->get_type_name() == component_type) {
+			return true;
+		}
+	}
+	return false;
+}
+PackedStringArray FlecsEntity::get_component_types() const {
 	PackedStringArray ret;
 	for (int i = 0; i < components.size(); i++) {
 		if (!components[i].is_valid()) {

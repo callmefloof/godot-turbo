@@ -14,7 +14,17 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/components/script_visible_component.cpp",
     "ecs/systems/rendering/multimesh_render_system.cpp",
     "ecs/systems/rendering/occlusion/tile_occlusion_manager.cpp",
-
+    "ecs/systems/rendering/occlusion/occlusion_system.cpp",
+    "ecs/systems/flecs_system.cpp",
+    "ecs/systems/pipeline_manager.cpp",
+    "ecs/systems/rendering/render_system.cpp",
+    "ecs/utility/navigation/2d/navigation2d_utility.cpp",
+    "ecs/utility/navigation/3d/navigation3d_utility.cpp",
+    "ecs/utility/physics/2d/physics2d_utility.cpp",
+    "ecs/utility/physics/3d/physics3d_utility.cpp",
+    "ecs/utility/rendering/2d/render_utility_2d.cpp",
+    "ecs/utility/rendering/3d/render_utility_3d.cpp",
+    "ecs/utility/scene_object_utility.cpp",
 ])
 
 # Use env.GetModulePath() for the module's root, or env.Dir('.')

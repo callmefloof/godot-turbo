@@ -1,12 +1,12 @@
 #pragma once
-#include "../../../core/object/ref_counted.h"
-#include "../../../core/templates/rid.h"
-#include "../../../modules/godot_turbo/ecs/components/component_proxy.h"
-#include "../../../servers/navigation_server_3d.h"
-#include "../../../../thirdparty/flecs/distr/flecs.h"
+#include "core/object/ref_counted.h"
+#include "core/templates/rid.h"
+#include "modules/godot_turbo/ecs/components/component_proxy.h"
+#include "servers/navigation_server_3d.h"
+#include "thirdparty/flecs/distr/flecs.h"
 #include "../../component_module_base.h"
 #include "servers/navigation_server_3d.h"
-#include "../../../core/string/ustring.h"
+#include "core/string/ustring.h"
 
 
 struct NavAgent3DComponent {

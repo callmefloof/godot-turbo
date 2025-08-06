@@ -1,12 +1,12 @@
 #pragma once
-#include "../../../../thirdparty/flecs/distr/flecs.h"
+#include "thirdparty/flecs/distr/flecs.h"
 #include "../../component_module_base.h"
-#include "../../../../../../core/templates/rid.h"
-#include "../../../../../../core/os/memory.h"
-#include "../../../../../../modules/godot_turbo/ecs/components/component_proxy.h"
-#include "../../../../../../servers/physics_server_2d.h"
-#include "../../../flecs_types/flecs_component.h"
-#include "../../../core/string/ustring.h"
+#include "core/templates/rid.h"
+#include "core/os/memory.h"
+#include "modules/godot_turbo/ecs/components/component_proxy.h"
+#include "servers/physics_server_2d.h"
+#include "ecs/flecs_types/flecs_component.h"
+#include "core/string/ustring.h"
 
 
 struct Area2DComponent {

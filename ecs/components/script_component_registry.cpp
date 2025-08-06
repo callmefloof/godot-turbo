@@ -2,9 +2,9 @@
 // Created by Floof on 16-7-2025.
 //
 #include "script_component_registry.h"
-#include "../../../../core/object/class_db.h"
-#include "../../../../core/config/engine.h"
-#include "../../../../core/os/memory.h"
+#include "core/object/class_db.h"
+#include "core/config/engine.h"
+#include "core/os/memory.h"
 
 ScriptComponentRegistry* ScriptComponentRegistry::singleton = nullptr;
 

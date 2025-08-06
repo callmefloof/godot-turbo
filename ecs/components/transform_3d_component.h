@@ -1,6 +1,6 @@
 #pragma once
-#include "../../../../core/math/transform_3d.h"
-#include "../../thirdparty/flecs/distr/flecs.h"
+#include "core/math/transform_3d.h"
+#include "thirdparty/flecs/distr/flecs.h"
 #include "component_proxy.h"
 #include "single_component_module.h"
 

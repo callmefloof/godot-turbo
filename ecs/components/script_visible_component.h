@@ -4,14 +4,13 @@
 
 #ifndef SCRIPT_VISIBLE_COMPONENT_H
 #define SCRIPT_VISIBLE_COMPONENT_H
-#include "../../../../core/error/error_macros.h"
-#include "../../../../core/object/class_db.h"
-#include "../../../../core/object/object.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/string/string_name.h"
-#include "../../../../core/templates/a_hash_map.h"
-#include "../../../../core/typedefs.h"
-#include "../../../../core/variant/variant.h"
+#include "core/error/error_macros.h"
+#include "core/object/class_db.h"
+#include "core/object/ref_counted.h"
+#include "core/string/string_name.h"
+#include "core/templates/a_hash_map.h"
+#include "core/typedefs.h"
+#include "core/variant/variant.h"
 #include "../flecs_types/flecs_component.h"
 #include "type_id_generator.h"
 #include "single_component_module.h"

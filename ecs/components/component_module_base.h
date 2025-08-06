@@ -1,5 +1,5 @@
 #pragma once
-#include "../../thirdparty/flecs/distr/flecs.h"
+#include "thirdparty/flecs/distr/flecs.h"
 #include <cassert>
 
 template <typename ComponentsStruct>

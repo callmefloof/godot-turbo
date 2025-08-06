@@ -1,19 +1,19 @@
 #pragma once
-#include "../../../../../core/templates/rid.h"
-#include "../../../../../servers/rendering_server.h"
-#include "../../../thirdparty/flecs/distr/flecs.h"
+#include "ecs/systems/rendering/occlusion/tile.h"
+#include "ecs/components/component_module_base.h"
+#include "core/templates/rid.h"
+#include "servers/rendering_server.h"
 #include "../../flecs_types/flecs_entity.h"
-#include "../component_module_base.h"
-#include "../../../../../core/os/memory.h"
-#include "../../../../../core/math/transform_3d.h"
-#include "../../../../../core/math/vector2.h"
-#include "../../../../../core/math/projection.h"
+#include "core/os/memory.h"
+#include "core/math/transform_3d.h"
+#include "core/math/vector2.h"
+#include "core/math/projection.h"
 
-#include "../../../../../core/object/object.h"
+#include "core/object/object.h"
 
-#include "../../../../../core/variant/typed_array.h"
-#include "../../../../../core/string/ustring.h"
-#include "../../../../../core/templates/vector.h"
+#include "core/variant/typed_array.h"
+#include "core/string/ustring.h"
+#include "core/templates/vector.h"
 #include "../../flecs_types/flecs_component.h"
 #include "../component_proxy.h"
 
@@ -493,27 +493,23 @@ class CanvasItemComponentRef : public FlecsComponent<CanvasItemComponent> {
 	CANVAS_ITEM_COMPONENT_BINDINGS);
 };
 
-
-
-
-
-struct ScreenTriangle;
-
 struct FrustumCulled { /* tag component */ };
+
 struct Occluded { /* tag component */ };
+
 struct Occluder {
 	RID occluder_id;
 	Vector<ScreenTriangle> screen_triangles;
 	PackedVector3Array vertices;
 	PackedInt32Array indices;
 };
+
 struct Occludee {
 	AABB worldAABB;
 	AABB aabb;
 	Occludee() = default;
 	~Occludee() = default;
 };
-
 
 struct RenderingBaseComponents{
 	flecs::component<MeshComponent> mesh;

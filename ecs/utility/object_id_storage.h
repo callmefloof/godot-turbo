@@ -17,10 +17,12 @@ struct ObjectIDContainer {
 class ObjectIDStorage {
 
 private:
-	static Vector<ObjectIDContainer> object_id_pool;
+	static inline Vector<ObjectIDContainer> object_id_pool;
 
 public:
-
+	~ObjectIDStorage(){
+		release_all();
+	};
 	static bool add(Object *p_obj, const RID &p_rid)
 	{
 		if (p_obj == nullptr) {
@@ -83,6 +85,24 @@ public:
 			return object_id_pool.erase(*it);
 		}
 		return false;
+	}
+
+	static void release_all(){
+		for (int i = 0; i < object_id_pool.size(); i++) {
+			if (!object_id_pool[i].id.is_valid()) {
+				continue;
+			}
+			const auto obj = ObjectDB::get_instance(object_id_pool[i].id);
+			auto node = Object::cast_to<Node>(obj);
+			if (node == nullptr) {
+				memdelete(obj);
+			}
+			if (node->is_inside_tree()) {
+				node->get_parent()->remove_child(node);	
+			}
+			node->queue_free();
+		}
+		object_id_pool.resize_zeroed(0);
 	}
 
 	static bool has(const ObjectID &p_id) {

@@ -4,11 +4,11 @@
 
 
 #pragma once
-#include "../../../../core/error/error_macros.h"
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/typedefs.h"
-#include "../../../../core/variant/variant_utility.h"
-#include "../../thirdparty/nameof/include/nameof.hpp"
+#include "core/error/error_macros.h"
+#include "core/object/ref_counted.h"
+#include "core/typedefs.h"
+#include "core/variant/variant_utility.h"
+#include "thirdparty/nameof/include/nameof.hpp"
 #include "flecs_component.h"
 #include "flecs_component_base.h"
 #include "flecs_entity.h"
@@ -79,6 +79,7 @@ void FlecsComponent<T>::set_flecs_owner(const flecs::entity p_owner) {
 template <typename T>
 void FlecsComponent<T>::set_data(T &p_data) {
 	owner.set<T>(p_data);
+	owner.modified<T>();
 }
 
 template <typename T>

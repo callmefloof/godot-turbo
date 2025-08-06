@@ -1,6 +1,6 @@
 #pragma once
-#include "../../thirdparty/flecs/distr/flecs.h"
-#include "../../../../core/math/transform_2d.h"
+#include "thirdparty/flecs/distr/flecs.h"
+#include "core/math/transform_2d.h"
 #include "single_component_module.h"
 #include "../flecs_types/flecs_entity.h"
 #include <cassert>

@@ -1,11 +1,11 @@
 #pragma once
-#include "../../../core/templates/rid.h"
-#include "../../../servers/physics_server_3d.h"
-#include "../../../../thirdparty/flecs/distr/flecs.h"
-#include "../../../flecs_types/flecs_entity.h"
+#include "core/templates/rid.h"
+#include "servers/physics_server_3d.h"
+#include "thirdparty/flecs/distr/flecs.h"
+#include "ecs/flecs_types/flecs_entity.h"
 #include "../../component_module_base.h"
-#include "../../../core/os/memory.h"
-#include "../../../core/string/ustring.h"
+#include "core/os/memory.h"
+#include "core/string/ustring.h"
 
 struct Area3DComponent {
 	RID area_id;

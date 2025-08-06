@@ -1,12 +1,11 @@
 #pragma once
-#include "../../../../core/templates/rid.h"
-#include "../../../../modules/godot_turbo/ecs/components/component_proxy.h"
-#include "../../../../servers/navigation_server_2d.h"
-#include "../../../../thirdparty/flecs/distr/flecs.h"
-#include "../../../flecs_types/flecs_component.h"
-#include "../../../flecs_types/flecs_entity.h"
+#include "core/templates/rid.h"
+#include "modules/godot_turbo/ecs/components/component_proxy.h"
+#include "servers/navigation_server_2d.h"
+#include "thirdparty/flecs/distr/flecs.h"
+#include "ecs/flecs_types/flecs_component.h"
 #include "modules/godot_turbo/ecs/components/component_module_base.h"
-#include "../../../core/string/ustring.h"
+#include "core/string/ustring.h"
 
 
 class FlecsEntity;

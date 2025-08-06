@@ -1,12 +1,12 @@
 #ifndef SCRIPT_COMPONENT_REGISTRY_H
 #define SCRIPT_COMPONENT_REGISTRY_H
 
-#include "../../../../core/object/ref_counted.h"
-#include "../../../../core/templates/a_hash_map.h"
-#include "../../../../core/string/string_name.h"
-#include "../../../../core/variant/variant.h"
-#include "../../../../core/object/object.h"
-#include "../../../../core/variant/dictionary.h"
+#include "core/object/ref_counted.h"
+#include "core/templates/a_hash_map.h"
+#include "core/string/string_name.h"
+#include "core/variant/variant.h"
+#include "core/object/object.h"
+#include "core/variant/dictionary.h"
 
 class ScriptComponentRegistry : public RefCounted {
 	GDCLASS(ScriptComponentRegistry, RefCounted);
