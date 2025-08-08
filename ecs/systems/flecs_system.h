@@ -4,7 +4,7 @@
 #include "core/string/ustring.h"
 #include "core/object/ref_counted.h"
 #include "core/object/class_db.h"
-#include "../../../thirdparty/flecs/distr/flecs.h"
+#include "thirdparty/flecs/distr/flecs.h"
 
 class FlecsWorld;
 

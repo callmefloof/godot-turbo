@@ -14,6 +14,7 @@
 #include "ecs/systems/pipeline_manager.h"
 #include "ecs/systems/rendering/mulitmesh_render_system.h"
 #include "ecs/systems/rendering/occlusion/occlusion_system.h"
+#include "ecs/systems/rendering/mesh_render_system.h"
 
 class ScriptVisibleComponentRef;
 
@@ -38,6 +39,7 @@ private:
 	AHashMap<flecs::entity,Ref<FlecsEntity>> entities;
 	CommandQueue system_command_queue;
 	MultiMeshRenderSystem multi_mesh_render_system;
+	MeshRenderSystem mesh_render_system;
 	OcclusionSystem occlusion_system;
 	PipelineManager pipeline_manager;
 	/* data */

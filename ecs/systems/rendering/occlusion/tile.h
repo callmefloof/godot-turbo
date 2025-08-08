@@ -4,14 +4,15 @@
 
 #ifndef TILE_H
 #define TILE_H
-#include "../../../../../../core/math/projection.h"
-#include "../../../../../../core/math/vector2.h"
-#include "../../../../../../core/math/vector2i.h"
-#include "../../../../../../core/math/vector3.h"
-#include "../../../../../../core/math/transform_3d.h"
-#include "../../../../../../core/variant/variant.h"
-#include "../../../../../../core/variant/typed_array.h"
-#include "../../../../../../core/templates/vector.h"
+#include "core/object/ref_counted.h"
+#include "core/math/projection.h"
+#include "core/math/vector2.h"
+#include "core/math/vector2i.h"
+#include "core/math/vector3.h"
+#include "core/math/transform_3d.h"
+#include "core/variant/variant.h"
+#include "core/variant/typed_array.h"
+#include "core/templates/vector.h"
 #include <algorithm>
 #include <vector>
 
@@ -23,7 +24,9 @@ constexpr int TILE_RES = TILE_SIZE; // 1:1 sample-to-pixel in each tile
 constexpr int SCREEN_TILES_X = OCCLUSION_WIDTH / TILE_SIZE;
 constexpr int SCREEN_TILES_Y = OCCLUSION_HEIGHT / TILE_SIZE;
 
-struct ScreenTriangle {
+class ScreenTriangle : public RefCounted {
+	GDCLASS(ScreenTriangle, RefCounted);
+public:
 	ScreenTriangle() {
 		z0 = 0;
 		z1 = 0;
@@ -46,14 +49,14 @@ struct ScreenTriangle {
 	}
 
 
-	static Vector<ScreenTriangle> convert_to_screen_triangles(
+	static Vector<Ref<ScreenTriangle>> convert_to_screen_triangles(
     const PackedVector3Array &vertices,
     const PackedInt32Array &indices,
     const Transform3D& cam_view,
     const Projection& cam_proj,
     const Vector2& screen_size
 ) {
-    Vector<ScreenTriangle> screen_tris;
+    Vector<Ref<ScreenTriangle>> screen_tris;
     const size_t triangle_count = indices.size() / 3;
 
     for (size_t i = 0; i < triangle_count; ++i) {
@@ -87,10 +90,10 @@ struct ScreenTriangle {
         Vector2 v2_screen = ((v2_ndc + Vector2(1,1)) * 0.5f) * screen_size;
 
         // Create ScreenTriangle
-        ScreenTriangle tri;
-        tri.v0 = v0_screen; tri.z0 = v0_view.z;
-        tri.v1 = v1_screen; tri.z1 = v1_view.z;
-        tri.v2 = v2_screen; tri.z2 = v2_view.z;
+        Ref<ScreenTriangle> tri = memnew(ScreenTriangle);
+        tri->v0 = v0_screen; tri->z0 = v0_view.z;
+        tri->v1 = v1_screen; tri->z1 = v1_view.z;
+        tri->v2 = v2_screen; tri->z2 = v2_view.z;
 
         screen_tris.push_back(tri);
     }
@@ -101,7 +104,16 @@ struct ScreenTriangle {
 	float z0, z1, z2;         // depth values
 };
 
-struct ScreenAABB {
+class ScreenAABB : public RefCounted {
+	GDCLASS(ScreenAABB, RefCounted);
+public:
+	ScreenAABB() {
+		position = Vector2i(0, 0);
+		size = Vector2i(0, 0);
+		min_z = FLT_MAX;
+		max_z = -FLT_MAX;
+	}
+	~ScreenAABB() = default;
 	Vector2i position;
 	Vector2i size;
 	float min_z = FLT_MAX;
@@ -119,14 +131,14 @@ struct ScreenAABB {
 		return position.y + size.y;
 	}
 
-	static ScreenAABB aabb_to_screen_aabb(
+	static Ref<ScreenAABB> aabb_to_screen_aabb(
 		const AABB &aabb,
 		const Vector2i &screen_size,
 		const Projection &cam_projection,
 		const Transform3D &cam_transform,
 		const Vector2 &cam_view_offset
 	) {
-		ScreenAABB screen_aabb;
+		Ref<ScreenAABB> screen_aabb = memnew(ScreenAABB);
 
 		Transform3D cam_view = cam_transform.affine_inverse();
 
@@ -154,8 +166,8 @@ struct ScreenAABB {
 			if (clip_pos.z <= 0.0f) // Behind camera
 				continue;
 
-			screen_aabb.min_z = std::min(screen_aabb.min_z, view_pos.z);
-			screen_aabb.max_z = std::max(screen_aabb.max_z, view_pos.z);
+			screen_aabb->min_z = std::min(screen_aabb->min_z, view_pos.z);
+			screen_aabb->max_z = std::max(screen_aabb->max_z, view_pos.z);
 
 			Vector2 ndc = Vector2(clip_pos.x, clip_pos.y) / clip_pos.z;
 			Vector2 screen_pos = ((ndc + Vector2(1.0f, 1.0f)) * 0.5f) * screen_size + cam_view_offset;
@@ -164,15 +176,15 @@ struct ScreenAABB {
 			max_screen = max_screen.max(screen_pos);
 		}
 
-		screen_aabb.position = min_screen.floor();
-		screen_aabb.size = (max_screen - min_screen).ceil();
+		screen_aabb->position = min_screen.floor();
+		screen_aabb->size = (max_screen - min_screen).ceil();
 
 		return screen_aabb;
 	}
 };
 
 struct TileBin {
-	Vector<ScreenTriangle> triangles;
+	Vector<Ref<ScreenTriangle>> triangles;
 	Vector<float> depth_buffer; // tileWidth * tileHeight
 	int tile_width;
 

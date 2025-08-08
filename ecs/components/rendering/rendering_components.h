@@ -495,13 +495,64 @@ class CanvasItemComponentRef : public FlecsComponent<CanvasItemComponent> {
 
 struct FrustumCulled { /* tag component */ };
 
+struct FrustumCulledRef : public FlecsComponent<FrustumCulled> {
+	#define FRUSTUM_CULLED_COMPONENT_PROPERTIES
+
+	#define FRUSTUM_CULLED_COMPONENT_BINDINGS
+
+	DEFINE_COMPONENT_PROXY(FrustumCulled,
+	FRUSTUM_CULLED_COMPONENT_PROPERTIES,
+	FRUSTUM_CULLED_COMPONENT_BINDINGS);
+};
+
 struct Occluded { /* tag component */ };
+
+class OccludedRef : public FlecsComponent<Occluded> {
+	#define OCCLUDED_COMPONENT_PROPERTIES
+
+	#define OCCLUDED_COMPONENT_BINDINGS
+
+	DEFINE_COMPONENT_PROXY(Occluded,
+	OCCLUDED_COMPONENT_PROPERTIES,
+	OCCLUDED_COMPONENT_BINDINGS);
+};
+
+struct MainCamera { /* tag component */ };
+
+class MainCameraRef : public FlecsComponent<MainCamera> {
+	#define MAIN_CAMERA_COMPONENT_PROPERTIES
+
+	#define MAIN_CAMERA_COMPONENT_BINDINGS
+
+	DEFINE_COMPONENT_PROXY(MainCamera,
+	MAIN_CAMERA_COMPONENT_PROPERTIES,
+	MAIN_CAMERA_COMPONENT_BINDINGS);
+};
+
 
 struct Occluder {
 	RID occluder_id;
-	Vector<ScreenTriangle> screen_triangles;
+	Vector<Ref<ScreenTriangle>> screen_triangles;
 	PackedVector3Array vertices;
 	PackedInt32Array indices;
+};
+
+class OccluderRef : public FlecsComponent<Occluder> {
+	#define OCCLUDER_COMPONENT_PROPERTIES\
+	DEFINE_PROPERTY(RID, occluder_id, Occluder)\
+	DEFINE_ARRAY_PROPERTY(ScreenTriangle, screen_triangles, Occluder)\
+	DEFINE_ARRAY_PROPERTY(Vector3, vertices, Occluder)\
+	DEFINE_ARRAY_PROPERTY(int32_t, indices, Occluder)\
+
+	#define OCCLUDER_COMPONENT_BINDINGS\
+	BIND_PROPERTY(RID, occluder_id, OccluderRef)\
+	BIND_ARRAY_PROPERTY(ScreenTriangle, screen_triangles, OccluderRef)\
+	BIND_ARRAY_PROPERTY(Vector3, vertices, OccluderRef)\
+	BIND_ARRAY_PROPERTY(int32_t, indices, OccluderRef)\
+
+	DEFINE_COMPONENT_PROXY(Occluder,
+	OCCLUDER_COMPONENT_PROPERTIES,
+	OCCLUDER_COMPONENT_BINDINGS);
 };
 
 struct Occludee {
@@ -509,6 +560,20 @@ struct Occludee {
 	AABB aabb;
 	Occludee() = default;
 	~Occludee() = default;
+};
+
+class OccludeeRef : public FlecsComponent<Occludee> {
+	#define OCCLUDEE_COMPONENT_PROPERTIES\
+	DEFINE_PROPERTY(AABB, worldAABB, Occludee)\
+	DEFINE_PROPERTY(AABB, aabb, Occludee)\
+
+	#define OCCLUDEE_COMPONENT_BINDINGS\
+	BIND_PROPERTY(AABB, worldAABB, OccludeeRef)\
+	BIND_PROPERTY(AABB, aabb, OccludeeRef)\
+
+	DEFINE_COMPONENT_PROXY(Occludee,
+	OCCLUDEE_COMPONENT_PROPERTIES,
+	OCCLUDEE_COMPONENT_BINDINGS);
 };
 
 struct RenderingBaseComponents{

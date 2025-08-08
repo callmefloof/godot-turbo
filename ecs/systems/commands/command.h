@@ -5,7 +5,7 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 #include <utility>
-#include "../../../thirdparty/concurrentqueue/concurrentqueue.h"
+#include "thirdparty/concurrentqueue/concurrentqueue.h"
 
 
 struct ICommand {
@@ -70,9 +70,9 @@ struct Command : CommandBase<Command<F>, F> {
 
 
 
-// Usage:
-constexpr size_t COMMAND_SIZE = 128;
-static Pool commandArena(COMMAND_SIZE, 1024); // 128 KB
+// // Usage:
+// constexpr size_t COMMAND_SIZE = 128;
+// static Pool commandArena(COMMAND_SIZE, 1024); // 128 KB
 
 template<typename F>
 static ICommand* make_command(F&& func) {

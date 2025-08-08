@@ -6,31 +6,35 @@
 #include "render_system.h"
 #include "../commands/command.h"
 #include "../pipeline_manager.h"
+#include "ecs/components/visibility_component.h"
 
 class MeshRenderSystem : public RenderSystem
 {
 
-protected:
-	flecs::world &world;
+
 public:
-	explicit MeshRenderSystem(flecs::world& world) :
-			world(world){}
-	void register_system(CommandQueue& command_queue, PipelineManager& pipeline_manager) const {
-		world.system<const RenderInstanceComponent, const MeshComponent, const Transform3DComponent>("MeshRenderSystem")
-				.kind(flecs::OnUpdate)
-				.run([this](const flecs::iter it) {
-					const flecs::field<RenderInstanceComponent> render_instances = it.field<RenderInstanceComponent>(1);
-					const flecs::field<MeshComponent> meshes = it.field<MeshComponent>(2);
-					const flecs::field<Transform3DComponent> transforms = it.field<Transform3DComponent>(3);
-
-					for (int i = 0; i < it.count(); ++i) {
-						const auto &[instance_id] = render_instances[i];
-						const auto &mesh = meshes[i];
-						const auto &[transform] = transforms[i];
-
-						RS::get_singleton()->instance_set_transform(instance_id, transform);
-					}
+	MeshRenderSystem() = default;
+	~MeshRenderSystem() override = default;
+	float far_dist = 9999;
+	void create_mesh_render_system(CommandQueue& command_queue, PipelineManager& pipeline_manager) const {
+		flecs::system mesh_render_system = world.system<const RenderInstanceComponent, const Transform3DComponent, const VisibilityComponent>("MeshRenderSystem:Render")
+				.each([=](flecs::entity entity, const RenderInstanceComponent& render_instance_comp, const Transform3DComponent& transform_3d_component, const VisibilityComponent& visibility_comp) {
+					//command_queue.enqueue([=](){
+						if (visibility_comp.visible) {
+							if(!entity.has<Occluded>()){
+								RS::get_singleton()->instance_set_transform(render_instance_comp.render_instance_id, transform_3d_component.transform);
+								return;
+							}
+						}
+						Transform3D transform_far;
+						const Vector3 far_pos = Vector3(far_dist,far_dist,far_dist);
+						transform_far.set_origin(far_pos);
+						RS::get_singleton()->instance_set_transform(render_instance_comp.render_instance_id, transform_far);
+						return;
+					//});
+					
 				});
+		pipeline_manager.add_to_pipeline(mesh_render_system, flecs::OnUpdate, "OcclusionSystem::Occludee::Cull");
 	}
 };
 

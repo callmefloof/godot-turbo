@@ -217,7 +217,7 @@ Ref<FlecsEntity> FlecsWorld::add_entity(const flecs::entity &e) {
 
 void FlecsWorld::init_render_system() {
 	multi_mesh_render_system.set_world(this);
-	flecs::entity main_camera;
+	flecs::entity main_camera = world.lookup("MainCamera");
 	occlusion_system.set_world(this);
 	
 	occlusion_system.set_main_camera(main_camera);

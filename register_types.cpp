@@ -67,6 +67,11 @@ INSTANTIATE_TYPED_ACCESSOR(VoxelGIComponent)
 INSTANTIATE_TYPED_ACCESSOR(ScenarioComponent)
 INSTANTIATE_TYPED_ACCESSOR(RenderInstanceComponent)
 INSTANTIATE_TYPED_ACCESSOR(CanvasItemComponent)
+INSTANTIATE_TYPED_ACCESSOR(FrustumCulled)
+INSTANTIATE_TYPED_ACCESSOR(Occluded)
+INSTANTIATE_TYPED_ACCESSOR(Occluder)
+INSTANTIATE_TYPED_ACCESSOR(Occludee)
+
 
 // Physics Components
 INSTANTIATE_TYPED_ACCESSOR(Area2DComponent)
@@ -108,7 +113,8 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
-
+	ClassDB::register_class<ScreenAABB>();
+	ClassDB::register_class<ScreenTriangle>();
 	ClassDB::register_class<FlecsEntity>();
 	ClassDB::register_abstract_class<FlecsComponentBase>();
     ClassDB::register_class<FlecsWorld>();
@@ -149,6 +155,10 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(ScenarioComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(RenderInstanceComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(CanvasItemComponent)
+	REGISTER_FLECS_COMPONENT_CLASS(FrustumCulled)
+	REGISTER_FLECS_COMPONENT_CLASS(Occluded)
+	REGISTER_FLECS_COMPONENT_CLASS(Occluder)
+	REGISTER_FLECS_COMPONENT_CLASS(Occludee)
 
 	// Physics Components
 	REGISTER_FLECS_COMPONENT_CLASS(Area2DComponent)

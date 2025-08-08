@@ -94,7 +94,7 @@ public:
 	static flecs::entity _create_occluder(const flecs::world &world, const RID& occluder_id, const String &name);
 	static flecs::entity _create_occluder(const flecs::world &world, OccluderInstance3D* occluder_instance);
 	static bool _bake_material_check(const Ref<Material> &p_material);
-	static void _bake_surface(const Transform3D &p_transform, Array p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, Array &r_vertices, Array &r_indices);
+	static void _bake_surface(const Transform3D &p_transform, const Array& p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, const PackedVector3Array &r_vertices, const PackedInt32Array &r_indices);
 	static Ref<FlecsEntity> create_mesh_instance(FlecsWorld* flecs_world, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id);
 	static Ref<FlecsEntity> create_mesh_instance_with_object(FlecsWorld* flecs_world, MeshInstance3D* mesh_instance_3d);
 	static TypedArray<FlecsEntity> create_multi_mesh(FlecsWorld* flecs_world, const Transform3D& transform, uint32_t size, const RID& mesh_id, const TypedArray<RID>& material_ids, const RID& scenario_id, const String& name, bool use_colors = false, bool use_custom_data = false, bool use_indirect = false);

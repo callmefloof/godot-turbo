@@ -10,15 +10,17 @@
 
 class SceneObjectUtility : public Object {
 	GDCLASS(SceneObjectUtility, Object)
-	
+private:
+	static inline SceneObjectUtility* instance = nullptr;
 public:
 	SceneObjectUtility() = default;
 	~SceneObjectUtility() = default;
-	static Array  create_entities_from_scene(FlecsWorld* world, const SceneTree* tree );
-	static Array  create_entities(FlecsWorld* world, const Node *base_node, Array &entities,
+	TypedArray<FlecsEntity> create_entities_from_scene(FlecsWorld* world, SceneTree* tree );
+	TypedArray<FlecsEntity> create_entities(FlecsWorld* world, const Node *base_node, const TypedArray<FlecsEntity> &entities,
 			int current_depth = 0, const int max_depth = 10000);
-	static Array create_entity(FlecsWorld* world, Node* node);
-	static Ref<FlecsEntity> get_script(FlecsWorld* world, const Node* node, const FlecsEntity* node_entity, Array &entities);
+	TypedArray<FlecsEntity> create_entity(FlecsWorld* world, Node* node);
+	Ref<FlecsEntity> get_script(FlecsWorld *world, const Node *node, const FlecsEntity *node_entity);
 	static void _bind_methods();
+	static SceneObjectUtility* get_singleton();
 };
 

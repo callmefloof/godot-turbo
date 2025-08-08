@@ -540,7 +540,7 @@ bool RenderUtility3D::_bake_material_check(const Ref<Material> &p_material) {
 	return true;
 }
 
-void RenderUtility3D::_bake_surface(const Transform3D &p_transform, Array p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, Array &r_vertices, Array &r_indices) {
+void RenderUtility3D::_bake_surface(const Transform3D &p_transform, const Array& p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, const PackedVector3Array &r_vertices, const PackedInt32Array &r_indices) {
 	if (!_bake_material_check(p_material)) {
 		return;
 	}
@@ -916,6 +916,6 @@ void RenderUtility3D::_bind_methods(){
 		&RenderUtility3D::create_occluder, "flecs_world", "occluder_id", "name");
 	ClassDB::bind_static_method(get_class_static(), "bake_material_check",
 		&RenderUtility3D::_bake_material_check, "p_material");
-	// ClassDB::bind_static_method(get_class_static(), "bake_surface",
-	// 	&RenderUtility3D::_bake_surface, "p_transform", "p_surface_arrays", "p_material", "p_simplification_dist", "r_vertices", "r_indices");
+	ClassDB::bind_static_method(get_class_static(), "bake_surface",
+		&RenderUtility3D::_bake_surface, "p_transform", "p_surface_arrays", "p_material", "p_simplification_dist", "r_vertices", "r_indices");
 }

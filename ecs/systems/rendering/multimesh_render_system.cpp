@@ -42,8 +42,8 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 			.with<VisibilityComponent>()
 			.without<FrustumCulled>()
 			.without<Occluded>()
-			.each([&](flecs::entity multi_mesh, const MultiMeshComponent &mmc) {
-				auto q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
+			.each([=](flecs::entity multi_mesh, const MultiMeshComponent &mmc) {
+				static flecs::query q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
 								.with(flecs::ChildOf, multi_mesh)
 								.with<VisibilityComponent>()
 								.without<FrustumCulled>()
@@ -51,19 +51,19 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 								.cache_kind(flecs::QueryCacheAuto)
 								.build();
 
-				q.each([&](flecs::entity child, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform_comp, const VisibilityComponent &visibility_comp) {
+				q.each([=](flecs::entity child, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform_comp, const VisibilityComponent &visibility_comp) {
 					if (visibility_comp.visible) {
-						command_queue.enqueue([=]() {
+						//command_queue.enqueue([=]() {
 							RS::get_singleton()->multimesh_instance_set_transform(mmc.multi_mesh_id, mmi_comp.index, transform_comp.transform);
-						});
+						//});
 					} else {
 						//Set it far away from render distance
 						Transform3D far_transform;
 						const Vector3 far_pos = cam_transform_ref->transform.get_origin() + Vector3(far_dist, far_dist, far_dist);
 						far_transform.set_origin(far_pos);
-						command_queue.enqueue([=]() {
+						//command_queue.enqueue([=]() {
 							RS::get_singleton()->multimesh_instance_set_transform(mmc.multi_mesh_id, mmi_comp.index, far_transform);
-						});
+						//});
 					}
 				});
 			});
@@ -95,18 +95,18 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 			.name("MultiMeshRenderSystem::FrustumCulling")
 			.multi_threaded()
 			.cache_kind(flecs::QueryCacheAuto)
-			.each([&](flecs::entity entity, const MultiMeshComponent &mmc, const MeshComponent &mesh_comp) {
+			.each([=](flecs::entity entity, const MultiMeshComponent &mmc, const MeshComponent &mesh_comp) {
 				
 				static flecs::query q = world.query_builder<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
 								.with(flecs::ChildOf, entity)
 								.cache_kind(flecs::QueryCacheDefault)
 								.build();
 
-				q.each([&](flecs::entity child, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform, const VisibilityComponent &visibility_comp) {
+				q.each([=](flecs::entity child, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform, const VisibilityComponent &visibility_comp) {
 					if (!visibility_comp.visible) {
 						return;
 					}
-					command_queue.enqueue([&]() {
+					//command_queue.enqueue([&]() {
 						AABB local_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh_comp.mesh_id);
 						AABB world_aabb = local_aabb;
 						world_aabb.set_position(local_aabb.position + transform.transform.get_origin());
@@ -124,20 +124,20 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 								child.remove<FrustumCulled>();
 							}
 						}
-					});
+					//});
 				});
 			});
 	pipeline_manager.add_to_pipeline(frustum_culling_system, flecs::OnUpdate);
 }
 
 void MultiMeshRenderSystem::_bind_methods() {
- 	ClassDB::bind_static_method(get_class_static(),"get_singleton",&MultiMeshRenderSystem::get_singleton);
+ 	//ClassDB::bind_static_method(get_class_static(),"get_singleton",&MultiMeshRenderSystem::get_singleton);
 }
 
-MultiMeshRenderSystem *MultiMeshRenderSystem::get_singleton() {
- 	if (!Engine::get_singleton()->has_singleton("MultiMeshRenderSystem")) {
- 		Engine::get_singleton()->add_singleton(Engine::Singleton("MultiMeshRenderSystem",memnew(MultiMeshRenderSystem), "MultiMeshRenderSystem"));
- 	}
- 	static MultiMeshRenderSystem* singleton = cast_to<MultiMeshRenderSystem>(Engine::get_singleton()->get_singleton_object("MultiMeshRenderSystem"));
- 	return singleton;
-}
+// MultiMeshRenderSystem *MultiMeshRenderSystem::get_singleton() {
+//  	if (!Engine::get_singleton()->has_singleton("MultiMeshRenderSystem")) {
+//  		Engine::get_singleton()->add_singleton(Engine::Singleton("MultiMeshRenderSystem",memnew(MultiMeshRenderSystem), "MultiMeshRenderSystem"));
+//  	}
+//  	static MultiMeshRenderSystem* singleton = cast_to<MultiMeshRenderSystem>(Engine::get_singleton()->get_singleton_object("MultiMeshRenderSystem"));
+//  	return singleton;
+// }
