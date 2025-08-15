@@ -28,7 +28,7 @@ flecs::entity Physics2DUtility::_create_area(const flecs::world *world, Area2D *
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = area_2d->get_instance_id();
+    object_instance_component.object_instance_id = area_2d->get_instance_id();
     NodeStorage::add(area_2d, area_2d->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Area2DComponent>({ area_id })
@@ -46,7 +46,7 @@ flecs::entity Physics2DUtility::_create_rigid_body(const flecs::world *world, Ri
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = rigid_body->get_instance_id();
+    object_instance_component.object_instance_id = rigid_body->get_instance_id();
     NodeStorage::add(rigid_body, rigid_body->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Body2DComponent>({ body_id })
@@ -64,7 +64,7 @@ flecs::entity Physics2DUtility::_create_physics_body(const flecs::world *world, 
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = physics_body->get_instance_id();
+    object_instance_component.object_instance_id = physics_body->get_instance_id();
     NodeStorage::add(physics_body, physics_body->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Body2DComponent>({ body_id })
@@ -82,7 +82,7 @@ flecs::entity Physics2DUtility::_create_joint(const flecs::world *world, Joint2D
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = joint_2d->get_instance_id();
+    object_instance_component.object_instance_id = joint_2d->get_instance_id();
     NodeStorage::add(joint_2d, joint_2d->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Joint2DComponent>({ joint_id })

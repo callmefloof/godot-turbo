@@ -54,7 +54,7 @@ flecs::entity RenderUtility2D::_create_mesh_instance(const flecs::world *world, 
 
     RefStorage::add(mesh, mesh_instance_2d->get_canvas_item());
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = mesh_instance_2d->get_instance_id();
+    object_instance_component.object_instance_id = mesh_instance_2d->get_instance_id();
     NodeStorage::add(mesh_instance_2d, mesh_instance_2d->get_instance_id());
     return world->entity()
             .set<MeshComponent>({ mesh->get_rid(), material_ids })
@@ -122,7 +122,7 @@ flecs::entity RenderUtility2D::_create_multi_mesh(const flecs::world *world, Mul
         material_ids.write[i] = mesh->surface_get_material(i)->get_rid();
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = multi_mesh_instance->get_instance_id();
+    object_instance_component.object_instance_id = multi_mesh_instance->get_instance_id();
     NodeStorage::add(multi_mesh_instance, multi_mesh_instance->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<MultiMeshComponent>({ multi_mesh_id, static_cast<uint32_t>(multi_mesh_ref->get_instance_count()) })
@@ -177,7 +177,7 @@ flecs::entity RenderUtility2D::_create_camera_2d(const flecs::world *world, Came
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = camera_2d->get_instance_id();
+    object_instance_component.object_instance_id = camera_2d->get_instance_id();
     NodeStorage::add(camera_2d, camera_2d->get_instance_id());
     const flecs::entity camera = world->entity()
                             .set<Transform2DComponent>({ camera_2d->get_transform() })
@@ -241,7 +241,7 @@ flecs::entity RenderUtility2D::_create_directional_light(const flecs::world *wor
         RS::get_singleton()->canvas_item_set_parent(light_id, parent->get_canvas_item());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = directional_light->get_instance_id();
+    object_instance_component.object_instance_id = directional_light->get_instance_id();
     NodeStorage::add(directional_light, directional_light->get_instance_id());
 
     auto &entity = world->entity()
@@ -315,7 +315,7 @@ flecs::entity RenderUtility2D::_create_point_light(const flecs::world *world, Po
     }
 
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = point_light->get_instance_id();
+    object_instance_component.object_instance_id = point_light->get_instance_id();
     NodeStorage::add(point_light, point_light->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<PointLightComponent>({ light_id })
@@ -332,7 +332,7 @@ flecs::entity RenderUtility2D::_create_canvas_item(const flecs::world *world, Ca
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = canvas_item->get_instance_id();
+    object_instance_component.object_instance_id = canvas_item->get_instance_id();
     NodeStorage::add(canvas_item, canvas_item->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<CanvasItemComponent>({ canvas_item->get_canvas_item(), canvas_item->get_class() })
@@ -375,7 +375,7 @@ flecs::entity RenderUtility2D::_create_skeleton(const flecs::world *world, Skele
         RS::get_singleton()->skeleton_bone_set_transform_2d(skeleton_id, i, skeleton_2d->get_bone(i)->get_transform());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = skeleton_2d->get_instance_id();
+    object_instance_component.object_instance_id = skeleton_2d->get_instance_id();
     NodeStorage::add(skeleton_2d, skeleton_2d->get_instance_id());
     return world->entity()
             .set<SkeletonComponent>({ skeleton_id })
@@ -404,7 +404,7 @@ flecs::entity RenderUtility2D::_create_light_occluder(const flecs::world *world,
         RS::get_singleton()->canvas_item_set_parent(light_occluder_id, parent->get_canvas_item());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = light_occluder->get_instance_id();
+    object_instance_component.object_instance_id = light_occluder->get_instance_id();
     NodeStorage::add(light_occluder, light_occluder->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<LightOccluderComponent>({light_occluder_id})
@@ -611,7 +611,7 @@ flecs::entity RenderUtility2D::_create_gpu_particles_2d(const flecs::world *worl
     // end copy
 
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = gpu_particles->get_instance_id();
+    object_instance_component.object_instance_id = gpu_particles->get_instance_id();
     NodeStorage::add(gpu_particles, gpu_particles->get_instance_id());
     new_gpu_particle_entity.set<ObjectInstanceComponent>(object_instance_component);
 

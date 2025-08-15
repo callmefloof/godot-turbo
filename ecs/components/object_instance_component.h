@@ -6,23 +6,23 @@
 #include "component_proxy.h"
 
 struct ObjectInstanceComponent {
-    ObjectID instance_id; // Unique identifier for the object instance
+    ObjectID object_instance_id; // Unique identifier for the object instance
 
     // Default constructor initializes instance_id to an invalid state
     ObjectInstanceComponent() = default;
     ~ObjectInstanceComponent() = default;
 
     // Constructor to initialize with a specific instance ID
-    explicit ObjectInstanceComponent(ObjectID p_instance_id) : instance_id(p_instance_id) {}
+    explicit ObjectInstanceComponent(ObjectID p_instance_id) : object_instance_id(p_instance_id) {}
 };
 
 
 class ObjectInstanceComponentRef : public FlecsComponent<ObjectInstanceComponent> {
     #define OBJECT_INSTANCE_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(ObjectID, instance_id,ObjectInstanceComponent)\
+	DEFINE_PROPERTY(ObjectID, object_instance_id,ObjectInstanceComponent)\
 
 	#define OBJECT_INSTANCE_COMPONENT_BINDINGS\
-	BIND_PROPERTY(ObjectID, instance_id, ObjectInstanceComponentRef)\
+	BIND_PROPERTY(ObjectID, object_instance_id, ObjectInstanceComponentRef)\
 
 	DEFINE_COMPONENT_PROXY(ObjectInstanceComponent,OBJECT_INSTANCE_COMPONENT_PROPERTIES,OBJECT_INSTANCE_COMPONENT_BINDINGS);
 };

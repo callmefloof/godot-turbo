@@ -124,7 +124,7 @@ flecs::entity RenderUtility3D::_create_mesh_instance(const flecs::world *world, 
 	mesh_component.mesh_id = base;
 	NodeStorage::add(mesh_instance_3d, mesh_instance_3d->get_instance_id());
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = mesh_instance_3d->get_instance_id();
+	object_instance_component.object_instance_id = mesh_instance_3d->get_instance_id();
 	return world->entity()
 			.set<MeshComponent>(mesh_component)
 			.set<Transform3DComponent>({ mesh_instance_3d->get_transform() })
@@ -213,7 +213,7 @@ flecs::entity RenderUtility3D::_create_multi_mesh(const flecs::world *world, Mul
 		}
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = multi_mesh_instance->get_instance_id();
+	object_instance_component.object_instance_id = multi_mesh_instance->get_instance_id();
 	const flecs::entity entity = world->entity()
 										 .set<MultiMeshComponent>({ multi_mesh_id, size })
 										 .set<MeshComponent>({ mesh_id, material_ids })
@@ -279,7 +279,7 @@ flecs::entity RenderUtility3D::_create_particles(const flecs::world *world, GPUP
 	}
 	const RID& instance_id = RS::get_singleton()->instance_create2(gpu_particles_3d->get_base(), world->get<World3DComponent>().scenario_id);
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = gpu_particles_3d->get_instance_id();
+	object_instance_component.object_instance_id = gpu_particles_3d->get_instance_id();
 	auto &particles = world->entity()
 							  .set<ParticlesComponent>({ gpu_particles_3d->get_base() })
 							  .set<RenderInstanceComponent>({ instance_id })
@@ -326,7 +326,7 @@ flecs::entity RenderUtility3D::_create_skeleton(const flecs::world *world, Skele
 		RS::get_singleton()->skeleton_bone_set_transform(skeleton_id, i, skeleton_3d->get_bone_global_pose(i));
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = skeleton_3d->get_instance_id();
+	object_instance_component.object_instance_id = skeleton_3d->get_instance_id();
 	NodeStorage::add(skeleton_3d, skeleton_3d->get_instance_id());
 	return world->entity()
 			.set<SkeletonComponent>({ skeleton_id })
@@ -356,7 +356,7 @@ flecs::entity RenderUtility3D::_create_environment(const flecs::world *world, Wo
 	const RID &environment_id = world_environment->get_environment()->get_rid();
 	RefStorage::add(environment_ref, environment_id);
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = world_environment->get_instance_id();
+	object_instance_component.object_instance_id = world_environment->get_instance_id();
 	NodeStorage::add(world_environment, world_environment->get_instance_id());
 	return world->entity()
 			.set<EnvironmentComponent>({ environment_id })
@@ -396,7 +396,7 @@ flecs::entity RenderUtility3D::_create_camera(const flecs::world *world, Camera3
 										 	camera_3d->get_camera_projection(),
 											camera_offset};
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = camera_3d->get_instance_id();
+	object_instance_component.object_instance_id = camera_3d->get_instance_id();
 	NodeStorage::add(camera_3d, camera_3d->get_instance_id());
 	const flecs::entity camera = world->entity()
 		.set<CameraComponent>(camera_component)
@@ -473,7 +473,7 @@ flecs::entity RenderUtility3D::_create_directional_light(const flecs::world *wor
 		ERR_FAIL_V(flecs::entity());
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = directional_light->get_instance_id();
+	object_instance_component.object_instance_id = directional_light->get_instance_id();
 	NodeStorage::add(directional_light, directional_light->get_instance_id());
 	const flecs::entity entity = world->entity()
 										 .set<DirectionalLight3DComponent>({ directional_light->get_base() })
@@ -506,7 +506,7 @@ flecs::entity RenderUtility3D::_create_omni_light(const flecs::world *world, Omn
 		ERR_FAIL_V(flecs::entity());
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = omni_light->get_instance_id();
+	object_instance_component.object_instance_id = omni_light->get_instance_id();
 	NodeStorage::add(omni_light, omni_light->get_instance_id());
 	const flecs::entity entity = world->entity()
 										 .set<OmniLightComponent>({ omni_light->get_base() })
@@ -558,7 +558,7 @@ flecs::entity RenderUtility3D::_create_spot_light(const flecs::world *world, Spo
 		ERR_FAIL_V(flecs::entity());
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = spot_light->get_instance_id();
+	object_instance_component.object_instance_id = spot_light->get_instance_id();
 	NodeStorage::add(spot_light, spot_light->get_instance_id());
 	const flecs::entity entity = world->entity()
 										 .set<SpotLightComponent>({ spot_light->get_base() })
@@ -581,7 +581,7 @@ flecs::entity RenderUtility3D::_create_viewport(const flecs::world *world, Viewp
 		ERR_FAIL_V(flecs::entity());
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = viewport->get_instance_id();
+	object_instance_component.object_instance_id = viewport->get_instance_id();
 	NodeStorage::add(viewport, viewport->get_instance_id());
 	const flecs::entity entity = world->entity("Viewport")
 										 .set<ViewportComponent>({ viewport->get_viewport_rid() })
@@ -619,7 +619,7 @@ flecs::entity RenderUtility3D::_create_voxel_gi(const flecs::world *world, Voxel
 		ERR_FAIL_V(flecs::entity());
 	}
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = voxel_gi->get_instance_id();
+	object_instance_component.object_instance_id = voxel_gi->get_instance_id();
 	NodeStorage::add(voxel_gi, voxel_gi->get_instance_id());
 	const flecs::entity entity = world->entity(String(voxel_gi->get_name()).ascii().get_data())
 										 .set<VoxelGIComponent>({ voxel_gi->get_base() })
@@ -660,7 +660,7 @@ flecs::entity RenderUtility3D::_create_occluder(const flecs::world *world, Occlu
 	const PackedVector3Array vertices = occluder->get_vertices();
 	const PackedInt32Array indices = occluder->get_indices();
 	ObjectInstanceComponent object_instance_component;
-	object_instance_component.instance_id = occluder_instance->get_instance_id();
+	object_instance_component.object_instance_id = occluder_instance->get_instance_id();
 	NodeStorage::add(occluder_instance, occluder_instance->get_instance_id());
 	if(!world->has<World3DComponent>()) {
 		ERR_FAIL_COND_V(!world->has<World3DComponent>(), flecs::entity());

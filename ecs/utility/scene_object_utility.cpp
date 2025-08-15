@@ -450,7 +450,7 @@ Ref<FlecsEntity> SceneObjectUtility::get_node_script(FlecsWorld *world, const No
         child_resource_entity->get_entity().add(flecs::ChildOf, node_entity->get_entity());
         return child_resource_entity;
     }
-    ERR_PRINT("No script found. returning empty flecs component");
+    WARN_PRINT("No script found. returning empty flecs component");
     return Ref<FlecsEntity>();
 }
 
@@ -459,7 +459,7 @@ void SceneObjectUtility::_bind_methods() {
     ClassDB::bind_method(D_METHOD("create_entities_from_scene", "world", "tree"), &SceneObjectUtility::create_entities_from_scene);
     ClassDB::bind_method(D_METHOD("create_entities", "world", "base_node", "entities", "current_depth", "max_depth"), &SceneObjectUtility::create_entities, DEFVAL(0), DEFVAL(10000));
     ClassDB::bind_method(D_METHOD("create_entity", "world", "node"), &SceneObjectUtility::create_entity);
-    ClassDB::bind_method(D_METHOD("get_script", "world", "node", "node_entity", "entities"), &SceneObjectUtility::get_node_script);
+    ClassDB::bind_method(D_METHOD("get_node_script", "world", "node", "node_entity"), &SceneObjectUtility::get_node_script);
     
 }
 

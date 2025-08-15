@@ -14,6 +14,7 @@
 #include "ecs/systems/rendering/mulitmesh_render_system.h"
 #include "ecs/systems/rendering/occlusion/occlusion_system.h"
 #include "ecs/systems/rendering/mesh_render_system.h"
+#include "flecs_pair.h"
 
 class ScriptVisibleComponentRef;
 
@@ -37,9 +38,10 @@ class FlecsWorld : public Resource {
 public:
 
 private:
-	//world is wrapped in a unique ptr to prevent copying
+
 	flecs::world world;
 	Vector<Ref<FlecsComponentBase>> components;
+	Vector<Ref<FlecsPair>> relationships;
 	ecs_entity_t OnPhysics = ecs_new_w_id(world, EcsPhase);
 	ecs_entity_t OnCollisions = ecs_new_w_id(world, EcsPhase);
 	Vector<Ref<FlecsScriptSystem>> script_systems;
@@ -78,6 +80,10 @@ public:
 	Ref<FlecsEntity> add_entity(const flecs::entity &e);
 	void init_render_system();
 	void set_log_level(const int level);
+	void add_relationship(FlecsPair *pair);
+	void remove_relationship(const StringName &first_entity, const StringName &second_entity);
+	Ref<FlecsPair> get_relationship(const StringName &first_entity, const StringName &second_entity) const;
+	TypedArray<FlecsPair> get_relationships() const;
 
 };
 

@@ -26,11 +26,7 @@ struct World2DComponent {
 	bool is_valid() const { return canvas_id.is_valid() && navigation_map_id.is_valid() && space_id.is_valid(); }
 	bool is_null() const { return canvas_id.is_null() && navigation_map_id.is_null() && space_id.is_null(); }
 	World2DComponent() = default;
-	virtual ~World2DComponent() {
-		RenderingServer::get_singleton()->free(canvas_id);
-		NavigationServer2D::get_singleton()->free(navigation_map_id);
-		PhysicsServer2D::get_singleton()->free(space_id);
-	}
+	~World2DComponent() = default;
 };
 
 class World2DComponentRef : public FlecsSingletonComponent<World2DComponent> {
@@ -75,14 +71,7 @@ struct World3DComponent {
 		space_id.is_null();
 	}
 	World3DComponent()= default;
-	~World3DComponent() {
-		RenderingServer::get_singleton()->free(camera_attributes_id);
-		RenderingServer::get_singleton()->free(environment_id);
-		RenderingServer::get_singleton()->free(fallback_environment_id);
-		NavigationServer3D::get_singleton()->free(navigation_map_id);
-		RenderingServer::get_singleton()->free(scenario_id);
-		PhysicsServer3D::get_singleton()->free(space_id);
-	}
+	~World3DComponent() = default;
 };
 
 class World3DComponentRef : public FlecsSingletonComponent<World3DComponent> {

@@ -11,6 +11,7 @@
 #include "core/variant/variant.h"
 #include "core/object/ref_counted.h"
 #include "../../thirdparty/flecs/distr/flecs.h"
+#include "flecs_pair.h"
 
 class FlecsComponentBase;
 
@@ -26,6 +27,7 @@ protected:
 	Ref<FlecsEntity> gd_parent;
 	Vector<Ref<FlecsEntity>> children;
 	Vector<Ref<FlecsComponentBase>> components;
+    Vector<Ref<FlecsPair>> relationships;
 
 public:
 	FlecsEntity() = default;
@@ -64,6 +66,10 @@ public:
 	void remove_child_by_name(const StringName &name);
 	void remove_child_by_index(int index);
 	void remove_all_children();
+	void add_relationship(FlecsPair *pair);
+	void remove_relationship(const StringName &first_entity, const StringName &second_entity);
+	Ref<FlecsPair> get_relationship(const StringName &first_entity, const StringName &second_entity) const;
+	TypedArray<FlecsPair> get_relationships() const;
 };
 
 

@@ -41,6 +41,10 @@ void FlecsWorld::_bind_methods()
 	ClassDB::bind_method(D_METHOD("has_component", "component_type"), &FlecsWorld::has_component);
 	ClassDB::bind_method(D_METHOD("get_component_types"), &FlecsWorld::get_component_types);
 	ClassDB::bind_method(D_METHOD("set_log_level", "level"), &FlecsWorld::set_log_level);
+	ClassDB::bind_method(D_METHOD("add_relationship", "pair"), &FlecsWorld::add_relationship);
+	ClassDB::bind_method(D_METHOD("remove_relationship", "first_entity", "second_entity"), &FlecsWorld::remove_relationship);
+	ClassDB::bind_method(D_METHOD("get_relationship", "first_entity", "second_entity"), &FlecsWorld::get_relationship);
+	ClassDB::bind_method(D_METHOD("get_relationships"), &FlecsWorld::get_relationships);
 
 
 }
@@ -162,6 +166,7 @@ FlecsWorld::FlecsWorld(/* args */) : pipeline_manager(&world) {
 		Ref<CompositorComponentRef> compositor_comp = comp_ref;
 		e.set<CompositorComponent>(compositor_comp->get_data());
 	};
+	component_registry.insert(StringName(rendering_components.compositor.name()), compositor_info);
 
 	
 	ComponentTypeInfo viewport_info;
@@ -628,9 +633,37 @@ Ref<FlecsEntity> FlecsWorld::add_entity(const flecs::entity &e) {
 	e.each([&](flecs::id id) {
 		// Get the type id (component or tag)
 		if (id.is_pair()) {
-			WARN_PRINT("This is not (yet) implemented");
-			return;
-		}
+			// Extract the relation and object
+			flecs::entity relation = id.first();
+			FlecsEntity * gd_relation = nullptr;
+			if(entities.has(relation)) {
+				gd_relation = entities[relation].ptr();
+			} else {
+				gd_relation = memnew(FlecsEntity);
+				gd_relation->set_entity(relation);
+				entities.insert(relation, gd_relation);
+			}
+
+			flecs::entity object = id.second();
+			FlecsEntity * gd_object = nullptr;
+			if(entities.has(object)) {
+				gd_object = entities[object].ptr();
+			} else {
+				gd_object = memnew(FlecsEntity);
+				gd_object->set_entity(object);
+				entities.insert(object, gd_object);
+			}
+
+			// Log or handle the pair
+			String relation_name = relation.name().c_str();
+			String object_name = object.name().c_str();
+			print_line("Pair detected: (" + relation_name + ", " + object_name + ")");
+			FlecsPair *pair = memnew(FlecsPair);
+			pair->set_first(gd_relation);
+			pair->set_second(gd_object);
+			new_entity->add_relationship(pair);
+        return;
+    }
 		StringName comp_name = StringName(id.entity().name());
 		if(component_registry.has(comp_name)) {
 			Ref<FlecsComponentBase> comp = component_registry[comp_name].creator();
@@ -671,6 +704,65 @@ void FlecsWorld::init_render_system() {
 
 void FlecsWorld::set_log_level(const int level) {
 	flecs::log::set_level(level);
+}
+
+void FlecsWorld::add_relationship(FlecsPair *pair) {
+	if (!pair) {
+		ERR_PRINT("FlecsWorld::add_relationship called with null pair");
+		return;
+	}
+	relationships.append(pair);
+}
+
+void FlecsWorld::remove_relationship(const StringName &first_entity, const StringName &second_entity) {
+	int8_t index = -1;
+	FlecsPair *pair = nullptr;
+	for (int i = 0; i < relationships.size(); i++) {
+		pair = relationships[i].ptr();
+		if (pair->get_first()->get_name() == first_entity && pair->get_second()->get_name() == second_entity) {
+			index = i;
+			break;
+		}
+	}
+	if(!pair){
+		ERR_PRINT("FlecsWorld::remove_relationship: pair not found for " + first_entity + " and " + second_entity);
+		return;
+	}
+
+	world.remove(pair->get_first()->get_entity(),pair->get_second()->get_entity());
+	memdelete(pair->get_first());
+	memdelete(pair->get_second());
+	pair->set_first(nullptr);
+	pair->set_second(nullptr);
+	relationships.erase(pair);
+	memdelete(pair);
+	return;
+}
+
+Ref<FlecsPair> FlecsWorld::get_relationship(const StringName &first_entity, const StringName &second_entity) const {
+	for (const auto &pair : relationships) {
+		if (pair.is_null()) {
+			ERR_PRINT("FlecsWorld::get_relationship: pair is null, skipping.");
+			continue;
+		}
+		if (pair->get_first()->get_name() == first_entity && pair->get_second()->get_name() == second_entity) {
+			return pair;
+		}
+	}
+	ERR_PRINT("FlecsWorld::get_relationship: relationship not found for " + first_entity + " and " + second_entity);
+	return Ref<FlecsPair>();
+}
+
+TypedArray<FlecsPair> FlecsWorld::get_relationships() const {
+	TypedArray<FlecsPair> result;
+	for (const auto &pair : relationships) {
+		if (pair.is_null()) {
+			ERR_PRINT("FlecsWorld::get_relationships: pair is null, skipping.");
+			continue;
+		}
+		result.append(pair);
+	}
+	return result;
 }
 
 void FlecsWorld::register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const {

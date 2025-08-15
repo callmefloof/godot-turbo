@@ -34,7 +34,7 @@ flecs::entity Physics3DUtility::_create_area(const flecs::world *world, Area3D *
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = area_3d->get_instance_id();
+    object_instance_component.object_instance_id = area_3d->get_instance_id();
     NodeStorage::add(area_3d, area_3d->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Area3DComponent>({ area_id })
@@ -54,7 +54,7 @@ flecs::entity Physics3DUtility::_create_rigid_body(const flecs::world *world, Ri
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = body_3d->get_instance_id();
+    object_instance_component.object_instance_id = body_3d->get_instance_id();
     NodeStorage::add(body_3d, body_3d->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Body3DComponent>({ body_id })
@@ -73,7 +73,7 @@ flecs::entity Physics3DUtility::_create_physics_body(const flecs::world *world, 
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = physics_body->get_instance_id();
+    object_instance_component.object_instance_id = physics_body->get_instance_id();
     const flecs::entity entity = world->entity()
                             .set<Body3DComponent>({ body_id })
                             .set<ObjectInstanceComponent>(object_instance_component)
@@ -90,7 +90,7 @@ flecs::entity Physics3DUtility::_create_joint(const flecs::world *world, Joint3D
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = joint_3d->get_instance_id();
+    object_instance_component.object_instance_id = joint_3d->get_instance_id();
     NodeStorage::add(joint_3d, joint_3d->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<Joint3DComponent>({ joint_id })
@@ -108,7 +108,7 @@ flecs::entity Physics3DUtility::_create_soft_body(const flecs::world *world, Sof
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = soft_body_3d->get_instance_id();
+    object_instance_component.object_instance_id = soft_body_3d->get_instance_id();
     NodeStorage::add(soft_body_3d, soft_body_3d->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<SoftBody3DComponent>({ soft_body_id })

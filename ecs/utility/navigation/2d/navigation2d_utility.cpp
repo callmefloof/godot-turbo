@@ -54,7 +54,7 @@ flecs::entity Navigation2DUtility::_create_nav_2d_agent(const flecs::world *worl
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_agent->get_instance_id();
+    object_instance_component.object_instance_id = nav_agent->get_instance_id();
     NodeStorage::add(nav_agent, nav_agent->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<NavAgent2DComponent>({ agent_id })
@@ -72,7 +72,7 @@ flecs::entity Navigation2DUtility::_create_nav_2d_link(const flecs::world *world
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_link->get_instance_id();
+    object_instance_component.object_instance_id = nav_link->get_instance_id();
     NodeStorage::add(nav_link, nav_link->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<NavLink2DComponent>({ link_id })
@@ -90,7 +90,7 @@ flecs::entity Navigation2DUtility::_create_nav_2d_obstacle(const flecs::world *w
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_obstacle->get_instance_id();
+    object_instance_component.object_instance_id = nav_obstacle->get_instance_id();
     NodeStorage::add(nav_obstacle, nav_obstacle->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<NavObstacle2DComponent>({ obstacle_id })
@@ -108,7 +108,7 @@ flecs::entity Navigation2DUtility::_create_nav_2d_region(const flecs::world *wor
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_region->get_instance_id();
+    object_instance_component.object_instance_id = nav_region->get_instance_id();
     NodeStorage::add(nav_region, nav_region->get_instance_id());
 
     const flecs::entity entity = world->entity()

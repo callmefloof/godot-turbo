@@ -55,7 +55,7 @@ flecs::entity Navigation3DUtility::_create_nav_agent(const flecs::world *world, 
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_agent->get_instance_id();
+    object_instance_component.object_instance_id = nav_agent->get_instance_id();
     NodeStorage::add(nav_agent, nav_agent->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<NavAgent3DComponent>({ agent_id })
@@ -73,7 +73,7 @@ flecs::entity Navigation3DUtility::_create_nav_link(const flecs::world *world, N
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_link->get_instance_id();
+    object_instance_component.object_instance_id = nav_link->get_instance_id();
     NodeStorage::add(nav_link, nav_link->get_instance_id());
     auto entity = world->entity()
                             .set<NavLink3DComponent>({ link_id })
@@ -92,7 +92,7 @@ flecs::entity Navigation3DUtility::_create_nav_obstacle(const flecs::world *worl
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_obstacle->get_instance_id();
+    object_instance_component.object_instance_id = nav_obstacle->get_instance_id();
     NodeStorage::add(nav_obstacle, nav_obstacle->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<NavObstacle3DComponent>({ obstacle_id })
@@ -110,7 +110,7 @@ flecs::entity Navigation3DUtility::_create_nav_region(const flecs::world *world,
         ERR_FAIL_V(flecs::entity());
     }
     ObjectInstanceComponent object_instance_component;
-    object_instance_component.instance_id = nav_region->get_instance_id();
+    object_instance_component.object_instance_id = nav_region->get_instance_id();
     NodeStorage::add(nav_region, nav_region->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<NavRegion3DComponent>({ region_id })

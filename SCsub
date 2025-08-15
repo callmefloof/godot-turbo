@@ -25,6 +25,7 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/utility/rendering/2d/render_utility_2d.cpp",
     "ecs/utility/rendering/3d/render_utility_3d.cpp",
     "ecs/utility/scene_object_utility.cpp",
+    "ecs/flecs_types/flecs_pair.cpp",
 ])
 
 # Use env.GetModulePath() for the module's root, or env.Dir('.')

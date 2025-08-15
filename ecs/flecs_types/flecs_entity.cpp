@@ -29,6 +29,11 @@
 	ClassDB::bind_method(D_METHOD("add_child", "child"), &FlecsEntity::add_child);
 	ClassDB::bind_method(D_METHOD("remove_child", "child"), &FlecsEntity::remove_child);
 	ClassDB::bind_method(D_METHOD("remove_all_children"), &FlecsEntity::remove_all_children);
+	ClassDB::bind_method(D_METHOD("add_relationship", "pair"), &FlecsEntity::add_relationship);
+	ClassDB::bind_method(D_METHOD("remove_relationship", "first_entity", "second_entity"), &FlecsEntity::remove_relationship);
+	ClassDB::bind_method(D_METHOD("get_relationship", "first_entity", "second_entity"), &FlecsEntity::get_relationship);
+	ClassDB::bind_method(D_METHOD("get_relationships"), &FlecsEntity::get_relationships);
+	
 
 
 
@@ -323,4 +328,63 @@ void FlecsEntity::set_internal_world(flecs::world* p_world) {
 void FlecsEntity::remove_all_children() {
 	children.clear();
 }
+
+void FlecsEntity::add_relationship(FlecsPair *pair) {
+	if (!pair) {
+		ERR_PRINT("FlecsEntity::add_relationship called with null pair");
+		return;
+	}
+	relationships.append(pair);
+}
+
+void FlecsEntity::remove_relationship(const StringName &first_entity, const StringName &second_entity) {
+	int8_t index = -1;
+	FlecsPair *pair = nullptr;
+	for (int i = 0; i < relationships.size(); i++) {
+		pair = relationships[i].ptr();
+		if (pair->get_first()->get_name() == first_entity && pair->get_second()->get_name() == second_entity) {
+			index = i;
+			break;
+		}
+	}
+	if(!pair){
+		ERR_PRINT("FlecsEntity::remove_relationship: pair not found for " + first_entity + " and " + second_entity);
+		return;
+	}
+	world->remove(pair->get_first()->get_entity(),pair->get_second()->get_entity());
+	memdelete(pair->get_first());
+	memdelete(pair->get_second());
+	pair->set_first(nullptr);
+	pair->set_second(nullptr);
+	relationships.erase(pair);
+	memdelete(pair);
+	return;
+}
+
+Ref<FlecsPair> FlecsEntity::get_relationship(const StringName &first_entity, const StringName &second_entity) const {
+	for (const auto &pair : relationships) {
+		if (pair.is_null()) {
+			ERR_PRINT("FlecsEntity::get_relationship: pair is null, skipping.");
+			continue;
+		}
+		if (pair->get_first()->get_name() == first_entity && pair->get_second()->get_name() == second_entity) {
+			return pair;
+		}
+	}
+	ERR_PRINT("FlecsEntity::get_relationship: relationship not found for " + first_entity + " and " + second_entity);
+	return Ref<FlecsPair>();
+}
+
+TypedArray<FlecsPair> FlecsEntity::get_relationships() const {
+	TypedArray<FlecsPair> result;
+	for (const auto &pair : relationships) {
+		if (pair.is_null()) {
+			ERR_PRINT("FlecsEntity::get_relationships: pair is null, skipping.");
+			continue;
+		}
+		result.append(pair);
+	}
+	return result;
+}
+
 
