@@ -1,8 +1,10 @@
 #pragma once
 #include "ecs/flecs_types/flecs_world.h"
-#include "../../../../thirdparty/flecs/distr/flecs.h"
-#include "../../../components/navigation/2d/2d_navigation_components.h"
-#include "../../object_id_storage.h"
+#include "thirdparty/flecs/distr/flecs.h"
+#include "ecs/components/navigation/2d/2d_navigation_components.h"
+#include "ecs/utility/ref_storage.h"
+#include "ecs/utility/node_storage.h"
+#include "ecs/components/object_instance_component.h"
 #include "core/string/ustring.h"
 #include "core/templates/rid.h"
 #include "servers/navigation_server_2d.h"
@@ -21,21 +23,21 @@ class Navigation2DUtility: public Object {
 public:
 	Navigation2DUtility() = default; // Prevent instantiation
 	~Navigation2DUtility() = default;
-	static flecs::entity _create_nav_2d_agent(const flecs::world &world, const RID &agent, const String &name);
-	static flecs::entity _create_nav_2d_agent(const flecs::world &world, const String &name);
-	static flecs::entity _create_nav_2d_link(const flecs::world &world, const String &name);
-	static flecs::entity _create_nav_2d_link(const flecs::world &world, const RID &link, const String &name);
-	static flecs::entity _create_nav_2d_obstacle(const flecs::world &world, const RID &obstacle, const String &name);
-	static flecs::entity _create_nav_2d_obstacle(const flecs::world &world, const String &name);
-	static flecs::entity _create_nav_2d_region(const flecs::world &world, const RID &region, const String &name);
-	static flecs::entity _create_nav_2d_region(const flecs::world &world, const String &name);
-	static flecs::entity _create_source_geometry_parser_2d(const flecs::world &world, const RID &source_geometry_parser, const String &name);
-	static flecs::entity _create_source_geometry_parser_2d(const flecs::world &world, const String &name);
-	static flecs::entity _create_nav_2d_agent(const flecs::world &world, NavigationAgent2D *nav_agent);
-	static flecs::entity _create_nav_2d_link(const flecs::world &world, NavigationLink2D *nav_link);
-	static flecs::entity _create_nav_2d_obstacle(const flecs::world &world, NavigationObstacle2D *nav_obstacle);
-	static flecs::entity _create_nav_2d_region(const flecs::world &world, NavigationRegion2D *nav_region);
-	static flecs::entity _create_source_geometry_parser_2d(const flecs::world &world, const Callable &callable, const String &name);
+	static flecs::entity _create_nav_2d_agent(const flecs::world *world, const RID &agent, const String &name);
+	static flecs::entity _create_nav_2d_agent(const flecs::world *world, const String &name);
+	static flecs::entity _create_nav_2d_link(const flecs::world *world, const String &name);
+	static flecs::entity _create_nav_2d_link(const flecs::world *world, const RID &link, const String &name);
+	static flecs::entity _create_nav_2d_obstacle(const flecs::world *world, const RID &obstacle, const String &name);
+	static flecs::entity _create_nav_2d_obstacle(const flecs::world *world, const String &name);
+	static flecs::entity _create_nav_2d_region(const flecs::world *world, const RID &region, const String &name);
+	static flecs::entity _create_nav_2d_region(const flecs::world *world, const String &name);
+	static flecs::entity _create_source_geometry_parser_2d(const flecs::world *world, const RID &source_geometry_parser, const String &name);
+	static flecs::entity _create_source_geometry_parser_2d(const flecs::world *world, const String &name);
+	static flecs::entity _create_nav_2d_agent(const flecs::world *world, NavigationAgent2D *nav_agent);
+	static flecs::entity _create_nav_2d_link(const flecs::world *world, NavigationLink2D *nav_link);
+	static flecs::entity _create_nav_2d_obstacle(const flecs::world *world, NavigationObstacle2D *nav_obstacle);
+	static flecs::entity _create_nav_2d_region(const flecs::world *world, NavigationRegion2D *nav_region);
+	static flecs::entity _create_source_geometry_parser_2d(const flecs::world *world, const Callable &callable, const String &name);
 	
 	static Ref<FlecsEntity> create_nav_agent_with_object(FlecsWorld *world, NavigationAgent2D *nav_agent);
 	static Ref<FlecsEntity> create_nav_link_with_object(FlecsWorld *world, NavigationLink2D *nav_link);

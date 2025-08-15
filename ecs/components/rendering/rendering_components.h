@@ -1,9 +1,9 @@
 #pragma once
+
 #include "ecs/systems/rendering/occlusion/tile.h"
 #include "ecs/components/component_module_base.h"
 #include "core/templates/rid.h"
 #include "servers/rendering_server.h"
-#include "../../flecs_types/flecs_entity.h"
 #include "core/os/memory.h"
 #include "core/math/transform_3d.h"
 #include "core/math/vector2.h"
@@ -14,24 +14,17 @@
 #include "core/variant/typed_array.h"
 #include "core/string/ustring.h"
 #include "core/templates/vector.h"
-#include "../../flecs_types/flecs_component.h"
+#include "ecs/flecs_types/flecs_component.h"
+#include "ecs/flecs_types/flecs_tag.h"
+#include "ecs/flecs_types/flecs_entity.h"
 #include "../component_proxy.h"
 
 struct MeshComponent {
 	RID mesh_id;
 	Vector<RID> material_ids;
 	MeshComponent() = default;
+	~MeshComponent() = default;
 	MeshComponent(const RID& id, const Vector<RID>& material_ids) : mesh_id(id) , material_ids(material_ids) {}
-	~MeshComponent() {
-		for (const RID &mat_id : material_ids) {
-			if (mat_id.is_valid()) {
-				RenderingServer::get_singleton()->free(mat_id);
-			}
-		}
-		if (mesh_id.is_valid()) {
-			RenderingServer::get_singleton()->free(mesh_id);
-		}
-	}
 };
 
 
@@ -49,19 +42,13 @@ class MeshComponentRef : public FlecsComponent<MeshComponent> {
 
 	DEFINE_COMPONENT_PROXY(MeshComponent,
 			MESH_COMPONENT_PROPERTIES,
-			MESH_COMPONENT_BINDINGS)
+			MESH_COMPONENT_BINDINGS);
 };
 
 
 struct MultiMeshComponent {
 	RID multi_mesh_id;
 	uint32_t instance_count = 0U;
-	~MultiMeshComponent() {
-		// Ensure that the RID is released when the component is destroyed
-		if (multi_mesh_id.is_valid()) {
-			RenderingServer::get_singleton()->free(multi_mesh_id);
-		}
-	}
 };
 
 
@@ -102,11 +89,6 @@ class MultiMeshInstanceComponentRef : public FlecsComponent<MultiMeshInstanceCom
 
 struct ParticlesComponent {
 	RID particles_id;
-	~ParticlesComponent() {
-		if (particles_id.is_valid()) {
-			RenderingServer::get_singleton()->free(particles_id);
-		}
-	}
 };
 
 class ParticlesComponentRef : public FlecsComponent<ParticlesComponent> {
@@ -124,11 +106,6 @@ class ParticlesComponentRef : public FlecsComponent<ParticlesComponent> {
 
 struct ReflectionProbeComponent {
 	RID probe_id;
-	~ReflectionProbeComponent() {
-		if (probe_id.is_valid()) {
-			RenderingServer::get_singleton()->free(probe_id);
-		}
-	}
 };
 
 class ReflectionProbeComponentRef : public FlecsComponent<ReflectionProbeComponent> {
@@ -147,11 +124,6 @@ class ReflectionProbeComponentRef : public FlecsComponent<ReflectionProbeCompone
 
 struct SkeletonComponent {
 	RID skeleton_id;
-	~SkeletonComponent() {
-		if (skeleton_id.is_valid()) {
-			RenderingServer::get_singleton()->free(skeleton_id);
-		}
-	}
 };
 
 class SkeletonComponentRef : public FlecsComponent<SkeletonComponent> {
@@ -169,11 +141,6 @@ class SkeletonComponentRef : public FlecsComponent<SkeletonComponent> {
 
 struct EnvironmentComponent {
 	RID environment_id;
-	~EnvironmentComponent() {
-		if (environment_id.is_valid()) {
-			RenderingServer::get_singleton()->free(environment_id);
-		}
-	}
 };
 
 class EnvironmentComponentRef : public FlecsComponent<EnvironmentComponent> {
@@ -199,11 +166,7 @@ struct CameraComponent {
 	Projection projection;
 	Vector2 camera_offset;
 	CameraComponent() = default;
-	~CameraComponent() {
-		if (camera_id.is_valid()) {
-			RenderingServer::get_singleton()->free(camera_id);
-		}
-	}
+	~CameraComponent() = default;
 };
 
 class CameraComponentRef : public FlecsComponent<CameraComponent> {
@@ -235,11 +198,6 @@ class CameraComponentRef : public FlecsComponent<CameraComponent> {
 
 struct CompositorComponent {
 	RID compositor_id;
-	~CompositorComponent() {
-		if (compositor_id.is_valid()) {
-			RenderingServer::get_singleton()->free(compositor_id);
-		}
-	}
 };
 
 class CompositorComponentRef : public FlecsComponent<CompositorComponent> {
@@ -258,11 +216,6 @@ class CompositorComponentRef : public FlecsComponent<CompositorComponent> {
 
 struct DirectionalLight3DComponent {
 	RID directional_light_id;
-	~DirectionalLight3DComponent() {
-		if (directional_light_id.is_valid()) {
-			RenderingServer::get_singleton()->free(directional_light_id);
-		}
-	}
 };
 
 class DirectionalLight3DComponentRef : public FlecsComponent<DirectionalLight3DComponent> {
@@ -280,11 +233,6 @@ class DirectionalLight3DComponentRef : public FlecsComponent<DirectionalLight3DC
 
 struct DirectionalLight2DComponent {
 	RID directional_light_id;
-	~DirectionalLight2DComponent() {
-		if (directional_light_id.is_valid()) {
-			RenderingServer::get_singleton()->free(directional_light_id);
-		}
-	}
 };
 
 class DirectionalLight2DComponentRef : public FlecsComponent<DirectionalLight2DComponent> {
@@ -302,11 +250,6 @@ class DirectionalLight2DComponentRef : public FlecsComponent<DirectionalLight2DC
 
 struct PointLightComponent {
 	RID point_light_id;
-	~PointLightComponent() {
-		if (point_light_id.is_valid()) {
-			RenderingServer::get_singleton()->free(point_light_id);
-		}
-	}
 };
 
 class PointLightComponentRef : public FlecsComponent<PointLightComponent> {
@@ -324,11 +267,6 @@ class PointLightComponentRef : public FlecsComponent<PointLightComponent> {
 
 struct LightOccluderComponent {
 	RID light_occluder_id;
-	~LightOccluderComponent() {
-		if (light_occluder_id.is_valid()) {
-			RenderingServer::get_singleton()->free(light_occluder_id);
-		}
-	}
 };
 
 class LightOccluderComponentRef : public FlecsComponent<LightOccluderComponent> {
@@ -346,11 +284,6 @@ class LightOccluderComponentRef : public FlecsComponent<LightOccluderComponent> 
 
 struct OmniLightComponent {
 	RID omni_light_id;
-	~OmniLightComponent() {
-		if (omni_light_id.is_valid()) {
-			RenderingServer::get_singleton()->free(omni_light_id);
-		}
-	}
 };
 
 class OmniLightComponentRef : public FlecsComponent<OmniLightComponent> {
@@ -369,11 +302,6 @@ class OmniLightComponentRef : public FlecsComponent<OmniLightComponent> {
 
 struct SpotLightComponent {
 	RID spot_light_id;
-	~SpotLightComponent() {
-		if (spot_light_id.is_valid()) {
-			RenderingServer::get_singleton()->free(spot_light_id);
-		}
-	}
 };
 
 class SpotLightComponentRef : public FlecsComponent<SpotLightComponent> {
@@ -408,11 +336,6 @@ class ViewportComponentRef : public FlecsComponent<ViewportComponent> {
 
 struct VoxelGIComponent {
 	RID voxel_gi_id;
-	~VoxelGIComponent() {
-		if (voxel_gi_id.is_valid()) {
-			RenderingServer::get_singleton()->free(voxel_gi_id);
-		}
-	}
 };
 
 class VoxelGIComponentRef : public FlecsComponent<VoxelGIComponent> {
@@ -447,11 +370,6 @@ class ScenarioComponentRef : public FlecsComponent<ScenarioComponent> {
 
 struct RenderInstanceComponent {
 	RID render_instance_id;
-	~RenderInstanceComponent() {
-		if (render_instance_id.is_valid()) {
-			RenderingServer::get_singleton()->free(render_instance_id);
-		}
-	}
 };
 
 class RenderInstanceComponentRef : public FlecsComponent<RenderInstanceComponent> {
@@ -470,12 +388,6 @@ class RenderInstanceComponentRef : public FlecsComponent<RenderInstanceComponent
 struct CanvasItemComponent {
 	RID canvas_item_id;
 	StringName class_name;
-	~CanvasItemComponent() {
-		if (canvas_item_id.is_valid()) {
-			RenderingServer::get_singleton()->canvas_item_clear(canvas_item_id);
-			RenderingServer::get_singleton()->free(canvas_item_id);
-		}
-	}
 };
 
 class CanvasItemComponentRef : public FlecsComponent<CanvasItemComponent> {
@@ -495,38 +407,20 @@ class CanvasItemComponentRef : public FlecsComponent<CanvasItemComponent> {
 
 struct FrustumCulled { /* tag component */ };
 
-struct FrustumCulledRef : public FlecsComponent<FrustumCulled> {
-	#define FRUSTUM_CULLED_COMPONENT_PROPERTIES
-
-	#define FRUSTUM_CULLED_COMPONENT_BINDINGS
-
-	DEFINE_COMPONENT_PROXY(FrustumCulled,
-	FRUSTUM_CULLED_COMPONENT_PROPERTIES,
-	FRUSTUM_CULLED_COMPONENT_BINDINGS);
+struct FrustumCulledRef : public FlecsTag<FrustumCulled> {
+	DEFINE_TAG_PROXY(FrustumCulled);
 };
 
 struct Occluded { /* tag component */ };
 
-class OccludedRef : public FlecsComponent<Occluded> {
-	#define OCCLUDED_COMPONENT_PROPERTIES
-
-	#define OCCLUDED_COMPONENT_BINDINGS
-
-	DEFINE_COMPONENT_PROXY(Occluded,
-	OCCLUDED_COMPONENT_PROPERTIES,
-	OCCLUDED_COMPONENT_BINDINGS);
+class OccludedRef : public FlecsTag<Occluded> {
+	DEFINE_TAG_PROXY(Occluded);
 };
 
 struct MainCamera { /* tag component */ };
 
-class MainCameraRef : public FlecsComponent<MainCamera> {
-	#define MAIN_CAMERA_COMPONENT_PROPERTIES
-
-	#define MAIN_CAMERA_COMPONENT_BINDINGS
-
-	DEFINE_COMPONENT_PROXY(MainCamera,
-	MAIN_CAMERA_COMPONENT_PROPERTIES,
-	MAIN_CAMERA_COMPONENT_BINDINGS);
+class MainCameraRef : public FlecsTag<MainCamera> {
+	DEFINE_TAG_PROXY(MainCamera);
 };
 
 
@@ -585,6 +479,7 @@ struct RenderingBaseComponents{
 	flecs::component<SkeletonComponent> skeleton;
 	flecs::component<EnvironmentComponent> environment;
 	flecs::component<CameraComponent> camera;
+	flecs::component<MainCamera> main_camera;
 	flecs::component<CompositorComponent> compositor;
 	flecs::component<DirectionalLight3DComponent> directional_light;
 	flecs::component<DirectionalLight2DComponent> directional_light_2d;
@@ -601,30 +496,31 @@ struct RenderingBaseComponents{
 	flecs::component<FrustumCulled> frustum_culled;
 	flecs::component<Occluded> occluded;
 
-	explicit RenderingBaseComponents(const flecs::world &world) :
-			mesh(world.component<MeshComponent>("MeshComponent")),
-			multi_mesh(world.component<MultiMeshComponent>("MultiMeshComponent")),
-			mesh_instance(world.component<MultiMeshInstanceComponent>("MultiMeshInstanceComponent")),
-			particles(world.component<ParticlesComponent>("ParticlesComponent")),
-			probe(world.component<ReflectionProbeComponent>("ReflectionProbeComponent")),
-			skeleton(world.component<SkeletonComponent>("SkeletonComponent")),
-			environment(world.component<EnvironmentComponent>("EnvironmentComponent")),
-			camera(world.component<CameraComponent>("CameraComponent")),
-			compositor(world.component<CompositorComponent>("CompositorComponent")),
-			directional_light(world.component<DirectionalLight3DComponent>("DirectionalLightComponent")),
-			directional_light_2d(world.component<DirectionalLight2DComponent>("DirectionalLight2DComponent")),
-			point_light(world.component<PointLightComponent>("PointLightComponent")),
-			omni_light(world.component<OmniLightComponent>("OmniLightComponent")),
-			spot_light(world.component<SpotLightComponent>("SpotLightComponent")),
-			viewport(world.component<ViewportComponent>("ViewportComponent")),
-			scenario(world.component<ScenarioComponent>("ScenarioComponent")),
-			voxel_gi(world.component<VoxelGIComponent>("VoxelGIComponent")),
-			instance(world.component<RenderInstanceComponent>("RenderInstanceComponent")),
-			canvas_item(world.component<CanvasItemComponent>("CanvasItemComponent")),
-			occluder(world.component<Occluder>("Occluder")),
-			occludee(world.component<Occludee>("Occludee")),
-			frustum_culled(world.component<FrustumCulled>("FrustumCulled")),
-			occluded(world.component<Occluded>("Occluded"))
+	explicit RenderingBaseComponents(const flecs::world *world) :
+			mesh(world->component<MeshComponent>("MeshComponent")),
+			multi_mesh(world->component<MultiMeshComponent>("MultiMeshComponent")),
+			mesh_instance(world->component<MultiMeshInstanceComponent>("MultiMeshInstanceComponent")),
+			particles(world->component<ParticlesComponent>("ParticlesComponent")),
+			probe(world->component<ReflectionProbeComponent>("ReflectionProbeComponent")),
+			skeleton(world->component<SkeletonComponent>("SkeletonComponent")),
+			environment(world->component<EnvironmentComponent>("EnvironmentComponent")),
+			camera(world->component<CameraComponent>("CameraComponent")),
+			main_camera(world->component<MainCamera>("MainCamera")),
+			compositor(world->component<CompositorComponent>("CompositorComponent")),
+			directional_light(world->component<DirectionalLight3DComponent>("DirectionalLightComponent")),
+			directional_light_2d(world->component<DirectionalLight2DComponent>("DirectionalLight2DComponent")),
+			point_light(world->component<PointLightComponent>("PointLightComponent")),
+			omni_light(world->component<OmniLightComponent>("OmniLightComponent")),
+			spot_light(world->component<SpotLightComponent>("SpotLightComponent")),
+			viewport(world->component<ViewportComponent>("ViewportComponent")),
+			scenario(world->component<ScenarioComponent>("ScenarioComponent")),
+			voxel_gi(world->component<VoxelGIComponent>("VoxelGIComponent")),
+			instance(world->component<RenderInstanceComponent>("RenderInstanceComponent")),
+			canvas_item(world->component<CanvasItemComponent>("CanvasItemComponent")),
+			occluder(world->component<Occluder>("Occluder")),
+			occludee(world->component<Occludee>("Occludee")),
+			frustum_culled(world->component<FrustumCulled>("FrustumCulled")),
+			occluded(world->component<Occluded>("Occluded"))
 			{}
 };
 

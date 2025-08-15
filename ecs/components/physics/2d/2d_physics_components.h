@@ -7,15 +7,11 @@
 #include "servers/physics_server_2d.h"
 #include "ecs/flecs_types/flecs_component.h"
 #include "core/string/ustring.h"
+#include "ecs/flecs_types/flecs_world.h"
 
 
 struct Area2DComponent {
 	RID area_id;
-	~Area2DComponent() {
-		if (area_id.is_valid()) {
-			PhysicsServer2D::get_singleton()->free(area_id);
-		}
-	}
 };
 
 class Area2DComponentRef : public FlecsComponent<Area2DComponent> {
@@ -32,11 +28,6 @@ class Area2DComponentRef : public FlecsComponent<Area2DComponent> {
 
 struct Body2DComponent {
 	RID body_id;
-	~Body2DComponent() {
-		if (body_id.is_valid()) {
-			PhysicsServer2D::get_singleton()->free(body_id);
-		}
-	}
 };
 
 class Body2DComponentRef : public FlecsComponent<Body2DComponent> {
@@ -53,11 +44,6 @@ class Body2DComponentRef : public FlecsComponent<Body2DComponent> {
 
 struct Joint2DComponent {
 	RID joint_id;
-	~Joint2DComponent() {
-		if (joint_id.is_valid()) {
-			PhysicsServer2D::get_singleton()->free(joint_id);
-		}
-	}
 };
 
 class Joint2DComponentRef : public FlecsComponent<Joint2DComponent> {
@@ -77,10 +63,10 @@ struct Physics2DBaseComponents {
 	flecs::component<Body2DComponent> body;
 	flecs::component<Joint2DComponent> joint;
 
-	explicit Physics2DBaseComponents(const flecs::world &world) :
-			area(world.component<Area2DComponent>("Area2DComponent")),
-			body(world.component<Body2DComponent>("Body2DComponent")),
-			joint(world.component<Joint2DComponent>("Joint2DComponent")){}
+	explicit Physics2DBaseComponents(const flecs::world *world) :
+			area(world->component<Area2DComponent>("Area2DComponent")),
+			body(world->component<Body2DComponent>("Body2DComponent")),
+			joint(world->component<Joint2DComponent>("Joint2DComponent")){}
 };
 
 using Physics2DComponentModule =  MultiComponentModule<Physics2DBaseComponents>;

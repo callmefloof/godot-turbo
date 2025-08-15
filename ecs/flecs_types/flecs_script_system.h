@@ -10,7 +10,7 @@
 #include "core/templates/vector.h"
 #include "core/typedefs.h"
 #include "core/variant/callable.h"
-#include "../../thirdparty/flecs/distr/flecs.h"
+#include "thirdparty/flecs/distr/flecs.h"
 #include "ecs/systems/commands/command.h"
 #include "ecs/systems/flecs_system.h"
 

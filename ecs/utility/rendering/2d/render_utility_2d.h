@@ -14,7 +14,8 @@
 #include <scene/2d/light_occluder_2d.h>
 #include <scene/2d/mesh_instance_2d.h>
 #include "../flecs_types/flecs_world.h"
-#include "ecs/utility/object_id_storage.h"
+#include "ecs/utility/ref_storage.h"
+#include "ecs/utility/node_storage.h"
 
 
 class RenderUtility2D : public Object{
@@ -22,10 +23,10 @@ class RenderUtility2D : public Object{
 public:
 	RenderUtility2D() = default;
 	~RenderUtility2D() = default;
-	static flecs::entity _create_mesh_instance(const flecs::world &world, const RID &mesh_id, const Transform2D &transform, const String &name, const RID &canvas_id);
-	static flecs::entity _create_mesh_instance(const flecs::world &world, const Transform2D &transform,  const String &name);
-	static flecs::entity _create_mesh_instance(const flecs::world &world, MeshInstance2D *mesh_instance_2d);
-	static flecs::entity _create_multi_mesh(const flecs::world &world,
+	static flecs::entity _create_mesh_instance(const flecs::world *world, const RID &mesh_id, const Transform2D &transform, const String &name, const RID &canvas_id);
+	static flecs::entity _create_mesh_instance(const flecs::world *world, const Transform2D &transform,  const String &name);
+	static flecs::entity _create_mesh_instance(const flecs::world *world, MeshInstance2D *mesh_instance_2d);
+	static flecs::entity _create_multi_mesh(const flecs::world *world,
 			const Transform2D &transform,
 			const uint32_t size,
 			const Ref<Mesh> mesh,
@@ -34,34 +35,34 @@ public:
 			const bool use_colors = false,
 			const bool use_custom_data = false,
 			const bool use_indirect = false);
-	static flecs::entity _create_multi_mesh(const flecs::world &world,
+	static flecs::entity _create_multi_mesh(const flecs::world *world,
 			MultiMeshInstance2D *multi_mesh_instance);
 	static flecs::entity _create_multi_mesh_instance(
-			const flecs::world &world,
+			const flecs::world *world,
 			const Transform2D &transform,
 			const uint32_t index,
 			const String &name);
 	static Vector<flecs::entity> _create_multi_mesh_instances(
-			const flecs::world &world,
+			const flecs::world *world,
 			const Vector<Transform2D>& transform,
 			const flecs::entity &multi_mesh);
-	static flecs::entity _create_camera_2d(const flecs::world &world, const RID &camera_id, const Transform2D &transform, const String &name);
-	static flecs::entity _create_camera_2d(const flecs::world &world, Camera2D *camera_2d);
-	static flecs::entity _create_directional_light(const flecs::world &world, const RID &light_id, const Transform2D &transform,  const String &name);
-	static flecs::entity _create_directional_light(const flecs::world &world, const Transform2D &transform, const String &name);
-	static flecs::entity _create_directional_light(const flecs::world &world, DirectionalLight2D *directional_light);
-	static flecs::entity _create_point_light(const flecs::world &world,  const Transform2D &transform, const String &name);
-	static flecs::entity _create_point_light(const flecs::world &world,  const RID &light_id, const Transform2D &transform, const String &name);
-	static flecs::entity _create_point_light(const flecs::world &world, PointLight2D *point_light);
-	static flecs::entity _create_canvas_item(const flecs::world &world, CanvasItem *canvas_item);
-	static flecs::entity _create_canvas_item(const flecs::world &world, const RID &canvas_item_id,const Transform2D& transform, const String &name, const String &class_name);
-	static flecs::entity _create_skeleton(const flecs::world &world, const RID &skeleton_id, const String &name);
-	static flecs::entity _create_skeleton(const flecs::world &world, Skeleton2D *skeleton_2d);
-	static flecs::entity _create_light_occluder(const flecs::world &world, LightOccluder2D *light_occluder);
-	static flecs::entity _create_light_occluder(const flecs::world &world, const RID& light_occluder_id, const Transform2D& transform, const RID& canvas_id, const String& name );
-	static flecs::entity _create_light_occluder(const flecs::world &world, const Transform2D &transform, const String &name);
-	static flecs::entity _create_gpu_particles_2d(const flecs::world &world, const RID canvas_item_id, const RID particles_id, const RID texture_id, const Transform2D &transform,  const String& name);
-	static flecs::entity _create_gpu_particles_2d(const flecs::world &world, GPUParticles2D* gpu_particles, uint32_t count = 0, const uint32_t max_depth = 10000);
+	static flecs::entity _create_camera_2d(const flecs::world *world, const RID &camera_id, const Transform2D &transform, const String &name);
+	static flecs::entity _create_camera_2d(const flecs::world *world, Camera2D *camera_2d);
+	static flecs::entity _create_directional_light(const flecs::world *world, const RID &light_id, const Transform2D &transform,  const String &name);
+	static flecs::entity _create_directional_light(const flecs::world *world, const Transform2D &transform, const String &name);
+	static flecs::entity _create_directional_light(const flecs::world *world, DirectionalLight2D *directional_light);
+	static flecs::entity _create_point_light(const flecs::world *world,  const Transform2D &transform, const String &name);
+	static flecs::entity _create_point_light(const flecs::world *world,  const RID &light_id, const Transform2D &transform, const String &name);
+	static flecs::entity _create_point_light(const flecs::world *world, PointLight2D *point_light);
+	static flecs::entity _create_canvas_item(const flecs::world *world, CanvasItem *canvas_item);
+	static flecs::entity _create_canvas_item(const flecs::world *world, const RID &canvas_item_id,const Transform2D& transform, const String &name, const String &class_name);
+	static flecs::entity _create_skeleton(const flecs::world *world, const RID &skeleton_id, const String &name);
+	static flecs::entity _create_skeleton(const flecs::world *world, Skeleton2D *skeleton_2d);
+	static flecs::entity _create_light_occluder(const flecs::world *world, LightOccluder2D *light_occluder);
+	static flecs::entity _create_light_occluder(const flecs::world *world, const RID& light_occluder_id, const Transform2D& transform, const RID& canvas_id, const String& name );
+	static flecs::entity _create_light_occluder(const flecs::world *world, const Transform2D &transform, const String &name);
+	static flecs::entity _create_gpu_particles_2d(const flecs::world *world, const RID canvas_item_id, const RID particles_id, const RID texture_id, const Transform2D &transform,  const String& name);
+	static flecs::entity _create_gpu_particles_2d(const flecs::world *world, GPUParticles2D* gpu_particles, uint32_t count = 0, const uint32_t max_depth = 10000);
 
 	static Ref<FlecsEntity> create_mesh_instance(const Ref<FlecsWorld>& flecs_world, const RID &mesh_id, const Transform2D &transform, const String &name, const RID &canvas_id);
 	static Ref<FlecsEntity> create_mesh_instance_with_object(const Ref<FlecsWorld>& flecs_world, MeshInstance2D *mesh_instance_2d);

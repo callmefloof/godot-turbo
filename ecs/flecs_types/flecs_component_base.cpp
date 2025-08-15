@@ -19,17 +19,17 @@ flecs::id FlecsComponentBase::get_internal_component() const {
 flecs::entity FlecsComponentBase::get_internal_owner() const {
 	return owner;
 }
-void FlecsComponentBase::set_component(const flecs::entity p_component) {
+void FlecsComponentBase::set_component(const flecs::entity& p_component) {
 	print_line("Setting component ID: " + itos((uint64_t)p_component.raw_id()));
 	component = p_component;
 }
-void FlecsComponentBase::set_internal_world(const flecs::world p_world) {
+void FlecsComponentBase::set_internal_world( flecs::world* p_world) {
 	world = p_world;
 }
-void FlecsComponentBase::set_internal_owner(const flecs::entity p_owner) {
+void FlecsComponentBase::set_internal_owner(const flecs::entity& p_owner) {
 	owner = p_owner;
 }
-flecs::world FlecsComponentBase::get_internal_world() const {
+flecs::world* FlecsComponentBase::get_internal_world() const {
 	return world;
 }
 

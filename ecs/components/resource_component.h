@@ -4,6 +4,7 @@
 #include "core/string/ustring.h"
 #include "core/templates/rid.h"
 #include "single_component_module.h"
+#include "ecs/flecs_types/flecs_world.h"
 
 struct ResourceComponent {
 	RID resource_id; // Unique identifier for the resource

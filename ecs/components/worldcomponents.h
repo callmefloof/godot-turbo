@@ -14,7 +14,8 @@
 #include "servers/navigation_server_2d.h"
 #include "servers/navigation_server_3d.h"
 #include "component_proxy.h"
-#include "../flecs_types/flecs_component.h"
+#include "ecs/flecs_types/flecs_world.h"
+#include "ecs/flecs_types/flecs_singleton_component.h"
 #include "core/string/ustring.h"
 
 
@@ -32,18 +33,18 @@ struct World2DComponent {
 	}
 };
 
-class World2DComponentRef : public FlecsComponent<World2DComponent> {
+class World2DComponentRef : public FlecsSingletonComponent<World2DComponent> {
 	#define WORLD_2D_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, canvas_id,World2DComponent)\
-	DEFINE_PROPERTY(RID, navigation_map_id,World2DComponent)\
-	DEFINE_PROPERTY(RID, space_id,World2DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, canvas_id,World2DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, navigation_map_id,World2DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, space_id,World2DComponent)\
 
 	#define WORLD_2D_COMPONENT_BINDINGS\
 	BIND_PROPERTY(RID, canvas_id, World2DComponentRef)\
 	BIND_PROPERTY(RID, navigation_map_id, World2DComponentRef)\
 	BIND_PROPERTY(RID, space_id, World2DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(World2DComponent,
+	DEFINE_SINGLETON_COMPONENT_PROXY(World2DComponent,
 	WORLD_2D_COMPONENT_PROPERTIES,
 	WORLD_2D_COMPONENT_BINDINGS);
 };
@@ -84,14 +85,14 @@ struct World3DComponent {
 	}
 };
 
-class World3DComponentRef : public FlecsComponent<World3DComponent> {
+class World3DComponentRef : public FlecsSingletonComponent<World3DComponent> {
 	#define WORLD_3D_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, camera_attributes_id,World3DComponent)\
-	DEFINE_PROPERTY(RID, environment_id,World3DComponent)\
-	DEFINE_PROPERTY(RID, fallback_environment_id,World3DComponent)\
-	DEFINE_PROPERTY(RID, navigation_map_id,World3DComponent)\
-	DEFINE_PROPERTY(RID, scenario_id,World3DComponent)\
-	DEFINE_PROPERTY(RID, space_id,World3DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, camera_attributes_id,World3DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, environment_id,World3DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, fallback_environment_id,World3DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, navigation_map_id,World3DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, scenario_id,World3DComponent)\
+	DEFINE_SINGLETON_PROPERTY(RID, space_id,World3DComponent)\
 
 
 	#define WORLD_3D_COMPONENT_BINDINGS\
@@ -102,7 +103,7 @@ class World3DComponentRef : public FlecsComponent<World3DComponent> {
 	BIND_PROPERTY(RID, scenario_id, World3DComponentRef)\
 	BIND_PROPERTY(RID, space_id, World3DComponentRef)\
 
-	DEFINE_COMPONENT_PROXY(World3DComponent,
+	DEFINE_SINGLETON_COMPONENT_PROXY(World3DComponent,
 	WORLD_3D_COMPONENT_PROPERTIES,
 	WORLD_3D_COMPONENT_BINDINGS);
 };

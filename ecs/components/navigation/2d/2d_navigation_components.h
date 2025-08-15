@@ -7,17 +7,10 @@
 #include "modules/godot_turbo/ecs/components/component_module_base.h"
 #include "core/string/ustring.h"
 
-
 class FlecsEntity;
 
 struct NavAgent2DComponent {
-
 	RID agent_id;
-	~NavAgent2DComponent() {
-		if (agent_id.is_valid()) {
-			NavigationServer2D::get_singleton()->free(agent_id);
-		}
-	}
 };
 
 class NavAgent2DComponentRef : public FlecsComponent<NavAgent2DComponent> {
@@ -35,11 +28,6 @@ class NavAgent2DComponentRef : public FlecsComponent<NavAgent2DComponent> {
 
 struct NavLink2DComponent {
 	RID link_id;
-	~NavLink2DComponent() {
-		if (link_id.is_valid()) {
-			NavigationServer2D::get_singleton()->free(link_id);
-		}
-	}
 };
 
 class NavLink2DComponentRef : public FlecsComponent<NavLink2DComponent> {
@@ -58,11 +46,6 @@ class NavLink2DComponentRef : public FlecsComponent<NavLink2DComponent> {
 
 struct NavObstacle2DComponent {
 	RID obstacle_id;
-	~NavObstacle2DComponent() {
-		if (obstacle_id.is_valid()) {
-			NavigationServer2D::get_singleton()->free(obstacle_id);
-		}
-	}
 };
 	
 class NavObstacle2DComponentRef : public FlecsComponent<NavObstacle2DComponent> {
@@ -80,11 +63,6 @@ class NavObstacle2DComponentRef : public FlecsComponent<NavObstacle2DComponent> 
 
 struct NavRegion2DComponent {
 	RID region_id;
-	~NavRegion2DComponent() {
-		if (region_id.is_valid()) {
-			NavigationServer2D::get_singleton()->free(region_id);
-		}
-	}
 };
 
 class NavRegion2DComponentRef : public FlecsComponent<NavRegion2DComponent> {
@@ -101,11 +79,6 @@ class NavRegion2DComponentRef : public FlecsComponent<NavRegion2DComponent> {
 
 struct SourceGeometryParser2DComponent {
 	RID source_geometry_parser_id;
-	~SourceGeometryParser2DComponent() {
-		if (source_geometry_parser_id.is_valid()) {
-			NavigationServer2D::get_singleton()->free(source_geometry_parser_id);
-		}
-	}
 };
 	
 class SourceGeometryParser2DComponentRef : public FlecsComponent<SourceGeometryParser2DComponent> {
@@ -128,12 +101,12 @@ struct Navigation2DBaseComponents {
 	flecs::component<NavRegion2DComponent> region;
 	flecs::component<SourceGeometryParser2DComponent> source_geometry_parser;
 
-	explicit Navigation2DBaseComponents(const flecs::world &world) :
-			agent(world.component<NavAgent2DComponent>("NavAgent2DComponent")),
-			link(world.component<NavLink2DComponent>("NavLink2DComponent")),
-			obstacle(world.component<NavObstacle2DComponent>("NavObstacle2DComponent")),
-			region(world.component<NavRegion2DComponent>("NavRegion2DComponent")),
-			source_geometry_parser(world.component<SourceGeometryParser2DComponent>("SourceGeometryParser2DComponent")) {}
+	explicit Navigation2DBaseComponents(const flecs::world *world) :
+			agent(world->component<NavAgent2DComponent>("NavAgent2DComponent")),
+			link(world->component<NavLink2DComponent>("NavLink2DComponent")),
+			obstacle(world->component<NavObstacle2DComponent>("NavObstacle2DComponent")),
+			region(world->component<NavRegion2DComponent>("NavRegion2DComponent")),
+			source_geometry_parser(world->component<SourceGeometryParser2DComponent>("SourceGeometryParser2DComponent")) {}
 };
 
 using Navigation2DComponentModule = MultiComponentModule<Navigation2DBaseComponents>;

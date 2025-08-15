@@ -8,14 +8,8 @@
 #include "servers/navigation_server_3d.h"
 #include "core/string/ustring.h"
 
-
 struct NavAgent3DComponent {
 	RID agent_id;
-	~NavAgent3DComponent() {
-		if (agent_id.is_valid()) {
-			NavigationServer3D::get_singleton()->free(agent_id);
-		}
-	}
 };
 
 class NavAgent3DComponentRef : public FlecsComponent<NavAgent3DComponent> {
@@ -32,11 +26,6 @@ class NavAgent3DComponentRef : public FlecsComponent<NavAgent3DComponent> {
 
 struct NavLink3DComponent {
 	RID link_id;
-	~NavLink3DComponent() {
-		if (link_id.is_valid()) {
-			NavigationServer3D::get_singleton()->free(link_id);
-		}
-	}
 };
 
 class NavLink3DComponentRef : public FlecsComponent<NavLink3DComponent> {
@@ -53,11 +42,6 @@ class NavLink3DComponentRef : public FlecsComponent<NavLink3DComponent> {
 
 struct NavObstacle3DComponent {
 	RID obstacle_id;
-	~NavObstacle3DComponent() {
-		if (obstacle_id.is_valid()) {
-			NavigationServer3D::get_singleton()->free(obstacle_id);
-		}
-	}
 };
 
 class NavObstacle3DComponentRef : public FlecsComponent<NavObstacle3DComponent> {
@@ -74,11 +58,6 @@ class NavObstacle3DComponentRef : public FlecsComponent<NavObstacle3DComponent> 
 
 struct NavRegion3DComponent {
 	RID region_id;
-	~NavRegion3DComponent() {
-		if (region_id.is_valid()) {
-			NavigationServer3D::get_singleton()->free(region_id);
-		}
-	}
 };
 
 class NavRegion3DComponentRef : public FlecsComponent<NavRegion3DComponent> {
@@ -95,11 +74,6 @@ class NavRegion3DComponentRef : public FlecsComponent<NavRegion3DComponent> {
 
 struct SourceGeometryParser3DComponent {
 	RID source_geometry_parser_id;
-	~SourceGeometryParser3DComponent() {
-		if (source_geometry_parser_id.is_valid()) {
-			NavigationServer3D::get_singleton()->free(source_geometry_parser_id);
-		}
-	}
 };
 
 class SourceGeometryParser3DComponentRef : public FlecsComponent<SourceGeometryParser3DComponent> {
@@ -122,12 +96,12 @@ struct Navigation3DBaseComponents {
 	flecs::component<NavRegion3DComponent> region;
 	flecs::component<SourceGeometryParser3DComponent> source_geometry_parser;
 
-	explicit Navigation3DBaseComponents(const flecs::world &world) :
-			agent(world.component<NavAgent3DComponent>("NavAgent3DComponent")),
-			link(world.component<NavLink3DComponent>("NavLink3DComponent")),
-			obstacle(world.component<NavObstacle3DComponent>("NavObstacle3DComponent")),
-			region(world.component<NavRegion3DComponent>("NavRegion3DComponent")),
-			source_geometry_parser(world.component<SourceGeometryParser3DComponent>("SourceGeometryParser3DComponent")) {}
+	explicit Navigation3DBaseComponents(const flecs::world *world) :
+			agent(world->component<NavAgent3DComponent>("NavAgent3DComponent")),
+			link(world->component<NavLink3DComponent>("NavLink3DComponent")),
+			obstacle(world->component<NavObstacle3DComponent>("NavObstacle3DComponent")),
+			region(world->component<NavRegion3DComponent>("NavRegion3DComponent")),
+			source_geometry_parser(world->component<SourceGeometryParser3DComponent>("SourceGeometryParser3DComponent")) {}
 };
 using Navigation3DComponentModule = MultiComponentModule<Navigation3DBaseComponents>;
 

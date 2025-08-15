@@ -4,6 +4,7 @@
 #include "single_component_module.h"
 #include "../flecs_types/flecs_entity.h"
 #include <cassert>
+#include "ecs/flecs_types/flecs_world.h"
 
 struct Transform2DComponent {
 	Transform2D transform;

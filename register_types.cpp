@@ -24,6 +24,7 @@
 
 #include "ecs/utility/navigation/2d/navigation2d_utility.h"
 #include "ecs/utility/navigation/3d/navigation3d_utility.h"
+#include "ecs/components/object_instance_component.h"
 #include "ecs/utility/physics/2d/physics2d_utility.h"
 #include "ecs/utility/physics/3d/physics3d_utility.h"
 
@@ -43,7 +44,7 @@ ClassDB::register_class<ClassName##Ref>();
 
 //Macro for
 #define INSTANTIATE_TYPED_ACCESSOR(Component) \
-template Component& FlecsComponentBase::get_typed_data<Component>() const;
+template Component* FlecsComponentBase::try_get_typed_data<Component>() const;
 
 
 // We need to do this to initalize getting the typed data of a component
@@ -56,6 +57,7 @@ INSTANTIATE_TYPED_ACCESSOR(ReflectionProbeComponent)
 INSTANTIATE_TYPED_ACCESSOR(SkeletonComponent)
 INSTANTIATE_TYPED_ACCESSOR(EnvironmentComponent)
 INSTANTIATE_TYPED_ACCESSOR(CameraComponent)
+//INSTANTIATE_TYPED_ACCESSOR(MainCamera)
 INSTANTIATE_TYPED_ACCESSOR(CompositorComponent)
 INSTANTIATE_TYPED_ACCESSOR(DirectionalLight3DComponent)
 INSTANTIATE_TYPED_ACCESSOR(PointLightComponent)
@@ -67,10 +69,10 @@ INSTANTIATE_TYPED_ACCESSOR(VoxelGIComponent)
 INSTANTIATE_TYPED_ACCESSOR(ScenarioComponent)
 INSTANTIATE_TYPED_ACCESSOR(RenderInstanceComponent)
 INSTANTIATE_TYPED_ACCESSOR(CanvasItemComponent)
-INSTANTIATE_TYPED_ACCESSOR(FrustumCulled)
+//INSTANTIATE_TYPED_ACCESSOR(FrustumCulled)
 INSTANTIATE_TYPED_ACCESSOR(Occluded)
 INSTANTIATE_TYPED_ACCESSOR(Occluder)
-INSTANTIATE_TYPED_ACCESSOR(Occludee)
+//INSTANTIATE_TYPED_ACCESSOR(Occludee)
 
 
 // Physics Components
@@ -106,33 +108,33 @@ INSTANTIATE_TYPED_ACCESSOR(ResourceComponent)
 INSTANTIATE_TYPED_ACCESSOR(World3DComponent)
 INSTANTIATE_TYPED_ACCESSOR(World2DComponent)
 INSTANTIATE_TYPED_ACCESSOR(VisibilityComponent)
-
+INSTANTIATE_TYPED_ACCESSOR(ObjectInstanceComponent)
 
 
 void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
-	ClassDB::register_class<ScreenAABB>();
-	ClassDB::register_class<ScreenTriangle>();
-	ClassDB::register_class<FlecsEntity>();
+	ClassDB::register_runtime_class<ScreenAABB>();
+	ClassDB::register_runtime_class<ScreenTriangle>();
+	ClassDB::register_runtime_class<FlecsEntity>();
 	ClassDB::register_abstract_class<FlecsComponentBase>();
-    ClassDB::register_class<FlecsWorld>();
+    ClassDB::register_runtime_class<FlecsWorld>();
 	ClassDB::register_class<FlecsScriptSystem>();
 	ClassDB::register_runtime_class<FlecsSystem>();
 	ClassDB::register_runtime_class<RenderSystem>();
 	ClassDB::register_runtime_class<MultiMeshRenderSystem>();
 	ClassDB::register_runtime_class<OcclusionSystem>();
-	ClassDB::register_class<RenderUtility2D>();
-	ClassDB::register_class<RenderUtility3D>();
-	ClassDB::register_class<Physics3DUtility>();
-	ClassDB::register_class<Physics2DUtility>();
-	ClassDB::register_class<Navigation2DUtility>();
-	ClassDB::register_class<Navigation3DUtility>();
-	ClassDB::register_class<World3DUtility>();
-	ClassDB::register_class<World2DUtility>();
-	ClassDB::register_class<SceneObjectUtility>();
-	ClassDB::register_class<ResourceObjectUtility>();
+	ClassDB::register_runtime_class<RenderUtility2D>();
+	ClassDB::register_runtime_class<RenderUtility3D>();
+	ClassDB::register_runtime_class<Physics3DUtility>();
+	ClassDB::register_runtime_class<Physics2DUtility>();
+	ClassDB::register_runtime_class<Navigation2DUtility>();
+	ClassDB::register_runtime_class<Navigation3DUtility>();
+	ClassDB::register_runtime_class<World3DUtility>();
+	ClassDB::register_runtime_class<World2DUtility>();
+	ClassDB::register_runtime_class<SceneObjectUtility>();
+	ClassDB::register_runtime_class<ResourceObjectUtility>();
 
 	// Rendering Components: 20 - 21-jul-2025
 
@@ -144,6 +146,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(SkeletonComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(EnvironmentComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(CameraComponent)
+	REGISTER_FLECS_COMPONENT_CLASS(MainCamera)
 	REGISTER_FLECS_COMPONENT_CLASS(CompositorComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(DirectionalLight3DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(PointLightComponent)
@@ -194,6 +197,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(World3DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(World2DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(VisibilityComponent)
+	REGISTER_FLECS_COMPONENT_CLASS(ObjectInstanceComponent)
 
 }
 

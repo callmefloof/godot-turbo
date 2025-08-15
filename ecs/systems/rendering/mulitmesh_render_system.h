@@ -9,8 +9,6 @@ private:
 
 protected:
 	flecs::entity pipeline;
-	
-
 public:
 	MultiMeshRenderSystem() = default;
 	~MultiMeshRenderSystem() override = default;

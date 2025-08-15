@@ -101,6 +101,13 @@ public:
 			destroy_command(cmd);
 		}
 	}
+
+	void clear() {
+		ICommand* cmd = nullptr;
+		while (queue.try_dequeue(cmd)) {
+			destroy_command(cmd);
+		}
+	}
 private:
 	moodycamel::ConcurrentQueue<ICommand*> queue;
 };

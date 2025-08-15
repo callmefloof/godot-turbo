@@ -1,6 +1,8 @@
 #pragma once
 #include "ecs/flecs_types/flecs_world.h"
-#include "ecs/utility/object_id_storage.h"
+#include "ecs/utility/ref_storage.h"
+#include "ecs/components/object_instance_component.h"
+#include "ecs/utility/node_storage.h"
 #include "core/string/ustring.h"
 #include "core/templates/rid.h"
 #include "ecs/components/physics/2d/2d_physics_components.h"
@@ -23,15 +25,15 @@ class Physics2DUtility : public Object {
 public:
 	Physics2DUtility() = default;
 	~Physics2DUtility() = default;
-	static flecs::entity _create_area(const flecs::world &world, const String &name, const RID &space_id);
-	static flecs::entity _create_body(const flecs::world &world, const String &name, const RID &space_id);
-	static flecs::entity _create_joint(const flecs::world &world, const String &name, const RID &space_id);
+	static flecs::entity _create_area(const flecs::world *world, const String &name, const RID &space_id);
+	static flecs::entity _create_body(const flecs::world *world, const String &name, const RID &space_id);
+	static flecs::entity _create_joint(const flecs::world *world, const String &name, const RID &space_id);
 	/// Create an Area2D entity from a Godot Area2D object
-	static flecs::entity _create_area(const flecs::world &world, Area2D *area_2d);
+	static flecs::entity _create_area(const flecs::world *world, Area2D *area_2d);
 	/// Create a RigidBody2D entity from a Godot RigidBody2D object
-	static flecs::entity _create_rigid_body(const flecs::world &world, RigidBody2D *rigid_body);
-	static flecs::entity _create_physics_body(const flecs::world& world, PhysicsBody2D* physics_body);
-	static flecs::entity _create_joint(const flecs::world &world, Joint2D *joint_2d);
+	static flecs::entity _create_rigid_body(const flecs::world *world, RigidBody2D *rigid_body);
+	static flecs::entity _create_physics_body(const flecs::world *world, PhysicsBody2D* physics_body);
+	static flecs::entity _create_joint(const flecs::world *world, Joint2D *joint_2d);
 	
 	static Ref<FlecsEntity> create_area_with_object(FlecsWorld *world, Area2D *area_2d);
 	static Ref<FlecsEntity> create_rigid_body_with_object(FlecsWorld *world, RigidBody2D *rigid_body);

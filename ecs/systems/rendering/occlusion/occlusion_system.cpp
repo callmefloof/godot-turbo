@@ -9,11 +9,15 @@
 #include "../../commands/command.h"
 
 void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, PipelineManager &pipeline_manager) {
+	if(!world){
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
+		return;
+	}
 	if (!main_camera.has<CameraComponent>()) {
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: CameraComponent not found");
 		return;
 	}
-	if (!world.has<World3DComponent>()) {
+	if (!world->has<World3DComponent>()) {
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: World3D not found");
 		return;
 	}
@@ -27,17 +31,21 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_transform_ref not found");
 		return;
 	}
-	flecs::system occlusion_update_tris = world.system<Occluder>("OcclusionSystem::Occluder::UpdateTris")
+	flecs::system occlusion_update_tris = world->system<Occluder>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.each([&](flecs::entity entity, Occluder& occ ) {
-		tile_occlusion_manager.reset(window_size.width, window_size.height);
+		if(!entity.parent().is_valid()){
+			//ERR_PRINT_ONCE("OcclusionSystem::create_occlusion_culling: entity parent is not valid");
+			return;
+		}
 		if ((!entity.parent().has<Transform3DComponent>() && !entity.parent().has<VisibilityComponent>()) || entity.parent().has<FrustumCulled>()) {
 			return;
 		}
 		if (!entity.get<VisibilityComponent>().visible) {
 			return;
 		}
+		tile_occlusion_manager.reset(window_size.width, window_size.height);
 		const auto& transform = entity.parent().get<Transform3DComponent>();
 
 		PackedVector3Array world_vertices = PackedVector3Array();
@@ -48,9 +56,12 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 		occ.screen_triangles.clear();
 		occ.screen_triangles = ScreenTriangle::convert_to_screen_triangles(world_vertices, occ.indices, cam_transform_ref->transform,cam_camera_ref->projection, cam_camera_ref->camera_offset);
 	});
-	pipeline_manager.add_to_pipeline(occlusion_update_tris, flecs::OnUpdate, "MultiMeshRenderSystem::FrustumCulling");
+	
+	occlusion_update_tris.set_name("OcclusionSystem/Occluder: UpdateTris");
+	flecs::entity_t phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occluder: UpdateTris", "MultiMeshRenderSystem: FrustumCulling");
+	pipeline_manager.add_to_pipeline(occlusion_update_tris, phase);
 
-	flecs::system occlusion_update_aabbs = world.system<Occludee>("OcclusionSystem::Occludee::UpdateAABBs")
+	flecs::system occlusion_update_aabbs = world->system<Occludee>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.with<Transform3DComponent>()
@@ -60,13 +71,19 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 		occludee.worldAABB.position = occludee.aabb.position + transform.transform.get_origin();
 		occludee.worldAABB.size = transform.transform.get_basis().get_scale()*occludee.aabb.size;
 	});
-	pipeline_manager.add_to_pipeline(occlusion_update_aabbs, flecs::OnUpdate, "OcclusionSystem::Occluder::UpdateTris");
+	occlusion_update_aabbs.set_name("OcclusionSystem/Occludee: UpdateAABBs");
+	flecs::entity_t occlusion_update_aabbs_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occludee: UpdateAABBs", "OcclusionSystem/Occluder: UpdateTris");
+	pipeline_manager.add_to_pipeline(occlusion_update_aabbs, occlusion_update_aabbs_phase);
 
 
-	flecs::system binning = world.system<const Occluder>("OcclusionSystem::Occluder::Binning")
+	flecs::system binning = world->system<const Occluder>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.each([&](flecs::entity entity, const Occluder& occ) {
+		if(!entity.parent().is_valid()){
+			//ERR_PRINT_ONCE("OcclusionSystem::create_occlusion_culling: entity parent is not valid");
+			return;
+		}
 		if ((!entity.parent().has<Transform3DComponent>() && !entity.parent().has<VisibilityComponent>()) || entity.parent().has<FrustumCulled>()) {
 			return;
 		}
@@ -75,17 +92,20 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 		}
 		tile_occlusion_manager.bin_triangles(occ.screen_triangles);
 	});
+	binning.set_name("OcclusionSystem/Occluder: Binning");
+	flecs::entity_t binning_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occluder: Binning", "OcclusionSystem/Occluder: UpdateTris");
+	pipeline_manager.add_to_pipeline(binning, binning_phase);
 
-	pipeline_manager.add_to_pipeline(binning, flecs::OnUpdate, "OcclusionSystem::Occluder::UpdateAABBs");
 
-
-	flecs::system rasterize = world.system("OcclusionSystem::Occluder::Rasterize").run([=](flecs::iter& it) {
+	flecs::system rasterize = world->system().run([=](flecs::iter& it) {
 		tile_occlusion_manager.rasterize_all_bins_parallel(OS::get_singleton()->get_processor_count());
 	});
+	rasterize.set_name("OcclusionSystem/Occluder: Rasterize");
 
-	pipeline_manager.add_to_pipeline(rasterize, flecs::OnUpdate, "OcclusionSystem::Occluder::Binning");
+	flecs::entity_t rasterize_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occluder: Rasterize", "OcclusionSystem/Occluder: Binning");
+	pipeline_manager.add_to_pipeline(rasterize, rasterize_phase);
 
-	flecs::system occlusion_cull = world.system<Occludee>("OcclusionSystem::Occludee::Cull")
+	flecs::system occlusion_cull = world->system<Occludee>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.each([=](flecs::entity entity, Occludee& occludee){
@@ -95,7 +115,9 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 			entity.remove<Occluded>();
 		}
 	});
-	pipeline_manager.add_to_pipeline(occlusion_cull, flecs::OnUpdate, "OcclusionSystem::Occluder::Rasterize");
+	occlusion_cull.set_name("OcclusionSystem/Occludee: OcclusionCull");
+	flecs::entity_t occlusion_cull_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occludee: OcclusionCull", "OcclusionSystem/Occluder: Rasterize");
+	pipeline_manager.add_to_pipeline(occlusion_cull, occlusion_cull_phase);
 
 
 }

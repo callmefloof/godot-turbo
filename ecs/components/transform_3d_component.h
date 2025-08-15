@@ -3,6 +3,8 @@
 #include "thirdparty/flecs/distr/flecs.h"
 #include "component_proxy.h"
 #include "single_component_module.h"
+#include "ecs/flecs_types/flecs_component.h"
+#include "ecs/flecs_types/flecs_world.h"
 
 #include <cassert>
 

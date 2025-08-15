@@ -14,6 +14,8 @@
 #include "../flecs_types/flecs_component.h"
 #include "type_id_generator.h"
 #include "single_component_module.h"
+#include "ecs/flecs_types/flecs_world.h"
+
 class FlecsEntity;
 
 struct ScriptVisibleComponent {

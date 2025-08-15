@@ -6,14 +6,10 @@
 #include "../../component_module_base.h"
 #include "core/os/memory.h"
 #include "core/string/ustring.h"
+#include "ecs/flecs_types/flecs_world.h"
 
 struct Area3DComponent {
 	RID area_id;
-	~Area3DComponent() {
-		if (area_id.is_valid()) {
-			PhysicsServer3D::get_singleton()->free(area_id);
-		}
-	}
 };
 
 class Area3DComponentRef : public FlecsComponent<Area3DComponent> {
@@ -32,11 +28,6 @@ class Area3DComponentRef : public FlecsComponent<Area3DComponent> {
 
 struct Body3DComponent {
 	RID body_id;
-	~Body3DComponent() {
-		if (body_id.is_valid()) {
-			PhysicsServer3D::get_singleton()->free(body_id);
-		}
-	}
 };
 
 class Body3DComponentRef : public FlecsComponent<Body3DComponent> {
@@ -53,11 +44,6 @@ class Body3DComponentRef : public FlecsComponent<Body3DComponent> {
 
 struct Joint3DComponent {
 	RID joint_id;
-	~Joint3DComponent() {
-		if (joint_id.is_valid()) {
-			PhysicsServer3D::get_singleton()->free(joint_id);
-		}
-	}
 };
 
 class Joint3DComponentRef : public FlecsComponent<Joint3DComponent> {
@@ -76,11 +62,6 @@ class Joint3DComponentRef : public FlecsComponent<Joint3DComponent> {
 
 struct SoftBody3DComponent {
 	RID soft_body_id;
-	~SoftBody3DComponent() {
-		if (soft_body_id.is_valid()) {
-			PhysicsServer3D::get_singleton()->free(soft_body_id);
-		}
-	}
 };
 
 class SoftBody3DComponentRef : public FlecsComponent<SoftBody3DComponent> {
@@ -103,11 +84,11 @@ struct Physics3DBaseComponents {
 	flecs::component<Joint3DComponent> joint;
 	flecs::component<SoftBody3DComponent> soft_body;
 
-	explicit Physics3DBaseComponents(const flecs::world &world) :
-			area(world.component<Area3DComponent>("Area3DComponent")),
-			body(world.component<Body3DComponent>("Body3DComponent")),
-			joint(world.component<Joint3DComponent>("Joint3DComponent")),
-			soft_body(world.component<SoftBody3DComponent>("SoftBody3DComponent")) {}
+	explicit Physics3DBaseComponents(const flecs::world *world) :
+			area(world->component<Area3DComponent>("Area3DComponent")),
+			body(world->component<Body3DComponent>("Body3DComponent")),
+			joint(world->component<Joint3DComponent>("Joint3DComponent")),
+			soft_body(world->component<SoftBody3DComponent>("SoftBody3DComponent")) {}
 };
 
 using Physics3DComponentModule = MultiComponentModule<Physics3DBaseComponents>;

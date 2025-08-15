@@ -201,7 +201,7 @@ struct TileBin {
 
 
 struct TileBuffer {
-	float depth[TILE_RES][TILE_RES];
+	float depth[TILE_RES][TILE_RES] = {}; // Zero-initialized
 
 	void clear() {
 		for (int y = 0; y < TILE_RES; y++) {

@@ -115,28 +115,28 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if (navigation_agent_3d != nullptr) {
         const FlecsEntity* entity = Navigation3DUtility::create_nav_agent_with_object(world, navigation_agent_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationLink3D *navigation_link_3d = Object::cast_to<NavigationLink3D>(node);
     if ( navigation_link_3d != nullptr) {
         const FlecsEntity* entity = Navigation3DUtility::create_nav_link_with_object(world, navigation_link_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationObstacle3D *navigation_obstacle_3d = Object::cast_to<NavigationObstacle3D>(node);
     if ( navigation_obstacle_3d != nullptr) {
         const FlecsEntity* entity = Navigation3DUtility::create_nav_obstacle_with_object(world, navigation_obstacle_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationRegion3D *navigation_region_3d = Object::cast_to<NavigationRegion3D>(node);
     if (navigation_region_3d != nullptr) {
         const FlecsEntity* entity = Navigation3DUtility::create_nav_region_with_object(world, navigation_region_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationAgent2D *navigation_agent_2d = Object::cast_to<NavigationAgent2D>(node);
@@ -144,28 +144,28 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if ( navigation_agent_2d != nullptr) {
         const FlecsEntity* entity = Navigation2DUtility::create_nav_agent_with_object(world, navigation_agent_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationLink2D *navigation_link_2d = Object::cast_to<NavigationLink2D>(node);
     if ( navigation_link_2d != nullptr) {
         const FlecsEntity* entity = Navigation2DUtility::create_nav_link_with_object(world, navigation_link_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationObstacle2D *navigation_obstacle_2d = Object::cast_to<NavigationObstacle2D>(node);
     if ( navigation_obstacle_2d != nullptr) {
         const FlecsEntity* entity = Navigation2DUtility::create_nav_obstacle_with_object(world, navigation_obstacle_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     NavigationRegion2D *navigation_region_2d = Object::cast_to<NavigationRegion2D>(node);
     if ( navigation_region_2d != nullptr) {
         const FlecsEntity* entity = Navigation2DUtility::create_nav_region_with_object(world, navigation_region_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
 
@@ -174,35 +174,35 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if ( area_3d != nullptr) {
         const FlecsEntity* entity = Physics3DUtility::create_area_with_object(world, area_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     RigidBody3D* rigid_body_3d = Object::cast_to<RigidBody3D>(node);
     if ( rigid_body_3d != nullptr) {
         const FlecsEntity* entity = Physics3DUtility::create_rigid_body_with_object(world, rigid_body_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     PhysicsBody3D *physics_body_3d = Object::cast_to<PhysicsBody3D>(node);
     if ( physics_body_3d != nullptr) {
         const FlecsEntity* entity = Physics3DUtility::create_physics_body_with_object(world, physics_body_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     Joint3D* joint_3d = Object::cast_to<Joint3D>(node);
     if (joint_3d) {
         const FlecsEntity* entity = Physics3DUtility::create_joint_with_object(world, joint_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     SoftBody3D* soft_body_3d = Object::cast_to<SoftBody3D>(node);
     if ( soft_body_3d != nullptr) {
         const FlecsEntity* entity = Physics3DUtility::create_soft_body_with_object(world, soft_body_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
 
@@ -211,28 +211,28 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if ( area_2d != nullptr) {
         const FlecsEntity* entity = Physics2DUtility::create_area_with_object(world, area_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     RigidBody2D* rigid_body_2d = Object::cast_to<RigidBody2D>(node);
     if ( rigid_body_2d != nullptr) {
         const FlecsEntity* entity = Physics2DUtility::create_rigid_body_with_object(world, rigid_body_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     PhysicsBody2D *physics_body_2d = Object::cast_to<PhysicsBody2D>(node);
     if ( physics_body_2d != nullptr) {
         const FlecsEntity* entity = Physics2DUtility::create_physics_body_with_object(world, physics_body_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     Joint2D *joint_2d = Object::cast_to<Joint2D>(node);
     if ( joint_2d != nullptr) {
         const FlecsEntity* entity = Physics2DUtility::create_joint_with_object(world, joint_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
 
@@ -241,12 +241,15 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if ( mesh_instance != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_mesh_instance_with_object(world, mesh_instance).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     MultiMeshInstance3D *multi_mesh_instance_3d = Object::cast_to<MultiMeshInstance3D>(node);
     if ( multi_mesh_instance_3d != nullptr) {
         TypedArray<FlecsEntity> multi_mesh_instance_3d_entities = RenderUtility3D::create_multi_mesh_with_object(world, multi_mesh_instance_3d);
+        if(multi_mesh_instance_3d_entities.size() == 0){
+            ERR_FAIL_COND_V(multi_mesh_instance_3d_entities.size() == 0 ,result);
+        }
         FlecsEntity* multi_mesh_instance_3d_entity = static_cast<Ref<FlecsEntity>>(multi_mesh_instance_3d_entities[0]).ptr();
         const uint32_t instance_count =  multi_mesh_instance_3d_entity->get_entity().get<MultiMeshComponent>().instance_count;
         TypedArray<FlecsEntity> multi_mesh_instances;
@@ -258,77 +261,77 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
             multi_mesh_instances.append(multi_mesh_instance_3d_entities[i]);
         }
         result.append_array(multi_mesh_instance_3d_entities);
-        result.append(get_script(world, node, multi_mesh_instance_3d_entity));
+        result.append(get_node_script(world, node, multi_mesh_instance_3d_entity));
         return result;
     }
     GPUParticles3D *particles_3d = Object::cast_to<GPUParticles3D>(node);
     if ( particles_3d != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_particles_with_object(world, particles_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     ReflectionProbe* reflection_probe = Object::cast_to<ReflectionProbe>(node);
     if ( reflection_probe != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_reflection_probe_with_object(world, reflection_probe).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     Skeleton3D* skeleton_3d = Object::cast_to<Skeleton3D>(node);
     if ( skeleton_3d != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_skeleton_with_object(world, skeleton_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     WorldEnvironment* world_environment = Object::cast_to<WorldEnvironment>(node);
     if ( world_environment != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_environment_with_object(world, world_environment).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     Camera3D* camera_3d = Object::cast_to<Camera3D>(node);
     if ( camera_3d != nullptr) {
         const FlecsEntity* entity =  RenderUtility3D::create_camera_with_object(world, camera_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     DirectionalLight3D* directional_light_3d = Object::cast_to<DirectionalLight3D>(node);
     if ( directional_light_3d != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_directional_light_with_object(world, directional_light_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     OmniLight3D* omni_light_3d = Object::cast_to<OmniLight3D>(node);
     if ( omni_light_3d != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_omni_light_with_object(world, omni_light_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     SpotLight3D* spot_light_3d = Object::cast_to<SpotLight3D>(node);
     if ( spot_light_3d != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_spot_light_with_object(world, spot_light_3d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     Viewport* viewport = Object::cast_to<Viewport>(node);
     if ( viewport != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_viewport_with_object(world, viewport).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     VoxelGI* voxel_gi = Object::cast_to<VoxelGI>(node);
     if ( voxel_gi != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_voxel_gi_with_object(world, voxel_gi).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
 
@@ -336,7 +339,7 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if (occluder_component != nullptr) {
         const FlecsEntity* entity = RenderUtility3D::create_occluder_with_object(world, occluder_component).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
 
@@ -345,7 +348,7 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     if ( mesh_instance_2d != nullptr) {
         const FlecsEntity* entity = RenderUtility2D::create_mesh_instance_with_object(world, mesh_instance_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     MultiMeshInstance2D *mmi = Object::cast_to<MultiMeshInstance2D>(node);
@@ -368,37 +371,37 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
             multi_mesh_instances.append(multi_mesh_instance_2d_entities[i]);
         }
         
-        get_script(world, node, multi_mesh_instance_2d_entity);
+        get_node_script(world, node, multi_mesh_instance_2d_entity);
         result.append_array(multi_mesh_instance_2d_entities);
-        result.append(get_script(world, node, multi_mesh_instance_2d_entity));
+        result.append(get_node_script(world, node, multi_mesh_instance_2d_entity));
         return result;
     }
     Camera2D *camera_2d = Object::cast_to<Camera2D>(node);
     if ( camera_2d != nullptr) {
         const FlecsEntity* node_camera = RenderUtility2D::create_camera_2d_with_object(world, camera_2d).ptr();
         result.append(node_camera);
-        result.append(get_script(world, node, node_camera));
+        result.append(get_node_script(world, node, node_camera));
         return result;
     }
     DirectionalLight2D* directional_light_2d = Object::cast_to<DirectionalLight2D>(node);
     if ( directional_light_2d != nullptr) {
         const FlecsEntity* entity = RenderUtility2D::create_directional_light_with_object(world, directional_light_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     PointLight2D* point_light_2d = Object::cast_to<PointLight2D>(node);
     if ( point_light_2d != nullptr) {
         const FlecsEntity* entity = RenderUtility2D::create_point_light_with_object(world, point_light_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     Skeleton2D* skeleton_2d = Object::cast_to<Skeleton2D>(node);
     if ( skeleton_2d != nullptr) {
         const FlecsEntity* entity = RenderUtility2D::create_skeleton_with_object(world, skeleton_2d).ptr();
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     LightOccluder2D * light_occluder = Object::cast_to<LightOccluder2D>(node);
@@ -406,13 +409,13 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
         const FlecsEntity* entity = RenderUtility2D::create_light_occluder_with_object(world, light_occluder).ptr();
         
         result.append(entity);
-        result.append(get_script(world, node, entity));
+        result.append(get_node_script(world, node, entity));
         return result;
     }
     GPUParticles2D* gpu_particles_2d = Object::cast_to<GPUParticles2D>(node);
     if (  gpu_particles_2d != nullptr) {
         const FlecsEntity* entity = RenderUtility2D::create_gpu_particles_2d_with_object(world, gpu_particles_2d).ptr();
-        get_script(world, node, entity);
+        get_node_script(world, node, entity);
         result.append(entity);
         return result;
     }
@@ -420,7 +423,7 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     CanvasItem* canvas_item = Object::cast_to<CanvasItem>(node);
     if ( canvas_item != nullptr) {
         const FlecsEntity* entity = RenderUtility2D::create_canvas_item_with_object(world, canvas_item).ptr();
-        get_script(world, node, entity );
+        get_node_script(world, node, entity );
         result.append(entity);
         return result;
     }
@@ -434,16 +437,16 @@ TypedArray<FlecsEntity> SceneObjectUtility::create_entity(FlecsWorld *world, Nod
     entity->get_entity().set<SceneNodeComponent>(scene_node_component);
     SceneNodeComponentRef::create_component(entity);
 
-    get_script(world, node, entity);
+    get_node_script(world, node, entity);
     result.append(entity);
     return result;
 }
 
-Ref<FlecsEntity> SceneObjectUtility::get_script(FlecsWorld *world, const Node *node, const FlecsEntity *node_entity) {
+Ref<FlecsEntity> SceneObjectUtility::get_node_script(FlecsWorld *world, const Node *node, const FlecsEntity *node_entity) {
     const Variant variant = node->get_script();
-    const Ref<Script> script = Ref<Script>(VariantCaster<Script*>::cast(variant));
-    if ( script.is_valid()) {
-        const Ref<FlecsEntity> child_resource_entity = ResourceObjectUtility::create_resource_entity(world, script);
+    const Ref<Script> node_script = Ref<Script>(VariantCaster<Script*>::cast(variant));
+    if ( node_script.is_valid()) {
+        const Ref<FlecsEntity> child_resource_entity = ResourceObjectUtility::create_resource_entity(world, node_script);
         child_resource_entity->get_entity().add(flecs::ChildOf, node_entity->get_entity());
         return child_resource_entity;
     }
@@ -456,7 +459,7 @@ void SceneObjectUtility::_bind_methods() {
     ClassDB::bind_method(D_METHOD("create_entities_from_scene", "world", "tree"), &SceneObjectUtility::create_entities_from_scene);
     ClassDB::bind_method(D_METHOD("create_entities", "world", "base_node", "entities", "current_depth", "max_depth"), &SceneObjectUtility::create_entities, DEFVAL(0), DEFVAL(10000));
     ClassDB::bind_method(D_METHOD("create_entity", "world", "node"), &SceneObjectUtility::create_entity);
-    ClassDB::bind_method(D_METHOD("get_script", "world", "node", "node_entity", "entities"), &SceneObjectUtility::get_script);
+    ClassDB::bind_method(D_METHOD("get_script", "world", "node", "node_entity", "entities"), &SceneObjectUtility::get_node_script);
     
 }
 

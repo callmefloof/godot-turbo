@@ -9,23 +9,31 @@
 #include "../components/script_visible_component.h"
 #include "../components/script_component_registry.h"
 #include "core/object/class_db.h"
+#include "flecs_world.h"
 
  void FlecsEntity::_bind_methods() {
 	//fill in methods
  	ClassDB::bind_method(D_METHOD("get_component", "component_type"),&FlecsEntity::get_component);
  	ClassDB::bind_method(D_METHOD("remove_all_components"),&FlecsEntity::remove_all_components);
  	ClassDB::bind_method(D_METHOD("get_component_types"),&FlecsEntity::get_component_types);
-
  	ClassDB::bind_method(D_METHOD("get_entity_name"),&FlecsEntity::get_entity_name);
  	ClassDB::bind_method(D_METHOD("set_entity_name", "p_name"),&FlecsEntity::set_entity_name);
  	ClassDB::bind_method(D_METHOD("set_component", "component_type"),&FlecsEntity::set_component);
- 	ClassDB::bind_method(D_METHOD("remove", "component_type"),&FlecsEntity::set_component);
  	ClassDB::bind_method(D_METHOD("get_component_by_name", "component_type"),&FlecsEntity::get_component_by_name);
+	ClassDB::bind_method(D_METHOD("has_component", "component_type"),&FlecsEntity::has_component);
+	ClassDB::bind_method(D_METHOD("remove_with_component", "component"),&FlecsEntity::remove_with_component);
+	ClassDB::bind_method(D_METHOD("remove", "component_name"),&FlecsEntity::remove);
+	ClassDB::bind_method(D_METHOD("get_parent"), &FlecsEntity::get_parent);
+	ClassDB::bind_method(D_METHOD("set_parent", "parent"), &FlecsEntity::set_parent);
+	ClassDB::bind_method(D_METHOD("get_children"), &FlecsEntity::get_children);
+	ClassDB::bind_method(D_METHOD("add_child", "child"), &FlecsEntity::add_child);
+	ClassDB::bind_method(D_METHOD("remove_child", "child"), &FlecsEntity::remove_child);
+	ClassDB::bind_method(D_METHOD("remove_all_children"), &FlecsEntity::remove_all_children);
 
 
 
 }
- void FlecsEntity::remove(const Ref<FlecsComponentBase> &comp) {
+ void FlecsEntity::remove_with_component(const Ref<FlecsComponentBase> &comp) {
 	if (!components.has(comp)) {
 		ERR_PRINT("component type not found in entity");
 		return;
@@ -41,6 +49,10 @@
 }
 
  void FlecsEntity::remove_all_components() {
+	Vector<Ref<FlecsComponentBase>> comp_copy = components;
+	for(int i = 0; i < comp_copy.size(); i++){
+		remove_with_component(comp_copy[i]);
+	}
 	components.clear();
 }
  Ref<FlecsComponentBase> FlecsEntity::get_component(const StringName &component_type) const {
@@ -146,15 +158,17 @@ PackedStringArray FlecsEntity::get_component_types() const {
 		}
 
 		// Set in ECS
-		// ReSharper disable once CppExpressionWithoutSideEffects
 		entity.set<ScriptVisibleComponent>(data);
 		dyn->set_data(data); // ensures pointer is synced
 		return;
 	}
+	
+	
  	components.append(comp_ref);
 }
-void FlecsEntity::remove(String &component_type) {
-	const char* c_component_type =component_type.ascii().get_data();
+
+void FlecsEntity::remove(const String &component_type) {
+	const char* c_component_type = component_type.ascii().get_data();
 	const flecs::entity component = entity.world().lookup(c_component_type);
 	if (component.is_valid()) {
 		ERR_PRINT("internal flecs component type is invalid. this likely means it wasn't added.");
@@ -179,6 +193,7 @@ void FlecsEntity::remove(String &component_type) {
 	}
 	ERR_PRINT("component type not found in entity");
 }
+
 Ref<FlecsComponentBase> FlecsEntity::get_component_by_name(const StringName &component_type) {
 	for (int i = 0; i < components.size(); i++) {
 		if (!components[i].is_valid()) {
@@ -197,3 +212,115 @@ Ref<FlecsComponentBase> FlecsEntity::get_component_by_name(const StringName &com
 	ERR_PRINT("component type not found in entity. returning nullptr");
 	return Ref<FlecsComponentBase>();
 }
+
+Ref<FlecsEntity> FlecsEntity::get_parent() const {
+	return gd_parent;
+}
+
+void FlecsEntity::set_parent(const Ref<FlecsEntity> &p_parent) {
+	if (p_parent.is_valid()) {
+		parent = p_parent->get_internal_entity();
+		gd_parent = p_parent;
+	} else {
+		parent = flecs::entity();
+		gd_parent = Ref<FlecsEntity>();
+	}
+	entity.set(flecs::ChildOf, parent);
+}
+
+flecs::entity FlecsEntity::get_internal_parent() const {
+	return parent;
+}
+
+flecs::entity FlecsEntity::get_internal_entity() const {
+	return entity;
+}
+
+Ref<FlecsEntity> FlecsEntity::get_child(int index) const {
+	if (index < 0 || index >= children.size()) {
+		ERR_PRINT("Index out of bounds for children array.");
+		return Ref<FlecsEntity>();
+	}
+	return children[index];
+}
+
+void FlecsEntity::set_children(const TypedArray<FlecsEntity> &p_children) {
+	// Clear existing children.
+	remove_all_children();
+
+	for(int i = 0; i < p_children.size(); i++) {
+		Variant v = p_children[i];
+		Object *obj = v;
+		String errormsg = "Expected FlecsEntity object, got: " + Variant::get_type_name(v.get_type()) + " at index " + itos(i);
+		if(!obj || !Object::cast_to<FlecsEntity>(obj)) {
+			ERR_PRINT(errormsg);
+			continue;
+		}
+		FlecsEntity *child = Object::cast_to<FlecsEntity>(obj);
+		if (child) {
+			add_child(child);
+		}
+	}
+}
+
+void FlecsEntity::add_child(const Ref<FlecsEntity> &child) {
+	if (!child.is_valid()) {
+		ERR_PRINT("Cannot add an invalid child entity.");
+		return;
+	}
+	children.append(child);
+	entity.add(flecs::ChildOf, child->get_internal_entity());
+}
+
+void FlecsEntity::remove_child(const Ref<FlecsEntity> &child) {
+	if (!child.is_valid()) {
+		ERR_PRINT("Cannot remove an invalid child entity.");
+		return;
+	}
+	if (children.erase(child)) {
+		entity.remove(flecs::ChildOf, child->get_internal_entity());
+	} else {
+		ERR_PRINT("Child entity not found in children array.");
+	}
+}
+
+TypedArray<FlecsEntity> FlecsEntity::get_children() const {
+	TypedArray<FlecsEntity> child_array;
+	for (const auto &child : children) {
+		child_array.append(child);
+	}
+	return child_array;
+}
+
+void FlecsEntity::add_component(const Ref<FlecsComponentBase> &comp_ref) {
+	if (!comp_ref.is_valid()) {
+		ERR_PRINT("add_component(): Component is null or invalid.");
+		return;
+	}
+
+	// Check if the component is already added
+	if (has_component(comp_ref->get_type_name())) {
+		ERR_PRINT("Component already exists in entity.");
+		return;
+	}
+
+	set_component(comp_ref);
+}
+
+flecs::world* FlecsEntity::get_internal_world() const {
+	return world;
+}
+
+void FlecsEntity::set_internal_world(flecs::world* p_world) {
+	if (!p_world) {
+		ERR_PRINT("FlecsEntity: set_internal_world() called with null world.");
+		return;
+	}
+	world = p_world;
+}
+
+
+void FlecsEntity::remove_all_children() {
+	children.clear();
+}
+

@@ -17,7 +17,7 @@ class ResourceObjectUtility : Object {
 public:
 	ResourceObjectUtility() = default; // Prevent instantiation
 	ResourceObjectUtility(const ResourceObjectUtility &) = delete; // Prevent copy
-	static flecs::entity _create_resource_entity(const flecs::world &world, const Ref<Resource>& resource) {
+	static flecs::entity _create_resource_entity(const flecs::world *world, const Ref<Resource>& resource) {
 		if (!resource.is_valid()) {
 			ERR_FAIL_V(flecs::entity());
 		}
@@ -25,16 +25,16 @@ public:
 			ERR_FAIL_V(flecs::entity());
 		}
 		if (const Ref<Script> scr = resource->get_script(); !scr.is_valid()) {
-			return world.entity(String(resource->get_name()).ascii().get_data()).set<ResourceComponent>({ resource->get_rid(), resource->get_class(), resource->get_name(), false });
+			return world->entity(String(resource->get_name()).ascii().get_data()).set<ResourceComponent>({ resource->get_rid(), resource->get_class(), resource->get_name(), false });
 		}
-		return world.entity(String(resource->get_name()).ascii().get_data()).set<ResourceComponent>({ resource->get_rid(), resource->get_class(), resource->get_name(), true });
+		return world->entity(String(resource->get_name()).ascii().get_data()).set<ResourceComponent>({ resource->get_rid(), resource->get_class(), resource->get_name(), true });
 	}
 	static Ref<FlecsEntity> create_resource_entity(const Ref<FlecsWorld>& world, const Ref<Resource>& resource) {
 		if (!world.is_valid() || !world.is_null()) {
 			ERR_FAIL_COND_V(!world.is_valid() || !world.is_null(), Ref<FlecsEntity>());
 		}
 		Ref<FlecsEntity> entity = memnew(FlecsEntity);
-		entity->set_entity(_create_resource_entity(world->get_world(), resource));
+		entity->set_entity(_create_resource_entity(world->get_world_ref(), resource));
 		ResourceComponentRef::create_component(entity);
 		return entity;
 	}

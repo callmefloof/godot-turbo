@@ -22,6 +22,9 @@ void TileOcclusionManager::rasterize_all_bins_parallel(const int thread_count) {
                 const int ty = i / num_tiles_x;
 
                 Vector2i tile_origin(tx * TILE_SIZE, ty * TILE_SIZE);
+                if(tile_buffers.size() == 0) {
+                    tile_buffers.resize(total_tiles);
+                }
                 tile_buffers.write[i].clear();
 
                 for (const Ref<ScreenTriangle> &tri : tile_bins[i].triangles) {

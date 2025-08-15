@@ -19,7 +19,7 @@ public:
 	TypedArray<FlecsEntity> create_entities(FlecsWorld* world, const Node *base_node, const TypedArray<FlecsEntity> &entities,
 			int current_depth = 0, const int max_depth = 10000);
 	TypedArray<FlecsEntity> create_entity(FlecsWorld* world, Node* node);
-	Ref<FlecsEntity> get_script(FlecsWorld *world, const Node *node, const FlecsEntity *node_entity);
+	Ref<FlecsEntity> get_node_script(FlecsWorld *world, const Node *node, const FlecsEntity *node_entity);
 	static void _bind_methods();
 	static SceneObjectUtility* get_singleton();
 };

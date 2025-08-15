@@ -60,6 +60,7 @@ void ScriptVisibleComponentRef::append_bytes(PackedByteArray &ba, const void *p_
 	const auto ref = Ref<ScriptVisibleComponentRef>(memnew(ScriptVisibleComponentRef));
 	ref->set_flecs_owner(p_owner->get_entity());
 	ref->set_owner(p_owner);
+	ref->set_internal_world(p_owner->get_internal_world());
 	auto comp = ref->get_internal_owner().get_mut<ScriptVisibleComponent>();
 	if (const auto *registry = ScriptComponentRegistry::get_singleton()) {
 		comp.fields = registry->create_field_map(comp.name);

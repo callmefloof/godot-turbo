@@ -8,13 +8,13 @@
 #include "flecs_world.h"
 
 flecs::query<> FlecsScriptSystem::get_query(const Vector<String> &component_names) {
-	flecs::query_builder<> q = world_ref->get_world().query_builder<>().cache_kind(flecs::QueryCacheAuto).with(component_names.get(0).ascii().get_data());
+	flecs::query_builder<> q = flecs_world_ref->get_world_ref()->query_builder<>().cache_kind(flecs::QueryCacheAuto).with(component_names.get(0).ascii().get_data());
 
 	for (int i = 0; i < component_names.size(); i++) {
 		String cname = component_names[i];
-		flecs::id comp_id = world_ref->get_world().lookup(cname.ascii().get_data());
+		flecs::id comp_id = flecs_world_ref->get_world_ref()->lookup(cname.ascii().get_data());
 
-		if (!flecs::entity(world_ref->get_world(), comp_id).is_valid()) {
+		if (!flecs::entity(*flecs_world_ref->get_world_ref(), comp_id).is_valid()) {
 			print_line("Invalid component name: %s", cname);
 			continue;
 		}
@@ -53,7 +53,7 @@ void FlecsScriptSystem::run() const {
 	// Get the query based on required_components
 
 	query.each([=](flecs::entity e) {
-		Ref<FlecsEntity> wrapped = world_ref->add_entity(e);
+		Ref<FlecsEntity> wrapped = flecs_world_ref->add_entity(e);
 		Array vargs;
 		vargs.append(wrapped); // No need for manual Variant
 		if (!callback.is_valid()) {

@@ -1,33 +1,15 @@
-//
-// Created by Floof on 14-7-2025.
-//
-
-
-#pragma once
-#include "core/error/error_macros.h"
-#include "core/object/ref_counted.h"
-#include "core/typedefs.h"
-#include "core/variant/variant_utility.h"
-#include "thirdparty/nameof/include/nameof.hpp"
 #include "flecs_component_base.h"
-#include "flecs_entity.h"
-#include "type_id_generator.h"
-#include "core/config/engine.h"
 
-class FlecsEntity;
-
-template <typename T>
-class FlecsComponent : public FlecsComponentBase {
+template<typename T>
+class FlecsSingletonComponent : public FlecsComponentBase {
 public:
-	FlecsComponent() = default;
-	~FlecsComponent() override = default;
+	FlecsSingletonComponent() = default;
+	~FlecsSingletonComponent() override = default;
 	T &get_data() const;
-	Ref<FlecsEntity> get_owner() const;
 	flecs::entity get_internal_owner() const override;
-	void set_flecs_owner(flecs::entity p_owner);
-	void set_owner(const Ref<FlecsEntity> &p_owner);
 	virtual void set_data(T &p_data);
 	flecs::id get_internal_component() const override;
+	void set_internal_component(const flecs::id& component);
 	StringName get_type_name() const override;
 	void clear_component() override;
 	//PackedByteArray byte_serialize() const;
@@ -42,8 +24,8 @@ public:
 };
 
 template <typename T>
-T& FlecsComponent<T>::get_data() const{
-	T* data = try_get_typed_data<T>();
+T& FlecsSingletonComponent<T>::get_data() const{
+	T* data = try_get_world_typed_data<T>();
 	if(!data){
 		if(!Engine::get_singleton()->is_editor_hint()){
 			WARN_PRINT("Data is null. Are you trying to instantiate a tag type as a component?");
@@ -56,60 +38,40 @@ T& FlecsComponent<T>::get_data() const{
 }
 
 template <typename T>
-flecs::entity FlecsComponent<T>::get_internal_owner() const {
+flecs::entity FlecsSingletonComponent<T>::get_internal_owner() const {
+    WARN_PRINT("FlecsSingletonComponent<T>'s owner is the flecs world, do not use this method");
 	return owner;
 }
-template <typename T>
-Ref<FlecsEntity> FlecsComponent<T>::get_owner() const {
-	return gd_owner;
-}
-template <typename T>
-void FlecsComponent<T>::set_owner(const Ref<FlecsEntity> &p_owner) {
-#ifdef DEBUG_ENABLED
-	if (!p_owner.is_valid()) {
-		ERR_PRINT("FlecsComponent::set_owner called with invalid owner Ref");
-	}
-#endif
-	gd_owner = p_owner.is_valid() ? p_owner : nullptr;
 
+template <typename T>
+void FlecsSingletonComponent<T>::set_data(T &p_data) {
+	world->set<T>(p_data);
+	world->modified<T>();
 }
 
 template <typename T>
-void FlecsComponent<T>::set_flecs_owner(const flecs::entity p_owner) {
-	const char* c_type_name = String(get_type_name()).ascii().get_data();
-	if (const flecs::entity comp = p_owner.world().lookup(c_type_name)) {
-		if (p_owner.has(comp)) {
-			owner = p_owner;
-		}
-	}
-	ERR_PRINT("p_owner does not have component");
-
-}
-
-template <typename T>
-void FlecsComponent<T>::set_data(T &p_data) {
-	owner.set<T>(p_data);
-	owner.modified<T>();
-}
-
-template <typename T>
-flecs::id FlecsComponent<T>::get_internal_component() const {
+flecs::id FlecsSingletonComponent<T>::get_internal_component() const {
 	return component;
 }
 
 template <typename T>
-int FlecsComponent<T>::get_type_id() const {
+inline void FlecsSingletonComponent<T>::set_internal_component(const flecs::id &p_component) {
+	component = p_component;
+}
+
+template <typename T>
+int FlecsSingletonComponent<T>::get_type_id() const {
 	return type_id();
 }
 
 template <typename T>
-StringName FlecsComponent<T>::get_type_name() const {
+StringName FlecsSingletonComponent<T>::get_type_name() const {
 	return get_class()+String("<" + String(NAMEOF_TYPE(T).data()) + ">");
 }
 
 template <typename T>
-void FlecsComponent<T>::clear_component() {
-	owner.set<T>({});
+void FlecsSingletonComponent<T>::clear_component() {
+	world->set<T>({});
 }
 
 // these cannot work due to the usage of RID's in components. I could refactor every RID into an uint64_t representation
@@ -151,12 +113,13 @@ void FlecsComponent<T>::clear_component() {
 
 
 template <typename T>
-Ref<FlecsComponentBase> FlecsComponent<T>::clone() const {
-	Ref<FlecsComponent<T>> new_ref;
+Ref<FlecsComponentBase> FlecsSingletonComponent<T>::clone() const {
+	Ref<FlecsSingletonComponent<T>> new_ref;
 	new_ref.instantiate();
 	new_ref->set_data(get_data());
+	new_ref->set_internal_owner(get_internal_owner());
+	new_ref->set_internal_component(get_internal_component());
+	new_ref->set_internal_world(get_internal_world());
+
 	return new_ref;
 }
-
-
-
