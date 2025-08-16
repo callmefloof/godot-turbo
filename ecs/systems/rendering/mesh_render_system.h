@@ -7,6 +7,7 @@
 #include "../commands/command.h"
 #include "../pipeline_manager.h"
 #include "ecs/components/visibility_component.h"
+#include "ecs/components/dirty_transform.h"
 
 class MeshRenderSystem : public RenderSystem
 {
@@ -16,7 +17,7 @@ public:
 	MeshRenderSystem() = default;
 	~MeshRenderSystem() override = default;
 	float far_dist = 9999;
-	void create_mesh_render_system(CommandQueue& command_queue, PipelineManager& pipeline_manager) const {
+	void create_mesh_render_system(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const {
 		if(!world){
 			ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 			return;
@@ -30,6 +31,8 @@ public:
 		print_line("Creating MeshRenderSystem...");
 
 		flecs::system mesh_render_system = world->system<const RenderInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
+				.detect_changes()
+				.with<DirtyTransform>()
 				.multi_threaded()
 							.each([&](flecs::entity entity, const RenderInstanceComponent& render_instance_comp, const Transform3DComponent& transform_3d_component, const VisibilityComponent& visibility_comp) {
 						if (visibility_comp.visible) {
@@ -46,7 +49,7 @@ public:
 									ERR_PRINT_ONCE("MeshRenderSystem::create_rendering: render_instance_id is not valid, this should not happen");
 									return;
 								}
-								command_queue.enqueue([=]() {
+								command_handler->enqueue_command([=]() {
 									RS::get_singleton()->instance_set_transform(render_instance_comp.render_instance_id, transform_3d_component.transform);
 								});
 								return;
@@ -56,9 +59,9 @@ public:
 						Transform3D transform_far;
 						const Vector3 far_pos = Vector3(far_dist,far_dist,far_dist);
 						transform_far.set_origin(far_pos);
-						command_queue.enqueue([=]() {
+						//command_queue.enqueue([=]() {
 							RS::get_singleton()->instance_set_transform(render_instance_comp.render_instance_id, transform_far);
-						});
+						//});
 						return;
 					
 					

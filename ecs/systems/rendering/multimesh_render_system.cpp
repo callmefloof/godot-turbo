@@ -11,63 +11,74 @@
 #include "mulitmesh_render_system.h"
 #include "ecs/components/rendering/rendering_components.h"
 #include "ecs/components/visibility_component.h"
+#include "ecs/components/dirty_transform.h"
 
-void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, PipelineManager& pipeline_manager) const {
-	if(!world){
-		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
-		return;
-	}
-	if (!main_camera.has<CameraComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::create_rendering: CameraComponent not found");
-		return;
-	}
-	if (!world->has<World3DComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::create_rendering: World3D not found");
-		return;
-	}
-	const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
-	if (cam_camera_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::create_rendering: cam_camera_ref not found");
-		return;
-	}
-	const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
-	if (cam_transform_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::create_rendering: cam_transform_ref not found");
-		return;
-	}
+void MultiMeshRenderSystem::create_rendering(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const {
 
-	flecs::system multi_mesh_render_system = world->system<const MultiMeshComponent>()
-			
+
+	world->component<FrameCounter>();
+	world->set<FrameCounter>({});
+
+	flecs::system multi_mesh_render_system = world->system<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
 			.multi_threaded()
-					.cache_kind(flecs::QueryCacheAuto)
+			.cache_kind(flecs::QueryCacheAuto)
 			.with<VisibilityComponent>()
 			.without<FrustumCulled>()
 			.without<Occluded>()
-			.each([&](flecs::entity multi_mesh, const MultiMeshComponent &mmc) {
-				multi_mesh.children([&](flecs::entity child) {
-					const auto mmi_comp = child.try_get<MultiMeshInstanceComponent>();
-					const auto transform_comp = child.try_get<Transform3DComponent>();
-					const auto visibility_comp = child.try_get<VisibilityComponent>();
-					if (mmi_comp == nullptr || transform_comp == nullptr || visibility_comp == nullptr) {
-						ERR_PRINT("MultiMeshRenderSystem: Missing required components on child entity.");
+			.with<DirtyTransform>()
+			.detect_changes()
+			.each([&](flecs::entity mm_instance, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform_comp, const VisibilityComponent &visibility_comp) {
+					
+					if(!world){
+						ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 						return;
 					}
+					if (!main_camera.has<CameraComponent>()) {
+						ERR_PRINT("MultiMeshRenderSystem::create_rendering: CameraComponent not found");
+						return;
+					}
+					if (!world->has<World3DComponent>()) {
+						ERR_PRINT("MultiMeshRenderSystem::create_rendering: World3D not found");
+						return;
+					}
+					const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
+					if (cam_camera_ref == nullptr) {
+						ERR_PRINT("MultiMeshRenderSystem::create_rendering: cam_camera_ref not found");
+						return;
+					}
+					const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
+					if (cam_transform_ref == nullptr) {
+						ERR_PRINT("MultiMeshRenderSystem::create_rendering: cam_transform_ref not found");
+						return;
+					}
+					auto& fc = world->get_mut<FrameCounter>().frame;
 					
-					if (visibility_comp->visible) {
-						command_queue.enqueue([=](){
-							RS::get_singleton()->multimesh_instance_set_transform(mmc.multi_mesh_id, mmi_comp->index, transform_comp->transform);
+					const int batch_size = 50000;
+					int idx = mm_instance.id() % batch_size;
+					if(idx != (fc % batch_size)) {
+						// Skip this instance if the index does not match the current frame
+						return;
+					}
+					fc++;
+					if (visibility_comp.visible) {
+						command_handler->enqueue_command([=](){
+						//Set the transform of the multimesh instance
+						const MultiMeshComponent& mmc = mm_instance.parent().get<MultiMeshComponent>();
+							RS::get_singleton()->multimesh_instance_set_transform(mmc.multi_mesh_id, mmi_comp.index, transform_comp.transform);
+							mm_instance.remove<DirtyTransform>();
 						});
 					} else {
 						//Set it far away from render distance
 						Transform3D far_transform;
 						const Vector3 far_pos = cam_transform_ref->transform.get_origin() + Vector3(far_dist, far_dist, far_dist);
 						far_transform.set_origin(far_pos);
-						command_queue.enqueue([=]() {
-							RS::get_singleton()->multimesh_instance_set_transform(mmc.multi_mesh_id, mmi_comp->index, far_transform);
+						const MultiMeshComponent& mmc = mm_instance.parent().get<MultiMeshComponent>();
+						command_handler->enqueue_command([=]() {
+							RS::get_singleton()->multimesh_instance_set_transform(mmc.multi_mesh_id, mmi_comp.index, far_transform);
+							mm_instance.remove<DirtyTransform>();
 						});
 
 					}
-			});
 		});
 	multi_mesh_render_system.set_name("MultiMeshRenderSystem: Render");
 	flecs::entity_t phase = pipeline_manager.create_custom_phase("MultiMeshRenderSystem: Render", "OcclusionSystem/Occludee: OcclusionCull");
@@ -76,53 +87,52 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 }
 
 
- void MultiMeshRenderSystem::create_frustum_culling(CommandQueue &command_queue, PipelineManager& pipeline_manager) const {
+ void MultiMeshRenderSystem::create_frustum_culling(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const {
 	if(!world){
 		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 		return;
 	}
-	if (!main_camera.has<CameraComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: CameraComponent not found");
-		return;
-	}
-	if (!world->has<World3DComponent>()) {
-		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: World3D not found");
-		return;
-	}
-	const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
-	if (cam_camera_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: cam_camera_ref not found");
-		return;
-	}
-	const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
-	if (cam_transform_ref == nullptr) {
-		ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: cam_transform_ref not found");
-		return;
-	}
 
 
-	flecs::system frustum_culling_system = world->system<const MultiMeshComponent, const MeshComponent>("MultiMeshRenderSystem: FrustumCulling")
+	flecs::system frustum_culling_system = world->system<const MultiMeshInstanceComponent, const Transform3DComponent,const VisibilityComponent>("MultiMeshRenderSystem: FrustumCulling")
 			
 			.multi_threaded()
-					.each([&](flecs::entity entity, const MultiMeshComponent &mmc, const MeshComponent &mesh_comp) {
-				entity.children([&](flecs::entity child) {
-					const auto mmi_comp = child.try_get<MultiMeshInstanceComponent>();
-					const auto transform_comp = child.try_get<Transform3DComponent>();
-					const auto visibility_comp = child.try_get<VisibilityComponent>();
-					if (mmi_comp == nullptr || transform_comp == nullptr || visibility_comp == nullptr) {
-						ERR_PRINT("MultiMeshRenderSystem: Missing required components on child entity.");
+			.detect_changes()
+			.interval(0.016)
+			.each([&](flecs::entity mm_instance, const MultiMeshInstanceComponent &mmi_comp, const Transform3DComponent &transform_comp, const VisibilityComponent &visibility_comp) {
+					if(!world){
+						ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 						return;
 					}
-					if (!visibility_comp->visible) {
+					if (!main_camera.has<CameraComponent>()) {
+						ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: CameraComponent not found");
 						return;
 					}
-					command_queue.enqueue([=]() {
-						AABB local_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh_comp.mesh_id);
+					if (!world->has<World3DComponent>()) {
+						ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: World3D not found");
+						return;
+					}
+					const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
+					if (cam_camera_ref == nullptr) {
+						ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: cam_camera_ref not found");
+						return;
+					}
+					const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
+					if (cam_transform_ref == nullptr) {
+						ERR_PRINT("MultiMeshRenderSystem::create_frustum_culling: cam_transform_ref not found");
+						return;
+					}
+
+					if (!visibility_comp.visible) {
+						return;
+					}
+					command_handler->enqueue_command([=]() {
+						AABB local_aabb = mm_instance.parent().get<MeshComponent>().custom_aabb;
 						AABB world_aabb = local_aabb;
-						world_aabb.set_position(local_aabb.position + transform_comp->transform.get_origin());
-						world_aabb.set_size(local_aabb.size * transform_comp->transform.get_basis().get_scale());
-						world_aabb.set_size(transform_comp->transform.basis.get_scale());
-						
+						world_aabb.set_position(local_aabb.position + transform_comp.transform.get_origin());
+						world_aabb.set_size(local_aabb.size * transform_comp.transform.get_basis().get_scale());
+						world_aabb.set_size(transform_comp.transform.basis.get_scale());
+
 						Plane frustum_planes[6];
 						for (int i = 0; i < 6; i++) {
 							frustum_planes[i] = cam_camera_ref->frustum[i];
@@ -130,14 +140,13 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 						
 						for (int i = 0; i < 6; ++i) {
 							if (!world_aabb.intersects_plane(frustum_planes[i])) {
-								child.add<FrustumCulled>();
+								mm_instance.add<FrustumCulled>();
 							} else {
-								child.remove<FrustumCulled>();
+								mm_instance.remove<FrustumCulled>();
 							}
 						}
 					});
 				});
-			});
 	frustum_culling_system.set_name("MultiMeshRenderSystem: FrustumCulling");
 	pipeline_manager.add_to_pipeline(frustum_culling_system, flecs::OnUpdate);
 }
@@ -145,6 +154,8 @@ void MultiMeshRenderSystem::create_rendering(CommandQueue& command_queue, Pipeli
 void MultiMeshRenderSystem::_bind_methods() {
  	//ClassDB::bind_static_method(get_class_static(),"get_singleton",&MultiMeshRenderSystem::get_singleton);
 }
+
+
 
 // MultiMeshRenderSystem *MultiMeshRenderSystem::get_singleton() {
 //  	if (!Engine::get_singleton()->has_singleton("MultiMeshRenderSystem")) {

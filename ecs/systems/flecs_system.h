@@ -21,5 +21,4 @@ class FlecsSystem : public Resource {
 	void _set_world(flecs::world *p_world);
     void set_world(FlecsWorld* p_world);
     static void _bind_methods();
-
 };

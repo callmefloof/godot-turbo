@@ -22,9 +22,10 @@
 struct MeshComponent {
 	RID mesh_id;
 	Vector<RID> material_ids;
+	AABB custom_aabb;
 	MeshComponent() = default;
 	~MeshComponent() = default;
-	MeshComponent(const RID& id, const Vector<RID>& material_ids) : mesh_id(id) , material_ids(material_ids) {}
+	MeshComponent(const RID& id, const Vector<RID>& material_ids, const AABB& custom_aabb) : mesh_id(id) , material_ids(material_ids), custom_aabb(custom_aabb) {}
 };
 
 

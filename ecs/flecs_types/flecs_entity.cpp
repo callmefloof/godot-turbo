@@ -230,7 +230,7 @@ void FlecsEntity::set_parent(const Ref<FlecsEntity> &p_parent) {
 		parent = flecs::entity();
 		gd_parent = Ref<FlecsEntity>();
 	}
-	entity.set(flecs::ChildOf, parent);
+	entity.add(flecs::ChildOf, parent);
 }
 
 flecs::entity FlecsEntity::get_internal_parent() const {
@@ -273,7 +273,18 @@ void FlecsEntity::add_child(const Ref<FlecsEntity> &child) {
 		ERR_PRINT("Cannot add an invalid child entity.");
 		return;
 	}
+	for(auto &existing_child : children) {
+		if (existing_child == child) {
+			return;
+		}
+	}
 	children.append(child);
+	if(entity.has(flecs::ChildOf, child->get_internal_entity())) {
+		return;
+	}
+	if(child->get_internal_entity().parent() == entity) {
+		return;
+	}
 	entity.add(flecs::ChildOf, child->get_internal_entity());
 }
 

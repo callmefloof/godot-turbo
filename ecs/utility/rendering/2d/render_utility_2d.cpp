@@ -13,10 +13,10 @@ flecs::entity RenderUtility2D::_create_mesh_instance(const flecs::world *world, 
         }
     }
     const RID canvas_item = RS::get_singleton()->canvas_item_create();
-
+    const AABB custom_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh_id);
 
     const flecs::entity entity = world->entity()
-                            .set<MeshComponent>({ mesh_id, material_ids })
+                            .set<MeshComponent>({ mesh_id, material_ids, custom_aabb })
                             .set<Transform2DComponent>({ transform }) // Default transform
                             .set<CanvasItemComponent>({ canvas_item, "MeshInstance2D" })
                             .set<VisibilityComponent>({ true }) // Default visibility
@@ -56,10 +56,11 @@ flecs::entity RenderUtility2D::_create_mesh_instance(const flecs::world *world, 
     ObjectInstanceComponent object_instance_component;
     object_instance_component.object_instance_id = mesh_instance_2d->get_instance_id();
     NodeStorage::add(mesh_instance_2d, mesh_instance_2d->get_instance_id());
+    AABB custom_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh->get_rid());
     return world->entity()
-            .set<MeshComponent>({ mesh->get_rid(), material_ids })
+            .set<MeshComponent>({ mesh->get_rid(), material_ids, custom_aabb })
             .set<CanvasItemComponent>({ canvas_item, mesh_instance_2d->get_class_name() })
-            .set<Transform2DComponent>({ mesh_instance_2d->get_transform() })
+            .set<Transform2DComponent>({ mesh_instance_2d->get_transform() }).add<DirtyTransform>()
             .set<VisibilityComponent>({ true })
             .set<ObjectInstanceComponent>(object_instance_component)
             .set_name(String(mesh_instance_2d->get_name()).ascii().get_data());
@@ -76,11 +77,12 @@ flecs::entity RenderUtility2D::_create_multi_mesh(const flecs::world *world, con
     for(int i = 0; i < mesh->get_surface_count(); i++){
         material_ids.write[i] = mesh->surface_get_material(i)->get_rid();
     }
+    AABB custom_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh->get_rid());
     const flecs::entity entity = world->entity()
                             .set<MultiMeshComponent>({ multi_mesh_id, size })
-                            .set<MeshComponent>({ mesh->get_rid(), material_ids})
+                            .set<MeshComponent>({ mesh->get_rid(), material_ids, custom_aabb })
                             .set<CanvasItemComponent>({ canvas_item })
-                            .set<Transform2DComponent>({ transform })
+                            .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
                             .set<VisibilityComponent>({ true })
                             .set_name(name.ascii().get_data());
 
@@ -124,9 +126,10 @@ flecs::entity RenderUtility2D::_create_multi_mesh(const flecs::world *world, Mul
     ObjectInstanceComponent object_instance_component;
     object_instance_component.object_instance_id = multi_mesh_instance->get_instance_id();
     NodeStorage::add(multi_mesh_instance, multi_mesh_instance->get_instance_id());
+    const AABB custom_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh->get_rid());
     const flecs::entity entity = world->entity()
                             .set<MultiMeshComponent>({ multi_mesh_id, static_cast<uint32_t>(multi_mesh_ref->get_instance_count()) })
-                            .set<MeshComponent>({ mesh->get_rid(), material_ids })
+                            .set<MeshComponent>({ mesh->get_rid(), material_ids, custom_aabb })
                             .set<CanvasItemComponent>({ canvas_item, "MultiMesh2D" })
                             .set<Transform2DComponent>({ transform })
                             .set<VisibilityComponent>({ true })
@@ -143,7 +146,7 @@ flecs::entity RenderUtility2D::_create_multi_mesh(const flecs::world *world, Mul
 flecs::entity RenderUtility2D::_create_multi_mesh_instance(const flecs::world *world, const Transform2D &transform, const uint32_t index, const String &name)  {
     return world->entity()
             .set<MultiMeshInstanceComponent>({ index })
-            .set<Transform2DComponent>({ transform })
+            .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
             .set<VisibilityComponent>({ true })
             .set_name(name.ascii().get_data());
 }
@@ -164,7 +167,7 @@ Vector<flecs::entity> RenderUtility2D::_create_multi_mesh_instances(
 flecs::entity RenderUtility2D::_create_camera_2d(const flecs::world *world, const RID &camera_id, const Transform2D &transform, const String &name)  {
     return world->entity()
         .set<CameraComponent>({ camera_id })
-        .set<Transform2DComponent>({ transform })
+        .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
         .set_name(name.ascii().get_data());
 }
 
@@ -180,7 +183,7 @@ flecs::entity RenderUtility2D::_create_camera_2d(const flecs::world *world, Came
     object_instance_component.object_instance_id = camera_2d->get_instance_id();
     NodeStorage::add(camera_2d, camera_2d->get_instance_id());
     const flecs::entity camera = world->entity()
-                            .set<Transform2DComponent>({ camera_2d->get_transform() })
+                            .set<Transform2DComponent>({ camera_2d->get_transform() }).add<DirtyTransform>()
                             .set<CameraComponent>({ camera_id })
                             .set<ObjectInstanceComponent>(object_instance_component)
                             .set_name(String(camera_2d->get_name()).ascii().get_data());
@@ -199,7 +202,7 @@ flecs::entity RenderUtility2D::_create_directional_light(const flecs::world *wor
     RS::get_singleton()->canvas_light_set_mode(light_id, RS::CanvasLightMode::CANVAS_LIGHT_MODE_DIRECTIONAL);
     const flecs::entity directional_light = world->entity()
                                         .set<DirectionalLight2DComponent>({ light_id })
-                                        .set<Transform2DComponent>({ transform })
+                                        .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
                                         .set<VisibilityComponent>({ true }) // Default visibility
                                         .set_name(name.ascii().get_data());
     return directional_light;
@@ -246,7 +249,7 @@ flecs::entity RenderUtility2D::_create_directional_light(const flecs::world *wor
 
     auto &entity = world->entity()
                             .set<DirectionalLight2DComponent>({ light_id })
-                            .set<Transform2DComponent>({ directional_light->get_transform() })
+                            .set<Transform2DComponent>({ directional_light->get_transform() }).add<DirtyTransform>()
                             .set_name(String(directional_light->get_name()).ascii().get_data())
                             .set<ObjectInstanceComponent>(object_instance_component)
                             .set<VisibilityComponent>({ true }); // Default visibility
@@ -274,7 +277,7 @@ flecs::entity RenderUtility2D::_create_point_light(const flecs::world *world, co
     RS::get_singleton()->canvas_light_set_mode(light_id, RS::CanvasLightMode::CANVAS_LIGHT_MODE_POINT);
     const flecs::entity point_light = world->entity()
                                         .set<DirectionalLight2DComponent>({ light_id })
-                                        .set<Transform2DComponent>({ transform })
+                                        .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
                                         .set<VisibilityComponent>({ true }) // Default visibility
                                         .set_name(name.ascii().get_data());
     return point_light;
@@ -319,7 +322,7 @@ flecs::entity RenderUtility2D::_create_point_light(const flecs::world *world, Po
     NodeStorage::add(point_light, point_light->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<PointLightComponent>({ light_id })
-                            .set<Transform2DComponent>({ point_light->get_transform() })
+                            .set<Transform2DComponent>({ point_light->get_transform() }).add<DirtyTransform>()
                             .set_name(String(point_light->get_name()).ascii().get_data())
                             .set<ObjectInstanceComponent>(object_instance_component)
                             .set<VisibilityComponent>({ true }); // Default visibility
@@ -336,7 +339,7 @@ flecs::entity RenderUtility2D::_create_canvas_item(const flecs::world *world, Ca
     NodeStorage::add(canvas_item, canvas_item->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<CanvasItemComponent>({ canvas_item->get_canvas_item(), canvas_item->get_class() })
-                            .set<Transform2DComponent>({canvas_item->get_transform()})
+                            .set<Transform2DComponent>({canvas_item->get_transform()}).add<DirtyTransform>()
                             .set<ObjectInstanceComponent>(object_instance_component)
                             .set<VisibilityComponent>({ canvas_item->is_visible() }) // Default visibility
                             .set_name(String(canvas_item->get_name()).ascii().get_data());
@@ -350,7 +353,7 @@ flecs::entity RenderUtility2D::_create_canvas_item(const flecs::world *world, Ca
 flecs::entity RenderUtility2D::_create_canvas_item(const flecs::world *world, const RID &canvas_item_id, const Transform2D &transform, const String &name, const String &class_name) {
     return world->entity()
             .set<CanvasItemComponent>({ canvas_item_id, class_name })
-            .set<Transform2DComponent>({ transform })
+            .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
             .set<VisibilityComponent>({ true }) // Default visibility
             .set_name(name.ascii().get_data());
 }
@@ -379,7 +382,7 @@ flecs::entity RenderUtility2D::_create_skeleton(const flecs::world *world, Skele
     NodeStorage::add(skeleton_2d, skeleton_2d->get_instance_id());
     return world->entity()
             .set<SkeletonComponent>({ skeleton_id })
-            .set<Transform2DComponent>({ skeleton_2d->get_transform() })
+            .set<Transform2DComponent>({ skeleton_2d->get_transform() }).add<DirtyTransform>()
             .set<ObjectInstanceComponent>(object_instance_component)
             .set<VisibilityComponent>({ skeleton_2d->is_visible() }) // Default;
             .set_name(String(skeleton_2d->get_name()).ascii().get_data());
@@ -408,7 +411,7 @@ flecs::entity RenderUtility2D::_create_light_occluder(const flecs::world *world,
     NodeStorage::add(light_occluder, light_occluder->get_instance_id());
     const flecs::entity entity = world->entity()
                             .set<LightOccluderComponent>({light_occluder_id})
-                            .set<Transform2DComponent>({ light_occluder->get_transform() })
+                            .set<Transform2DComponent>({ light_occluder->get_transform() }).add<DirtyTransform>()
                             .set<ObjectInstanceComponent>(object_instance_component)
                             .set<VisibilityComponent>({ light_occluder->is_visible() }) // Default visibility
                             .set_name(name.ascii().get_data());
@@ -419,7 +422,7 @@ flecs::entity RenderUtility2D::_create_light_occluder(const flecs::world *world,
 flecs::entity RenderUtility2D::_create_light_occluder(const flecs::world *world, const RID &light_occluder_id, const Transform2D &transform, const RID &canvas_id, const String &name)  {
     const auto entity = world->entity()
                             .set<LightOccluderComponent>({ light_occluder_id })
-                            .set<Transform2DComponent>({ transform })
+                            .set<Transform2DComponent>({ transform }).add<DirtyTransform>()
                             .set<VisibilityComponent>({ true }) // Default visibility
                             .set_name(name.ascii().get_data());
     RS::get_singleton()->canvas_light_occluder_attach_to_canvas(light_occluder_id, canvas_id);

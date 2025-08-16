@@ -70,13 +70,13 @@ void set_field_value(T &field, const Variant &v, const StringName &name) {
 Type get_##Name() const { \
 	if (!owner.is_alive()) { \
 	if (!Engine::get_singleton()->is_editor_hint()) { \
-	ERR_PRINT("Owner entity is not alive"); \
+	/*ERR_PRINT("Owner entity is not alive");*/ \
 	} \
 	return Type(); \
 	} \
 	if (!owner.has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("Entity does not have component " #Component); \
+		/*ERR_PRINT("Entity does not have component " #Component);*/ \
 		} \
 		return Type(); \
 	} \
@@ -85,13 +85,13 @@ Type get_##Name() const { \
 	void set_##Name(Type val) { \
 	if (!owner.is_alive()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("Owner entity is not alive"); \
+			/*ERR_PRINT("Owner entity is not alive");*/ \
 		} \
 		return; \
 	} \
 	if (!owner.has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("Entity does not have component " #Component); \
+			/*ERR_PRINT("Entity does not have component " #Component);*/ \
 		} \
 		return; \
 	} \
@@ -104,13 +104,13 @@ Type get_##Name() const { \
 Type get_##Name() const { \
 	if (!world) { \
 	if (!Engine::get_singleton()->is_editor_hint()) { \
-	ERR_PRINT("World is not alive"); \
+	/*ERR_PRINT("World is not alive"); */ \
 	} \
 	return Type(); \
 	} \
 	if (!world->has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("World does not have component " #Component); \
+			/*ERR_PRINT("World does not have component " #Component);*/ \
 		} \
 		return Type(); \
 	} \
@@ -119,13 +119,13 @@ Type get_##Name() const { \
 	void set_##Name(Type val) { \
 	if (!world) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("World is not alive"); \
+			/*ERR_PRINT("World is not alive"); */ \
 		} \
 		return; \
 	} \
 	if (!world->has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("World does not have component " #Component); \
+			/*ERR_PRINT("World does not have component " #Component);*/ \
 		} \
 		return; \
 	} \
@@ -138,7 +138,7 @@ TypedArray<Type> get_##Name() const { \
 	TypedArray<Type> arr; \
 	if (!world->c_ptr()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("World is not alive"); \
+			/*ERR_PRINT("World is not alive"); */ \
 		} \
 		return arr; \
 	} \
@@ -159,19 +159,19 @@ TypedArray<Type> get_##Name() const { \
 void set_##Name(const TypedArray<Type> &arr) { \
 	if (!world->c_ptr()) { \
 	if (!Engine::get_singleton()->is_editor_hint()) { \
-	ERR_PRINT("World is not alive"); \
+	/*ERR_PRINT("World is not alive"); */ \
 	} \
 	return; \
 	} \
 	if (!world->has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("World does not have component " #Component); \
+			/*ERR_PRINT("World does not have component " #Component);*/ \
 		} \
 		return; \
 	} \
 	auto c = try_get_typed_data<Component>(); \
 	if(!c){\
-		ERR_PRINT("Component data is null, array data was not set.");\
+		/* ERR_PRINT("Component data is null, array data was not set."); */ \
 		return;\
 	}\
 	c->Name.clear(); \
@@ -184,19 +184,19 @@ TypedArray<Type> get_##Name() const { \
 	TypedArray<Type> arr; \
 	if (!owner.is_alive()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("Owner entity is not alive"); \
+			/*ERR_PRINT("Owner entity is not alive"); */ \
 		} \
 		return arr; \
 	} \
 	if (!owner.has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-		ERR_PRINT("Entity does not have component " #Component); \
+			/*ERR_PRINT("Entity does not have component " #Component);*/ \
 		} \
 		return arr; \
 	} \
 	auto c = try_get_typed_data<Component>(); \
 	if(!c) {\
-		ERR_PRINT("Component data is null, returning empty array.");\
+		/*ERR_PRINT("Component data is null, returning empty array.");*/\
 		return arr;\
 	}\
 	for (auto &e : c->Name) { arr.push_back(e); }\
@@ -205,19 +205,19 @@ TypedArray<Type> get_##Name() const { \
 void set_##Name(const TypedArray<Type> &arr) { \
 	if (!owner.is_alive()) { \
 	if (!Engine::get_singleton()->is_editor_hint()) { \
-	ERR_PRINT("Owner entity is not alive"); \
+		/*ERR_PRINT("Owner entity is not alive"); */ \
 	} \
 	return; \
 	} \
 	if (!owner.has<Component>()) { \
 		if (!Engine::get_singleton()->is_editor_hint()) { \
-			ERR_PRINT("Entity does not have component " #Component); \
+			/*ERR_PRINT("Entity does not have component " #Component);*/ \
 		} \
 		return; \
 	} \
 	auto c = try_get_typed_data<Component>(); \
 	if(!c){\
-		ERR_PRINT("Component data is null, array data was not set.");\
+		/* ERR_PRINT("Component data is null, array data was not set.");*/ \
 		return;\
 	}\
 	c->Name.clear(); \

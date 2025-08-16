@@ -1,4 +1,3 @@
-
 #ifdef DEFINE_COMPONENT_PROXY
 #pragma message("DEFINE_COMPONENT_PROXY is defined here")
 #else
@@ -389,7 +388,7 @@ FlecsWorld::FlecsWorld(/* args */) : pipeline_manager(&world) {
 	transform_2d_info.creator = []() { return memnew(Transform2DComponentRef); };
 	transform_2d_info.apply = [](const flecs::entity &e, Ref<Transform2DComponentRef> comp_ref) {
 		Ref<Transform2DComponentRef> transform_2d_comp = comp_ref;
-		e.set<Transform2DComponent>(transform_2d_comp->get_data());
+		e.set<Transform2DComponent>(transform_2d_comp->get_data()).add<DirtyTransform>();
 	};
 	component_registry.insert(StringName(transform_2d_component.name()), transform_2d_info);
 	
@@ -400,7 +399,7 @@ FlecsWorld::FlecsWorld(/* args */) : pipeline_manager(&world) {
 	transform_3d_info.creator = []() { return memnew(Transform3DComponentRef); };
 	transform_3d_info.apply = [](const flecs::entity &e, Ref<Transform3DComponentRef> comp_ref) {
 		Ref<Transform3DComponentRef> transform_3d_comp = comp_ref;
-		e.set<Transform3DComponent>(transform_3d_comp->get_data());
+		e.set<Transform3DComponent>(transform_3d_comp->get_data()).add<DirtyTransform>();
 	};
 	component_registry.insert(StringName(transform_3d_components.name()), transform_3d_info);
 
@@ -451,7 +450,6 @@ FlecsWorld::FlecsWorld(/* args */) : pipeline_manager(&world) {
 
 FlecsWorld::~FlecsWorld()
 {
-	system_command_queue.clear();
 	world.quit();
 	NodeStorage::release_all();
 	RefStorage::release_all();
@@ -468,9 +466,15 @@ FlecsWorld::~FlecsWorld()
 }
 
 void FlecsWorld::init_world() {
-	world.import<flecs::stats>();
-	world.set<flecs::Rest>({});
+	//world.import<flecs::stats>();
+	//world.set<flecs::Rest>({});
     print_line("World initialized: " + itos((uint64_t)world.c_ptr()));
+	auto threads = std::thread::hardware_concurrency();
+	print_line("Detected hardware concurrency: " + itos(threads));
+	world.set_threads(threads);
+	system_command_handler = memnew(CommandHandler);
+	command_handler_callback = Callable(system_command_handler.ptr(), "process_command");
+
 
 }
 
@@ -487,7 +491,8 @@ bool FlecsWorld::progress(const double delta) {
 		sys->run();
 	}
 	const bool progress = world.progress(delta);
-	system_command_queue.process();
+
+	RS::get_singleton()->call_on_render_thread(command_handler_callback);
 
 	return progress;
 }
@@ -628,6 +633,7 @@ Ref<FlecsEntity> FlecsWorld::add_entity(const flecs::entity &e) {
 	Ref<FlecsEntity> new_entity = memnew(FlecsEntity);
 	auto entity_iter = entities.insert(e, new_entity);
 	new_entity->set_entity(e);
+	new_entity->set_internal_world(&world);
 	new_entity->set_name(e.name().c_str());
 	
 	e.each([&](flecs::id id) {
@@ -657,7 +663,7 @@ Ref<FlecsEntity> FlecsWorld::add_entity(const flecs::entity &e) {
 			// Log or handle the pair
 			String relation_name = relation.name().c_str();
 			String object_name = object.name().c_str();
-			print_line("Pair detected: (" + relation_name + ", " + object_name + ")");
+			//print_line("Pair detected: (" + relation_name + ", " + object_name + ")");
 			FlecsPair *pair = memnew(FlecsPair);
 			pair->set_first(gd_relation);
 			pair->set_second(gd_object);
@@ -696,10 +702,10 @@ void FlecsWorld::init_render_system() {
 	occlusion_system.set_main_camera(main_camera);
 	mesh_render_system.set_main_camera(main_camera);
 
-	multi_mesh_render_system.create_frustum_culling(system_command_queue, pipeline_manager);
-	occlusion_system.create_occlusion_culling(system_command_queue, pipeline_manager);
-	multi_mesh_render_system.create_rendering(system_command_queue, pipeline_manager);
-	mesh_render_system.create_mesh_render_system(system_command_queue, pipeline_manager);
+	multi_mesh_render_system.create_frustum_culling(system_command_handler, pipeline_manager);
+	occlusion_system.create_occlusion_culling(system_command_handler, pipeline_manager);
+	multi_mesh_render_system.create_rendering(system_command_handler, pipeline_manager);
+	mesh_render_system.create_mesh_render_system(system_command_handler, pipeline_manager);
 }
 
 void FlecsWorld::set_log_level(const int level) {
@@ -817,4 +823,29 @@ void FlecsWorld::register_component_type(const StringName &type_name, const Ref<
 	sys->init(this,component_names,callable);
 	script_systems.append(sys);
 }
+
+void FlecsWorld::remove_script_system(const Callable &callable) {
+	for (int i = 0; i < script_systems.size(); i++) {
+		if (script_systems[i].is_null()) {
+			ERR_PRINT("FlecsWorld::remove_script_system: system is null, skipping index " + itos(i));
+			continue;
+		}
+		if (script_systems[i]->get_callback() == callable) {
+			script_systems.remove_at(i);
+			return;
+		}
+	}
+	ERR_PRINT("FlecsWorld::remove_script_system: system not found for callable: " + callable.operator String());
+}
+
+
+
+PipelineManager &FlecsWorld::get_pipeline_manager() {
+	return pipeline_manager;
+}
+
+Ref<CommandHandler> FlecsWorld::get_command_handler() {
+	return system_command_handler;
+}
+
 

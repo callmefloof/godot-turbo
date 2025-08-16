@@ -41,6 +41,12 @@
 #include "ecs/components/object_instance_component.h"
 #include "core/templates/vector.h"
 #include "servers/rendering/renderer_scene_occlusion_cull.h"
+#include <vector>
+#include <algorithm>
+#include <execution>
+#include "ecs/systems/commands/command.h"
+#include "ecs/components/dirty_transform.h"
+
 
 RenderUtility3D::~RenderUtility3D() {
 }
@@ -59,12 +65,14 @@ flecs::entity RenderUtility3D::_create_mesh_instance(const flecs::world *world, 
 	auto mesh_component = MeshComponent();
 	mesh_component.material_ids = material_ids;
 	mesh_component.mesh_id = mesh_id;
+	mesh_component.custom_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh_id);
 
 	return world->entity()
 			.set<MeshComponent>(mesh_component)
 			.set<Transform3DComponent>({ transform }) // Default transform
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(mesh_id, scenario_id) })
 			.set<VisibilityComponent>({ true })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -131,6 +139,7 @@ flecs::entity RenderUtility3D::_create_mesh_instance(const flecs::world *world, 
 			.set<RenderInstanceComponent>({ instance })
 			.set<VisibilityComponent>({ true })
 			.set<ObjectInstanceComponent>(object_instance_component)
+			.add<DirtyTransform>()
 			.set_name(String(mesh->get_name()).ascii().get_data());
 }
 
@@ -158,6 +167,7 @@ flecs::entity RenderUtility3D::_create_multi_mesh(const flecs::world *world,
 										 .set<MeshComponent>(mesh_component)
 										 .set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(multi_mesh_id, scenario_id) })
 										 .set<Transform3DComponent>({ transform })
+										 .add<DirtyTransform>()
 										 .set_name(name.ascii().get_data());
 
 	return entity;
@@ -214,15 +224,57 @@ flecs::entity RenderUtility3D::_create_multi_mesh(const flecs::world *world, Mul
 	}
 	ObjectInstanceComponent object_instance_component;
 	object_instance_component.object_instance_id = multi_mesh_instance->get_instance_id();
+	const AABB custom_aabb = RS::get_singleton()->mesh_get_custom_aabb(mesh_id);
 	const flecs::entity entity = world->entity()
-										 .set<MultiMeshComponent>({ multi_mesh_id, size })
-										 .set<MeshComponent>({ mesh_id, material_ids })
-										 .set<RenderInstanceComponent>({ instance_id })
-										 .set<Transform3DComponent>({ transform })
-										 .set<VisibilityComponent>({ true })
-										 .set<ObjectInstanceComponent>(object_instance_component)
-										 .set_name(name.ascii().get_data());
+										.set<MultiMeshComponent>({ multi_mesh_id, size })
+										.set<MeshComponent>({ mesh_id, material_ids, custom_aabb })
+										.set<RenderInstanceComponent>({ instance_id })
+										.set<Transform3DComponent>({ transform })
+										.set<VisibilityComponent>({ true })
+										.set<ObjectInstanceComponent>(object_instance_component)
+										.add<DirtyTransform>()
+										.set_name(name.ascii().get_data());
+	
+										
+	
+
+		// Create a bulk array of entities
+	std::vector<flecs::entity_t> entities(size);
+
+
+	// Bulk assign components
+	std::vector<MultiMeshInstanceComponent> mm_components(size);
+	std::vector<Transform3DComponent> transforms(size);
+	std::vector<VisibilityComponent> vis(size, { true });
+
+	for (uint32_t i = 0; i < size; ++i) {
+		mm_components[i].index = i;
+		transforms[i].transform = multi_mesh_instance->get_multimesh()->get_instance_transform(i);
+		vis[i].visible = true;
+	}
+
+	
+	std::vector<void*> data(size * 3);
+	data[0] = mm_components.data();
+	data[1] = transforms.data();
+	data[2] = vis.data();
+	data[3] = nullptr; // Needed for pair/tag
+
+	
+	
+	ecs_bulk_desc_t bulk_desc = {0, nullptr, size, {
+		world->lookup("MultiMeshInstanceComponent").id(),
+		world->lookup("Transform3DComponent").id(),
+		world->lookup("VisibilityComponent").id(),
+		world->pair(flecs::ChildOf, entity),
+	}, data.data()};
+
+	auto entity_ids = ecs_bulk_init(world->c_ptr(), &bulk_desc);
+
+
+	
 	NodeStorage::add(multi_mesh_instance, multi_mesh_instance->get_instance_id());
+
 	return entity;
 }
 
@@ -237,9 +289,9 @@ flecs::entity RenderUtility3D::_create_multi_mesh_instance(
 	}
 	return world->entity()
 			.set<MultiMeshInstanceComponent>({ index })
-			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(multi_mesh_id, world->get<World3DComponent>().scenario_id) })
 			.set<Transform3DComponent>({ transform })
 			.set<VisibilityComponent>({ true })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -266,6 +318,7 @@ flecs::entity RenderUtility3D::_create_particles(
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(particles_id, scenario_id) })
 			.set<Transform3DComponent>({ transform })
 			.set<VisibilityComponent>({ true })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -281,12 +334,13 @@ flecs::entity RenderUtility3D::_create_particles(const flecs::world *world, GPUP
 	ObjectInstanceComponent object_instance_component;
 	object_instance_component.object_instance_id = gpu_particles_3d->get_instance_id();
 	auto &particles = world->entity()
-							  .set<ParticlesComponent>({ gpu_particles_3d->get_base() })
-							  .set<RenderInstanceComponent>({ instance_id })
-							  .set<Transform3DComponent>({ gpu_particles_3d->get_transform() })
-							  .set<VisibilityComponent>({ true })
-							  .set<ObjectInstanceComponent>(object_instance_component)
-							  .set_name(String(gpu_particles_3d->get_name()).ascii().get_data());
+							.set<ParticlesComponent>({ gpu_particles_3d->get_base() })
+							.set<RenderInstanceComponent>({ instance_id })
+							.set<Transform3DComponent>({ gpu_particles_3d->get_transform() })
+							.set<VisibilityComponent>({ true })
+							.set<ObjectInstanceComponent>(object_instance_component)
+							.add<DirtyTransform>()
+							.set_name(String(gpu_particles_3d->get_name()).ascii().get_data());
 	NodeStorage::add(gpu_particles_3d, gpu_particles_3d->get_instance_id());
 	return particles;
 }
@@ -333,6 +387,7 @@ flecs::entity RenderUtility3D::_create_skeleton(const flecs::world *world, Skele
 			.set<Transform3DComponent>({ skeleton_3d->get_transform() })
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(skeleton_id, world->get<World3DComponent>().scenario_id) })
 			.set<ObjectInstanceComponent>(object_instance_component)
+			.add<DirtyTransform>()
 			.set_name(String(skeleton_3d->get_name()).ascii().get_data());
 }
 
@@ -368,6 +423,7 @@ flecs::entity RenderUtility3D::_create_camera(const flecs::world *world, const R
 	return world->entity()
 			.set<CameraComponent>({ camera_id })
 			.set<Transform3DComponent>({ transform })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -490,6 +546,7 @@ flecs::entity RenderUtility3D::_create_omni_light(const flecs::world *world, con
 			.set<OmniLightComponent>({ light_id })
 			.set<Transform3DComponent>({ transform })
 			.set<VisibilityComponent>({ true })
+			.add<DirtyTransform>()
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(light_id, scenario_id) });
 }
 
@@ -498,6 +555,8 @@ flecs::entity RenderUtility3D::_create_omni_light(const flecs::world *world, con
 	return world->entity("OmniLight")
 			.set<OmniLightComponent>({ omni_light_id })
 			.set<Transform3DComponent>({ transform })
+			.set<VisibilityComponent>({ true })
+			.add<DirtyTransform>()
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(omni_light_id, scenario_id) });
 }
 
@@ -514,6 +573,7 @@ flecs::entity RenderUtility3D::_create_omni_light(const flecs::world *world, Omn
 										 .set<RenderInstanceComponent>({ omni_light->get_instance() })
 										 .set<ObjectInstanceComponent>(object_instance_component)
 										 .set<VisibilityComponent>({ true })
+										 .add<DirtyTransform>()
 										 .set_name(String(omni_light->get_name()).ascii().get_data());
 	return entity;
 }
@@ -527,6 +587,7 @@ flecs::entity RenderUtility3D::_create_spot_light(const flecs::world *world, con
 			.set<Transform3DComponent>({ transform })
 			.set<VisibilityComponent>({ true })
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(light_id, world->get<World3DComponent>().scenario_id) })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -540,6 +601,7 @@ flecs::entity RenderUtility3D::_create_spot_light(const flecs::world *world, con
 			.set<Transform3DComponent>({ transform })
 			.set<VisibilityComponent>({ true })
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(spot_light_id, world->get<World3DComponent>().scenario_id) })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -564,6 +626,7 @@ flecs::entity RenderUtility3D::_create_spot_light(const flecs::world *world, Spo
 										 .set<SpotLightComponent>({ spot_light->get_base() })
 										 .set<Transform3DComponent>({ spot_light->get_transform() })
 										 .set<VisibilityComponent>({ true })
+										 .add<DirtyTransform>()
 										 .set<ObjectInstanceComponent>(object_instance_component)
 										 .set<RenderInstanceComponent>({ spot_light->get_instance() })
 										 .set_name(String(spot_light->get_name()).ascii().get_data());
@@ -598,6 +661,7 @@ flecs::entity RenderUtility3D::_create_voxel_gi(const flecs::world *world, const
 			.set<Transform3DComponent>({ transform })
 			.set<VisibilityComponent>({ true })
 			.set<RenderInstanceComponent>({ RS::get_singleton()->instance_create2(voxel_gi_id, world->get<World3DComponent>().scenario_id) })
+			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 }
 
@@ -757,7 +821,8 @@ TypedArray<FlecsEntity> RenderUtility3D::create_multi_mesh(FlecsWorld *flecs_wor
 		// If no materials are provided, we can use an empty RID for the mesh component
 		material_ids_vector.push_back(RID());
 	}
-	flecs::entity e = _create_multi_mesh(flecs_world->get_world_ref(), transform, size, mesh_id, material_ids_vector, scenario_id, name, use_colors, use_custom_data, use_indirect);
+	flecs::world* world = flecs_world->get_world_ref();
+	flecs::entity e = _create_multi_mesh(world, transform, size, mesh_id, material_ids_vector, scenario_id, name, use_colors, use_custom_data, use_indirect);
 	Ref<FlecsEntity> flecs_entity = flecs_world->add_entity(e);
 	entities.push_back(flecs_entity);
 	MultiMeshComponentRef::create_component(flecs_entity);
@@ -765,16 +830,27 @@ TypedArray<FlecsEntity> RenderUtility3D::create_multi_mesh(FlecsWorld *flecs_wor
 	Transform3DComponentRef::create_component(flecs_entity);
 	RenderInstanceComponentRef::create_component(flecs_entity);
 	ObjectInstanceComponentRef::create_component(flecs_entity);
+
+	Vector<flecs::entity> entity_buffer;
+	entity_buffer.resize(e.get<MultiMeshComponent>().instance_count);
+	entities.resize(e.get<MultiMeshComponent>().instance_count+1);
+	int i = 0;
 	e.children([&](flecs::entity child) {
+		entity_buffer.write[i] = child;
+		i++;
+	});
+	world->defer_begin();
+	i = 1;
+	for(auto& child : entity_buffer){
 		Ref<FlecsEntity> child_entity = flecs_world->add_entity(child);
-		entities.push_back(child_entity);
+		entities.set(i,child_entity);
 		MultiMeshInstanceComponentRef::create_component(child_entity);
-		RenderInstanceComponentRef::create_component(child_entity);
 		Transform3DComponentRef::create_component(child_entity);
 		VisibilityComponentRef::create_component(child_entity);
-		ObjectInstanceComponentRef::create_component(child_entity);
-	});
-
+		i++;
+	}
+	
+	world->defer_end();
 	return entities;
 }
 
@@ -786,7 +862,8 @@ TypedArray<FlecsEntity> RenderUtility3D::create_multi_mesh_with_object(FlecsWorl
 	if(multi_mesh_instance_3d->get_multimesh().is_null()){
 		ERR_FAIL_COND_V(multi_mesh_instance_3d->get_multimesh().is_null(),entities);
 	}
-	flecs::entity e = _create_multi_mesh(flecs_world->get_world_ref(), multi_mesh_instance_3d);
+	flecs::world* world = flecs_world->get_world_ref();
+	flecs::entity e = _create_multi_mesh(world, multi_mesh_instance_3d);
 	Ref<FlecsEntity> flecs_entity = flecs_world->add_entity(e);
 	entities.push_back(flecs_entity);
 	MultiMeshComponentRef::create_component(flecs_entity);
@@ -794,15 +871,33 @@ TypedArray<FlecsEntity> RenderUtility3D::create_multi_mesh_with_object(FlecsWorl
 	RenderInstanceComponentRef::create_component(flecs_entity);
 	Transform3DComponentRef::create_component(flecs_entity);
 	ObjectInstanceComponentRef::create_component(flecs_entity);
+
+	Vector<flecs::entity> entity_buffer;
+	entity_buffer.resize(e.get<MultiMeshComponent>().instance_count);
+	int i = 0;
 	e.children([&](flecs::entity child) {
+		if (child.is_alive() == false) {
+			// Skip dead entities
+			return;
+		}
+		entity_buffer.write[i] = child;
+		i++;
+	});
+	world->defer_begin();
+	i = 1;
+
+	entities.resize(e.get<MultiMeshComponent>().instance_count+1);
+	entities.set(0,flecs_entity);
+	for(auto& child : entity_buffer){
 		Ref<FlecsEntity> child_entity = flecs_world->add_entity(child);
-		entities.push_back(child_entity);
+		entities.set(i,child_entity);
 		MultiMeshInstanceComponentRef::create_component(child_entity);
-		RenderInstanceComponentRef::create_component(child_entity);
 		Transform3DComponentRef::create_component(child_entity);
 		VisibilityComponentRef::create_component(child_entity);
-		ObjectInstanceComponentRef::create_component(child_entity);
-	});
+		i++;
+	}
+	
+	world->defer_end();
 	return entities;
 }
 

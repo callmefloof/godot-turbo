@@ -15,6 +15,7 @@
 #include "ecs/systems/rendering/occlusion/occlusion_system.h"
 #include "ecs/systems/rendering/mesh_render_system.h"
 #include "flecs_pair.h"
+#include "core/variant/callable.h"
 
 class ScriptVisibleComponentRef;
 
@@ -46,11 +47,12 @@ private:
 	ecs_entity_t OnCollisions = ecs_new_w_id(world, EcsPhase);
 	Vector<Ref<FlecsScriptSystem>> script_systems;
 	AHashMap<flecs::entity,Ref<FlecsEntity>> entities;
-	CommandQueue system_command_queue;
+	Ref<CommandHandler> system_command_handler;
 	MultiMeshRenderSystem multi_mesh_render_system;
 	MeshRenderSystem mesh_render_system;
 	OcclusionSystem occlusion_system;
 	PipelineManager pipeline_manager;
+	Callable command_handler_callback;
 	/* data */
 protected:
 	static void _bind_methods();
@@ -64,6 +66,7 @@ public:
 	bool progress(const double delta);
 	void register_component_type(const StringName &type_name, const Ref<ScriptVisibleComponentRef> &script_visible_component_ref) const;
 	void add_script_system(const Array &component_types, const Callable &callable);
+	void remove_script_system(const Callable &callable);
 	void set_component(const Ref<FlecsComponentBase> &comp_ref);
 	Ref<FlecsComponentBase> get_component(const StringName &component_type) const;
 	bool has_component(const StringName &component_type) const;
@@ -84,6 +87,9 @@ public:
 	void remove_relationship(const StringName &first_entity, const StringName &second_entity);
 	Ref<FlecsPair> get_relationship(const StringName &first_entity, const StringName &second_entity) const;
 	TypedArray<FlecsPair> get_relationships() const;
+	Ref<CommandHandler> get_command_handler();
+	PipelineManager &get_pipeline_manager();
+
 
 };
 

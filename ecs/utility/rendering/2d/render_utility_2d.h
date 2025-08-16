@@ -16,6 +16,7 @@
 #include "../flecs_types/flecs_world.h"
 #include "ecs/utility/ref_storage.h"
 #include "ecs/utility/node_storage.h"
+#include "ecs/components/dirty_transform.h"
 
 
 class RenderUtility2D : public Object{

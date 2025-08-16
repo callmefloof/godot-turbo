@@ -8,7 +8,7 @@
 #include "ecs/components/transform_3d_component.h"
 #include "../../commands/command.h"
 
-void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, PipelineManager &pipeline_manager) {
+void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_handler, PipelineManager &pipeline_manager) {
 	if(!world){
 		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 		return;
@@ -21,20 +21,23 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: World3D not found");
 		return;
 	}
-	const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
-	if (cam_camera_ref == nullptr) {
-		ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_camera_ref not found");
-		return;
-	}
-	const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
-	if (cam_transform_ref == nullptr) {
-		ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_transform_ref not found");
-		return;
-	}
+	
 	flecs::system occlusion_update_tris = world->system<Occluder>()
 	.multi_threaded()
 	.without<FrustumCulled>()
+	.detect_changes()
+	.interval(0.016)
 	.each([&](flecs::entity entity, Occluder& occ ) {
+		const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
+		if (cam_camera_ref == nullptr) {
+			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_camera_ref not found");
+			return;
+		}
+		const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
+		if (cam_transform_ref == nullptr) {
+			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_transform_ref not found");
+			return;
+		}
 		if(!entity.parent().is_valid()){
 			//ERR_PRINT_ONCE("OcclusionSystem::create_occlusion_culling: entity parent is not valid");
 			return;
@@ -66,6 +69,8 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 	.without<FrustumCulled>()
 	.with<Transform3DComponent>()
 	.with<VisibilityComponent>()
+	.interval(0.016)
+	.detect_changes()
 	.each([](flecs::entity entity, Occludee& occludee){
 		const auto& transform = entity.parent().get<Transform3DComponent>();
 		occludee.worldAABB.position = occludee.aabb.position + transform.transform.get_origin();
@@ -79,6 +84,8 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 	flecs::system binning = world->system<const Occluder>()
 	.multi_threaded()
 	.without<FrustumCulled>()
+	.detect_changes()
+	.interval(0.016)
 	.each([&](flecs::entity entity, const Occluder& occ) {
 		if(!entity.parent().is_valid()){
 			//ERR_PRINT_ONCE("OcclusionSystem::create_occlusion_culling: entity parent is not valid");
@@ -108,7 +115,20 @@ void OcclusionSystem::create_occlusion_culling(CommandQueue &command_queue, Pipe
 	flecs::system occlusion_cull = world->system<Occludee>()
 	.multi_threaded()
 	.without<FrustumCulled>()
+	.with<DirtyTransform>()
+	.detect_changes()
+	.interval(0.016)
 	.each([=](flecs::entity entity, Occludee& occludee){
+		const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
+		if (cam_camera_ref == nullptr) {
+			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_camera_ref not found");
+			return;
+		}
+		const auto cam_transform_ref = main_camera.try_get<Transform3DComponent>();
+		if (cam_transform_ref == nullptr) {
+			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_transform_ref not found");
+			return;
+		}
 		if (!tile_occlusion_manager.is_visible(ScreenAABB::aabb_to_screen_aabb(occludee.worldAABB,window_size, cam_camera_ref->projection, cam_transform_ref->transform,cam_camera_ref->camera_offset))) {
 			entity.add<Occluded>();
 		}else {

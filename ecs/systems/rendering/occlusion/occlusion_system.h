@@ -10,5 +10,5 @@ class OcclusionSystem : public RenderSystem {
 protected:
 	TileOcclusionManager tile_occlusion_manager;
 public: 
-    void create_occlusion_culling(CommandQueue &command_queue, PipelineManager &pipeline_manager);
+    void create_occlusion_culling(Ref<CommandHandler>& command_handler, PipelineManager &pipeline_manager);
 };

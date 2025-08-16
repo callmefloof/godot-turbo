@@ -3,6 +3,10 @@
 #include "thirdparty/flecs/distr/flecs.h"
 #include "../pipeline_manager.h"
 
+struct FrameCounter {
+	int frame = 0;
+};
+
 class MultiMeshRenderSystem : public RenderSystem {
 GDCLASS(MultiMeshRenderSystem, RenderSystem);
 private:
@@ -12,8 +16,8 @@ protected:
 public:
 	MultiMeshRenderSystem() = default;
 	~MultiMeshRenderSystem() override = default;
-	void create_rendering(CommandQueue& command_queue, PipelineManager& pipeline_manager) const;
-	void create_frustum_culling(CommandQueue& command_queue, PipelineManager& pipeline_manager) const;
+	void create_rendering(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const;
+	void create_frustum_culling(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const;
 	static void _bind_methods();
 	static MultiMeshRenderSystem* get_singleton();
 };

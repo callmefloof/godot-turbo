@@ -6,6 +6,9 @@
 #define COMMAND_H
 #include <utility>
 #include "thirdparty/concurrentqueue/concurrentqueue.h"
+#include "core/object/ref_counted.h"
+#include "core/templates/rid.h"
+#include "core/object/class_db.h"
 
 
 struct ICommand {
@@ -46,7 +49,9 @@ public:
 	}
 
 	void deallocate(void* ptr) {
+		if(!ptr) return;
 		freelist.enqueue(ptr);
+
 	}
 private:
 	void* data = nullptr;
@@ -87,6 +92,14 @@ static void destroy_command(ICommand* cmd) {
 }
 
 class CommandQueue {
+private:
+	void clear() {
+			ICommand* cmd = nullptr;
+			while (queue.try_dequeue(cmd) && cmd) {
+				destroy_command(cmd);
+			}
+		}
+
 public:
 	template<typename F>
 	void enqueue(F&& func) {
@@ -96,20 +109,45 @@ public:
 
 	void process() {
 		ICommand* cmd = nullptr;
-		while (queue.try_dequeue(cmd)) {
+		while (queue.try_dequeue(cmd) && cmd) {
 			cmd->execute();
 			destroy_command(cmd);
 		}
 	}
-
-	void clear() {
-		ICommand* cmd = nullptr;
-		while (queue.try_dequeue(cmd)) {
-			destroy_command(cmd);
-		}
+	~CommandQueue() {
+		
+	}
+	
+	bool is_empty() {
+		return queue.size_approx() == 0;
 	}
 private:
 	moodycamel::ConcurrentQueue<ICommand*> queue;
+};
+
+class CommandHandler : public RefCounted {
+	GDCLASS(CommandHandler, RefCounted);
+	CommandQueue command_queue;
+
+public:
+	CommandHandler() = default;
+	~CommandHandler() {
+	}
+	template<typename F>
+	inline void enqueue_command(F&& func) {
+		command_queue.enqueue(func);
+	}
+
+	inline void process_commands() {
+		command_queue.process();
+	}
+
+	static void _bind_methods() {
+		ClassDB::bind_method(D_METHOD("process_commands"), &CommandHandler::process_commands);
+	}
+
+
+
 };
 
 #endif //COMMAND_H

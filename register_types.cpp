@@ -31,6 +31,9 @@
 #include "ecs/utility/rendering/2d/render_utility_2d.h"
 #include "ecs/utility/rendering/3d/render_utility_3d.h"
 #include "ecs/flecs_types/flecs_pair.h"
+#include "ecs/systems/demo/bad_apple_system.h"
+#include "ecs/systems/commands/command.h"
+#include "ecs/components/dirty_transform.h"
 
 #ifndef COMPONENT_REF_CLASS
 #define COMPONENT_REF_CLASS\
@@ -110,7 +113,7 @@ INSTANTIATE_TYPED_ACCESSOR(World3DComponent)
 INSTANTIATE_TYPED_ACCESSOR(World2DComponent)
 INSTANTIATE_TYPED_ACCESSOR(VisibilityComponent)
 INSTANTIATE_TYPED_ACCESSOR(ObjectInstanceComponent)
-
+//INSTANTIATE_TYPED_ACCESSOR(DirtyTransform)
 
 void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
@@ -137,6 +140,8 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	ClassDB::register_runtime_class<SceneObjectUtility>();
 	ClassDB::register_runtime_class<ResourceObjectUtility>();
 	ClassDB::register_runtime_class<FlecsPair>();
+	ClassDB::register_runtime_class<BadAppleSystem>();
+	ClassDB::register_class<CommandHandler>();
 
 	// Rendering Components: 20 - 21-jul-2025
 
@@ -200,6 +205,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	REGISTER_FLECS_COMPONENT_CLASS(World2DComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(VisibilityComponent)
 	REGISTER_FLECS_COMPONENT_CLASS(ObjectInstanceComponent)
+	REGISTER_FLECS_COMPONENT_CLASS(DirtyTransform)
 
 }
 

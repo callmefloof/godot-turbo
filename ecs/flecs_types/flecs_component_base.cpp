@@ -20,7 +20,7 @@ flecs::entity FlecsComponentBase::get_internal_owner() const {
 	return owner;
 }
 void FlecsComponentBase::set_component(const flecs::entity& p_component) {
-	print_line("Setting component ID: " + itos((uint64_t)p_component.raw_id()));
+	//print_line("Setting component ID: " + itos((uint64_t)p_component.raw_id()));
 	component = p_component;
 }
 void FlecsComponentBase::set_internal_world( flecs::world* p_world) {
