@@ -17,7 +17,7 @@ struct RefContainer {
 
 class RefStorage {
 private:
-	static inline Vector<RefContainer> resource_pool;
+	Vector<RefContainer> resource_pool;
 
 public:
 	~RefStorage() {
@@ -26,7 +26,7 @@ public:
 
 	// Add resource + RID to storage
 	template <typename T = Resource>
-	static bool add(Ref<T> p_resource, const RID &p_rid) {
+	bool add(Ref<T> p_resource, const RID &p_rid) {
 		if (p_resource.is_null() || !p_rid.is_valid()) {
 			return false;
 		}
@@ -41,7 +41,7 @@ public:
 	}
 
 	// Remove resource by RID
-	static bool release(const RID &p_rid) {
+	inline bool release(const RID &p_rid) {
 		for (auto it = resource_pool.begin(); it != resource_pool.end(); ++it) {
 			if (it->rid != p_rid) {
 				continue;
@@ -64,7 +64,7 @@ public:
 	}
 
 	// Remove all resources
-	static void release_all() {
+	inline void release_all() {
 		for (RefContainer &container : resource_pool) {
 			if (container.rid.is_valid()) {
 				RS::get_singleton()->free(container.rid);
@@ -75,7 +75,7 @@ public:
 	}
 
 	// Check if RID exists
-	static bool has(const RID &p_rid) {
+	bool has(const RID &p_rid) const {
 		for (const RefContainer &container : resource_pool) {
 			if (container.rid == p_rid) {
 				return true;
@@ -85,7 +85,7 @@ public:
 	}
 
 	// Get container by RID
-	static RefContainer *get(const RID &p_rid) {
+	RefContainer *get(const RID &p_rid) {
 		for (auto it = resource_pool.begin(); it != resource_pool.end(); ++it) {
 			if (it->rid == p_rid) {
 				return &*it;

@@ -7,12 +7,13 @@ class PipelineManager {
     private:
         struct FlecsSystemContainer{
             flecs::system system;
-            flecs::entity_t relationship;
+            flecs::entity_t relationship = 0ULL;
         };
         flecs::entity pipeline;
         flecs::world* world = nullptr;
         Vector<FlecsSystemContainer> systems;
     public:
+        PipelineManager() = default;
         PipelineManager(flecs::world* p_world);
         virtual ~PipelineManager() = default;
         PipelineManager(const PipelineManager& rhs);

@@ -1,15 +1,38 @@
 #pragma once
 
-#include "thirdparty/flecs/distr/flecs.h"
-#include "ecs/components/component_proxy.h"
-#include "ecs/components/component_module_base.h"
-#include "ecs/flecs_types/flecs_component.h"
-#include "ecs/components/single_component_module.h"
+#include "ecs/components/component_registry.h"
+#include "core/variant/dictionary.h"
 
-struct DirtyTransform {};
+struct DirtyTransform : CompBase {
 
-class DirtyTransformRef : public FlecsComponent<DirtyTransform> {
-    DEFINE_TAG_PROXY(DirtyTransform)
+    Dictionary to_dict() const override {
+        Dictionary dict;
+        return dict;
+    }
+
+    void from_dict(const Dictionary &p_dict) override {
+    }
+
+    Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+        Dictionary dict;
+        if (entity.has<DirtyTransform>()) {
+            // No fields to serialize
+        } else {
+            ERR_PRINT("DirtyTransform::to_dict: entity does not have DirtyTransform");
+        }
+        return dict;
+    }
+
+    void from_dict_with_entity(const Dictionary &p_dict, flecs::entity &entity) override {
+        if (entity.has<DirtyTransform>()) {
+            // No fields to deserialize
+        } else {
+            ERR_PRINT("DirtyTransform::from_dict: entity does not have DirtyTransform");
+        }
+    }
+
+    StringName get_type_name() const override {
+        return "DirtyTransform";
+    }
 };
-
-using DirtyTransformModule = SingleComponentModule<DirtyTransform>;
+REGISTER_COMPONENT(DirtyTransform);

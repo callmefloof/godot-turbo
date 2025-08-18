@@ -6,16 +6,10 @@ module_env = env.Clone()
 module_env.add_source_files(env.modules_sources, [
     "register_types.cpp",
     "thirdparty/flecs/distr/flecs.c",
-    "ecs/flecs_types/flecs_world.cpp",
-    "ecs/flecs_types/flecs_entity.cpp",
-    "ecs/flecs_types/flecs_component_base.cpp",
-    "ecs/components/script_component_registry.cpp",
     "ecs/flecs_types/flecs_script_system.cpp",
-    "ecs/components/script_visible_component.cpp",
     "ecs/systems/rendering/multimesh_render_system.cpp",
     "ecs/systems/rendering/occlusion/tile_occlusion_manager.cpp",
     "ecs/systems/rendering/occlusion/occlusion_system.cpp",
-    "ecs/systems/flecs_system.cpp",
     "ecs/systems/pipeline_manager.cpp",
     "ecs/systems/rendering/render_system.cpp",
     "ecs/utility/navigation/2d/navigation2d_utility.cpp",
@@ -25,8 +19,8 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/utility/rendering/2d/render_utility_2d.cpp",
     "ecs/utility/rendering/3d/render_utility_3d.cpp",
     "ecs/utility/scene_object_utility.cpp",
-    "ecs/flecs_types/flecs_pair.cpp",
-    "ecs/systems/demo/bad_apple_system.cpp"
+    "ecs/systems/demo/bad_apple_system.cpp",
+    "ecs/flecs_types/flecs_server.cpp"
 ])
 
 # Use env.GetModulePath() for the module's root, or env.Dir('.')

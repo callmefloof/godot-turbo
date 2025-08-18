@@ -3,10 +3,12 @@
 #include "tile_occlusion_manager.h"
 #include "ecs/components/worldcomponents.h"
 #include "core/os/os.h"
-#include "servers/rendering_server.h"
 #include "ecs/components/rendering/rendering_components.h"
 #include "ecs/components/transform_3d_component.h"
 #include "../../commands/command.h"
+#include "thirdparty/flecs/distr/flecs.h"
+#include "ecs/components/dirty_transform.h"
+
 
 void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_handler, PipelineManager &pipeline_manager) {
 	if(!world){
@@ -48,7 +50,7 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 		if (!entity.get<VisibilityComponent>().visible) {
 			return;
 		}
-		tile_occlusion_manager.reset(window_size.width, window_size.height);
+		tile_occlusion_manager.reset(get_window_size().x, get_window_size().y);
 		const auto& transform = entity.parent().get<Transform3DComponent>();
 
 		PackedVector3Array world_vertices = PackedVector3Array();
@@ -129,7 +131,7 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_transform_ref not found");
 			return;
 		}
-		if (!tile_occlusion_manager.is_visible(ScreenAABB::aabb_to_screen_aabb(occludee.worldAABB,window_size, cam_camera_ref->projection, cam_transform_ref->transform,cam_camera_ref->camera_offset))) {
+		if (!tile_occlusion_manager.is_visible(ScreenAABB::aabb_to_screen_aabb(occludee.worldAABB,get_window_size(), cam_camera_ref->projection, cam_transform_ref->transform,cam_camera_ref->camera_offset))) {
 			entity.add<Occluded>();
 		}else {
 			entity.remove<Occluded>();

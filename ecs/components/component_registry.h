@@ -1,0 +1,116 @@
+#pragma once
+
+#include "core/templates/a_hash_map.h"
+#include "core/variant/dictionary.h"
+#include "core/string/string_name.h"
+#include "core/variant/variant.h"
+#include "flecs.h"
+#include "ecs/components/comp_base.h"
+#include "core/error/error_macros.h"
+#include <memory>
+
+struct ComponentRegistry {
+    using CreateFn = std::unique_ptr<CompBase> (*)();
+    using CreateFnWE = std::unique_ptr<CompBase> (*)(const flecs::entity &);
+    using ToDictFn = Dictionary (*)(const flecs::entity &);
+    using FromDictFn = void (*)(const flecs::entity &, const Dictionary&);
+    
+    struct Entry {
+        CreateFn create = nullptr;
+        CreateFnWE create_with_entity = nullptr;
+        ToDictFn to_dict = nullptr;
+        FromDictFn from_dict = nullptr;
+        flecs::entity_t comp_id{};  // Flecs component ID in this world
+    };
+
+    static HashMap<StringName, Entry>& get_map() {
+        static HashMap<StringName, Entry> map;
+        return map;
+    }
+
+    static void register_type(const StringName& name, Entry entry) {
+        get_map()[name] = entry;
+    }
+
+    static Entry* lookup(const StringName& name) {
+        return get_map().getptr(name);
+    }
+
+    static void bind_to_world(const StringName& name, flecs::entity_t id) {
+        if (Entry* e = lookup(name)) {
+            e->comp_id = id;
+        }
+    }
+
+    static Dictionary to_dict(const flecs::entity& entity, const StringName& type_name) {
+        if (const Entry* entry = lookup(type_name)) {
+            return entry->to_dict(entity);
+        }
+        ERR_PRINT("ComponentRegistry::to_dict: type_name not found or entity does not have component");
+        return Dictionary();
+    }
+
+    static Dictionary to_dict(const flecs::entity& entity, const flecs::entity_t& type_id) {
+        for (const auto& [name, entry] : get_map()) {
+            if (entry.comp_id == type_id) {
+                return entry.to_dict(entity);
+            }
+        }
+        ERR_PRINT("ComponentRegistry::to_dict: type_id not found or entity does not have component");
+        return Dictionary();
+    }
+
+    static void from_dict(flecs::entity& entity, const Dictionary& dict, const StringName& type_name) {
+        if (Entry* entry = lookup(type_name)) {
+            entry->from_dict(entity, dict);
+        } else {
+            ERR_PRINT("ComponentRegistry::from_dict: type_name not found");
+        }
+    }
+
+    static void from_dict(flecs::entity& entity, const Dictionary& dict, const flecs::entity_t& type_id) {
+        for (const auto& [name, entry] : get_map()) {
+            if (entry.comp_id == type_id) {
+                entry.from_dict(entity, dict);
+                return;
+            }
+        }
+        ERR_PRINT("ComponentRegistry::from_dict: type_id not found or entity does not have component");
+    }
+};
+
+#define REGISTER_COMPONENT(TYPE)                                      \
+    static Dictionary TYPE##_to_dict(const flecs::entity & e) {       \
+        if (e.has<TYPE>()) {                                          \
+            return e.get<TYPE>().to_dict();                           \
+        }                                                             \
+        return Dictionary();                                          \
+    }                                                                 \
+    static void TYPE##_from_dict(const flecs::entity &e, const Dictionary& d) {  \
+        if (e.has<TYPE>()) {                                          \
+            e.get_mut<TYPE>().from_dict(d);                          \
+        } else {                                                       \
+            ERR_PRINT("ComponentRegistry::from_dict: type_name not found"); \
+        }                                                             \
+    }                                                                 \
+    struct TYPE##_AutoRegister {                                      \
+        TYPE##_AutoRegister() {                                       \
+            ComponentRegistry::register_type(                         \
+                #TYPE,                                                \
+                ComponentRegistry::Entry{                             \
+                    []() -> std::unique_ptr<CompBase> { return std::make_unique<TYPE>(TYPE()); },       \
+                    [](const flecs::entity &e) -> std::unique_ptr<CompBase> { \
+                        if(e.has<TYPE>()) { \
+                            return std::make_unique<TYPE>(e.get_mut<TYPE>()); \
+                        } \
+                        ERR_FAIL_COND_V_MSG(!e.has<TYPE>(), nullptr,"Entity does not have component"); \
+                        return nullptr; \
+                    },\
+                    TYPE##_to_dict,                                   \
+                    TYPE##_from_dict,                                 \
+                    {} /* world_id will be set later */               \
+                }                                                     \
+            );                                                        \
+        }                                                             \
+    };                                                                \
+    static TYPE##_AutoRegister TYPE##_auto_register_instance;

@@ -4,26 +4,69 @@
 
 #ifndef SCRIPT_VISIBLE_COMPONENT_H
 #define SCRIPT_VISIBLE_COMPONENT_H
-#include "core/error/error_macros.h"
-#include "core/object/class_db.h"
-#include "core/object/ref_counted.h"
 #include "core/string/string_name.h"
 #include "core/templates/a_hash_map.h"
 #include "core/typedefs.h"
 #include "core/variant/variant.h"
-#include "../flecs_types/flecs_component.h"
-#include "type_id_generator.h"
-#include "single_component_module.h"
-#include "ecs/flecs_types/flecs_world.h"
+#include "ecs/components/component_registry.h"
+#include "core/variant/dictionary.h"
 
-class FlecsEntity;
-
-struct ScriptVisibleComponent {
+struct ScriptVisibleComponent : CompBase {
 	StringName name;
 	AHashMap<StringName, Variant> fields;
-	uint64_t get_virtual_component_type_hash() const {
-		return TypeIDGenerator::get_id_for_string(name);
+	
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict["name"] = name;
+		Dictionary fields_dict;
+		for (const auto &pair : fields) {
+			fields_dict[pair.key] = pair.value;
+		}
+		dict["fields"] = fields_dict;
+		return dict;
 	}
+
+	void from_dict(const Dictionary &dict) override {
+		name = dict["name"];
+		Dictionary fields_dict = dict["fields"];
+		for (const auto &key : fields_dict.keys()) {
+			fields[key] = fields_dict[key];
+		}
+	}
+
+	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+		Dictionary dict;
+		if (entity.has<ScriptVisibleComponent>()) {
+			const ScriptVisibleComponent &script = entity.get<ScriptVisibleComponent>();
+			dict["name"] = script.name;
+			Dictionary fields_dict;
+			for (const auto &pair : script.fields) {
+				fields_dict[pair.key] = pair.value;
+			}
+			dict["fields"] = fields_dict;
+		} else {
+			ERR_PRINT("ScriptVisibleComponent::to_dict: entity does not have ScriptVisibleComponent");
+		}
+		return dict;
+	}
+
+	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
+		if (entity.has<ScriptVisibleComponent>()) {
+			ScriptVisibleComponent &script = entity.get_mut<ScriptVisibleComponent>();
+			script.name = dict["name"];
+			Dictionary fields_dict = dict["fields"];
+			for (const auto &key : fields_dict.keys()) {
+				script.fields[key] = fields_dict[key];
+			}
+		} else {
+			ERR_PRINT("ScriptVisibleComponent::from_dict: entity does not have ScriptVisibleComponent");
+		}
+	}
+
+	StringName get_type_name() const override {
+		return "ScriptVisibleComponent";
+	}
+
 	ScriptVisibleComponent() = default;
 	ScriptVisibleComponent(const ScriptVisibleComponent& rhs) {
 		name = rhs.name;
@@ -34,37 +77,10 @@ struct ScriptVisibleComponent {
 		fields = rhs.fields;
 		return *this;
 	}
+
+
+
+
 };
-
-//making an exception for templating here
-class ScriptVisibleComponentRef : public FlecsComponent<ScriptVisibleComponent> {
-	GDCLASS(ScriptVisibleComponentRef, FlecsComponent<ScriptVisibleComponent>);
-public:
-	void set_data(ScriptVisibleComponent &p_data) override;
-	void clear_component() override;
-	StringName get_type_name() const override;
-
-
-private:
-	void append_bytes(PackedByteArray &array, const void *data, size_t size) const;
-	public:
-	ScriptVisibleComponentRef() = default;
-	~ScriptVisibleComponentRef() override = default;
-	Variant get_field_value(const StringName& field_name) const;
-	void set_field(const StringName& field_name, const Variant& value) const;
-	static void _bind_methods();
-	bool is_dynamic() const override;
-	static Ref<ScriptVisibleComponentRef> create_component(const StringName& name, const Ref<FlecsEntity> &p_owner);
-	Ref<FlecsComponentBase> clone() const override;
-	uint64_t get_virtual_component_type_hash() const;
-};
-
-
-// template <>
-// inline void FlecsComponent<ScriptVisibleComponent>::byte_deserialize(const PackedByteArray &p_ba) {
-// 	ERR_PRINT("Not implemented");
-// }
-
-using ScriptVisibleComponentModule = SingleComponentModule<ScriptVisibleComponent>;
 
 #endif //SCRIPT_VISIBLE_COMPONENT_H

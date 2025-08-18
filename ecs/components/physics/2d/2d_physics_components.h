@@ -1,62 +1,131 @@
 #pragma once
 #include "thirdparty/flecs/distr/flecs.h"
-#include "../../component_module_base.h"
 #include "core/templates/rid.h"
-#include "core/os/memory.h"
-#include "modules/godot_turbo/ecs/components/component_proxy.h"
-#include "servers/physics_server_2d.h"
-#include "ecs/flecs_types/flecs_component.h"
-#include "core/string/ustring.h"
-#include "ecs/flecs_types/flecs_world.h"
+#include "core/variant/dictionary.h"
+#include "ecs/components/component_registry.h"
+#include "core/variant/variant.h"
 
-
-struct Area2DComponent {
+struct Area2DComponent : CompBase {
 	RID area_id;
+
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict.set("area_id", area_id);
+		return dict;
+	}
+
+	void from_dict(const Dictionary &dict) override {
+		area_id = dict["area_id"];
+	}
+
+	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+		Dictionary dict;
+		if (entity.has<Area2DComponent>()) {
+			const Area2DComponent &area_component = entity.get<Area2DComponent>();
+			dict.set("area_id", area_component.area_id);
+		} else {
+			ERR_PRINT("Area2DComponent::to_dict: entity does not have Area2DComponent");
+			dict.set("area_id", RID());
+		}
+		return dict;
+	}
+
+	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
+		if (entity.has<Area2DComponent>()) {
+			Area2DComponent &area_component = entity.get_mut<Area2DComponent>();
+			area_component.area_id = dict["area_id"];
+		} else {
+			ERR_PRINT("Area2DComponent::from_dict: entity does not have Area2DComponent");
+		}
+	}
+
+	StringName get_type_name() const override {
+		return "Area2DComponent";
+	}
 };
 
-class Area2DComponentRef : public FlecsComponent<Area2DComponent> {
-	#define AREA_2D_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, area_id,Area2DComponent)\
+REGISTER_COMPONENT(Area2DComponent);
 
-	#define AREA_2D_COMPONENT_BINDINGS\
-	BIND_PROPERTY(RID, area_id, Area2DComponentRef)\
-
-	DEFINE_COMPONENT_PROXY(Area2DComponent,
-	AREA_2D_COMPONENT_PROPERTIES,
-	AREA_2D_COMPONENT_BINDINGS);
-};
-
-struct Body2DComponent {
+struct Body2DComponent : CompBase {
 	RID body_id;
+
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict.set("body_id", body_id);
+		return dict;
+	}
+
+	void from_dict(const Dictionary &dict) override {
+		body_id = dict["body_id"];
+	}
+
+	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+		Dictionary dict;
+		if (entity.has<Body2DComponent>()) {
+			const Body2DComponent &body_component = entity.get<Body2DComponent>();
+			dict.set("body_id", body_component.body_id);
+		} else {
+			ERR_PRINT("Body2DComponent::to_dict: entity does not have Body2DComponent");
+			dict.set("body_id", RID());
+		}
+		return dict;
+	}
+
+	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
+		if (entity.has<Body2DComponent>()) {
+			Body2DComponent &body_component = entity.get_mut<Body2DComponent>();
+			body_component.body_id = dict["body_id"];
+		} else {
+			ERR_PRINT("Body2DComponent::from_dict: entity does not have Body2DComponent");
+		}
+	}
+
+	StringName get_type_name() const override {
+		return "Body2DComponent";
+	}
 };
+REGISTER_COMPONENT(Body2DComponent);
 
-class Body2DComponentRef : public FlecsComponent<Body2DComponent> {
-	#define BODY_2D_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, body_id,Body2DComponent)\
-
-	#define BODY_2D_COMPONENT_BINDINGS\
-	BIND_PROPERTY(RID, body_id, Body2DComponentRef)\
-
-	DEFINE_COMPONENT_PROXY(Body2DComponent,
-	BODY_2D_COMPONENT_PROPERTIES,
-	BODY_2D_COMPONENT_BINDINGS);
-};
-
-struct Joint2DComponent {
+struct Joint2DComponent : CompBase {
 	RID joint_id;
+
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict.set("joint_id", joint_id);
+		return dict;
+	}
+
+	void from_dict(const Dictionary &dict) override {
+		joint_id = dict["joint_id"];
+	}
+
+	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+		Dictionary dict;
+		if (entity.has<Joint2DComponent>()) {
+			const Joint2DComponent &joint_component = entity.get<Joint2DComponent>();
+			dict.set("joint_id", joint_component.joint_id);
+		} else {
+			ERR_PRINT("Joint2DComponent::to_dict: entity does not have Joint2DComponent");
+			dict.set("joint_id", RID());
+		}
+		return dict;
+	}
+
+	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
+		if (entity.has<Joint2DComponent>()) {
+			Joint2DComponent &joint_component = entity.get_mut<Joint2DComponent>();
+			joint_component.joint_id = dict["joint_id"];
+		} else {
+			ERR_PRINT("Joint2DComponent::from_dict: entity does not have Joint2DComponent");
+		}
+	}
+
+	StringName get_type_name() const override {
+		return "Joint2DComponent";
+	}
 };
 
-class Joint2DComponentRef : public FlecsComponent<Joint2DComponent> {
-	#define JOINT_2D_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(RID, joint_id,Joint2DComponent)\
-
-	#define JOINT_2D_COMPONENT_BINDINGS\
-	BIND_PROPERTY(RID, joint_id, Joint2DComponentRef)\
-
-	DEFINE_COMPONENT_PROXY(Joint2DComponent,
-	JOINT_2D_COMPONENT_PROPERTIES,
-	JOINT_2D_COMPONENT_BINDINGS);
-};
+REGISTER_COMPONENT(Joint2DComponent);
 
 struct Physics2DBaseComponents {
 	flecs::component<Area2DComponent> area;
@@ -68,5 +137,3 @@ struct Physics2DBaseComponents {
 			body(world->component<Body2DComponent>("Body2DComponent")),
 			joint(world->component<Joint2DComponent>("Joint2DComponent")){}
 };
-
-using Physics2DComponentModule =  MultiComponentModule<Physics2DBaseComponents>;

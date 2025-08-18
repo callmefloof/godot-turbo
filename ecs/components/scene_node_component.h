@@ -1,34 +1,52 @@
 #pragma once
 #include "core/object/object_id.h"
-#include "core/os/memory.h"
-#include "scene/main/node.h"
-#include "../flecs_types/flecs_component.h"
-#include "component_proxy.h"
-#include "node_ref.h"
-#include "single_component_module.h"
-#include "core/string/ustring.h"
+#include "core/variant/variant.h"
+#include "ecs/components/component_registry.h"
+
+#include "core/variant/dictionary.h"
+#include <cstdint>
 
 
-
-struct SceneNodeComponent {
+struct SceneNodeComponent : CompBase {
 	ObjectID node_id; // Unique identifier for the node
 	StringName class_name; // Class name of the node
-	Ref<NodeRef> node_ref; // Reference to the node
+
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict.set("node_id", node_id);
+		dict.set("class_name", class_name);
+		return dict;
+	}
+
+	void from_dict(const Dictionary &dict) override {
+		node_id = ObjectID(dict["node_id"].operator int64_t());
+		class_name = dict["class_name"];
+	}
+
+	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+		Dictionary dict;
+		if (entity.has<SceneNodeComponent>()) {
+			const SceneNodeComponent &node = entity.get<SceneNodeComponent>();
+			dict.set("node_id", node.node_id);
+			dict.set("class_name", node.class_name);
+		} else {
+			ERR_PRINT("SceneNodeComponent::to_dict: entity does not have SceneNodeComponent");
+		}
+		return dict;
+	}
+
+	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
+		if (entity.has<SceneNodeComponent>()) {
+			SceneNodeComponent &node = entity.get_mut<SceneNodeComponent>();
+			node.node_id = ObjectID(dict["node_id"].operator int64_t());
+			node.class_name = dict["class_name"];
+		} else {
+			ERR_PRINT("SceneNodeComponent::from_dict: entity does not have SceneNodeComponent");
+		}
+	}
+
+	StringName get_type_name() const override {
+		return "SceneNodeComponent";
+	}
 };
-
-class SceneNodeComponentRef : public FlecsComponent<SceneNodeComponent> {
-	#define SCENE_NODE_COMPONENT_PROPERTIES\
-	DEFINE_PROPERTY(ObjectID, node_id,SceneNodeComponent)\
-	DEFINE_PROPERTY(StringName, class_name,SceneNodeComponent)\
-	DEFINE_PROPERTY(Ref<NodeRef>, node_ref,SceneNodeComponent)\
-
-	#define SCENE_NODE_COMPONENT_BINDINGS\
-	BIND_PROPERTY(ObjectID, node_id, SceneNodeComponentRef)\
-	BIND_PROPERTY(StringName, class_name, SceneNodeComponentRef)\
-	BIND_PROPERTY(Ref<NodeRef>, node_ref, SceneNodeComponentRef)\
-
-	DEFINE_COMPONENT_PROXY(SceneNodeComponent, SCENE_NODE_COMPONENT_PROPERTIES, SCENE_NODE_COMPONENT_BINDINGS);
-};
-
-template<typename T = Node>
-using SceneNodeComponentModule = SingleComponentModule<SceneNodeComponent>;
+REGISTER_COMPONENT(SceneNodeComponent);

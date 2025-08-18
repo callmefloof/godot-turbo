@@ -1,12 +1,10 @@
 #pragma once
 #include "core/math/transform_3d.h"
 #include "core/templates/vector.h"
-#include "ecs/components/worldcomponents.h"
-#include "thirdparty/flecs/distr/flecs.h"
-#include "ecs/components/rendering/rendering_components.h"
-#include "ecs/components/transform_3d_component.h"
-#include "core/variant/typed_array.h"
-#include "ecs/flecs_types/flecs_world.h"
+#include "core/variant/variant.h"
+#include "core/object/object.h"
+#include "core/templates/rid.h"
+#include "core/object/class_db.h"
 
 class VoxelGI;
 class OccluderInstance3D;
@@ -28,102 +26,63 @@ class RID;
 struct Plane;
 class Material;
 
+
+
 class RenderUtility3D : Object {
-	GDCLASS(RenderUtility3D, Object)
+	GDCLASS(RenderUtility3D, Object);
 public:
 	RenderUtility3D() = default;
 	~RenderUtility3D();
-	static flecs::entity _create_mesh_instance(const flecs::world *world, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id);
-	static flecs::entity _create_mesh_instance(const flecs::world *world, const Transform3D &transform, const RID &scenario_id, const String &name);
-	static flecs::entity _create_mesh_instance(const flecs::world *world, MeshInstance3D* mesh_instance_3d);
-	static flecs::entity _create_multi_mesh(const flecs::world *world,
+	static RID create_mesh_instance_with_id(const RID &world_id, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id);
+	static RID create_mesh_instance(const RID &world_id, const Transform3D &transform, const RID &scenario_id, const String &name);
+	static RID create_mesh_instance_with_object(const RID &world_id, MeshInstance3D* mesh_instance_3d);
+	static RID create_multi_mesh(const RID &world_id,
 			const Transform3D &transform,
 			uint32_t size,
 			const RID &mesh_id,
-			const Vector<RID> &material_ids,
+			const TypedArray<RID> &material_ids,
 			const RID &scenario_id,
 			const String &name,
 			bool use_colors = false,
 			bool use_custom_data = false, bool use_indirect = false);
-	static flecs::entity _create_multi_mesh(const flecs::world *world, MultiMeshInstance3D* multi_mesh_instance);
-	static flecs::entity _create_multi_mesh_instance(
-		const flecs::world *world,
-		const Transform3D &transform,
-		const uint32_t index,
-		const RID &multi_mesh_id,
-		const String &name);
-	static Vector<flecs::entity> _create_multi_mesh_instances(
-			const flecs::world *world,
-			const Vector<Transform3D> &transform,
-			const flecs::entity& multi_mesh);
-	static flecs::entity _create_particles(
-		const flecs::world *world,
-		const Transform3D &transform,
-		const RID &particles_id,
-		const RID &scenario_id,
-		const String &name);
-	static flecs::entity _create_particles(const flecs::world *world, GPUParticles3D *gpu_particles_3d);
-	static flecs::entity _create_reflection_probe(const flecs::world *world, const RID &probe_id, const Transform3D &transform, const String& name) ;
-	static flecs::entity _create_reflection_probe(const flecs::world *world, ReflectionProbe *reflection_probe);
-	static flecs::entity _create_skeleton(const flecs::world *world, const RID &skeleton_id, const String &name);
-	static flecs::entity _create_skeleton(const flecs::world *world, Skeleton3D* skeleton_3d);
-	static flecs::entity _create_environment(const flecs::world *world, const RID &environment_id, const String &name);
-	static flecs::entity _create_environment(const flecs::world *world, WorldEnvironment* world_environment);
-	static flecs::entity _create_camera(const flecs::world *world, const RID &camera_id,const Transform3D &transform, const String& name);
-	static flecs::entity _create_camera(const flecs::world *world, const Transform3D &transform, const String &name);
-	static flecs::entity _create_camera(const flecs::world *world, Camera3D *camera_3d);
-	static flecs::entity _create_compositor(const flecs::world *world, const RID &compositor_id, const String& name);
-	static flecs::entity _create_compositor(const flecs::world *world, const Ref<Compositor> &compositor);
-	static flecs::entity _create_directional_light(const flecs::world *world, const RID &light_id, const Transform3D& transform, const String &name);
-	static flecs::entity _create_directional_light(const flecs::world *world, const Transform3D &transform, const String &name);
-	static flecs::entity _create_directional_light(const flecs::world *world, DirectionalLight3D *directional_light);
-	static flecs::entity _create_omni_light(const flecs::world *world, const RID &light_id, const Transform3D &transform, const RID &scenario_id);
-	static flecs::entity _create_omni_light(const flecs::world *world, const Transform3D &transform, const RID &scenario_id);
-	static flecs::entity _create_omni_light(const flecs::world *world, OmniLight3D *omni_light);
-	static flecs::entity _create_spot_light(const flecs::world *world, const RID &light_id, const Transform3D &transform, const String &name);
-	static flecs::entity _create_spot_light(const flecs::world *world, const Transform3D &transform, const String &name);
-	static flecs::entity _create_spot_light(const flecs::world *world, SpotLight3D *spot_light);
-	static flecs::entity _create_viewport(const flecs::world *world, const RID &viewport_id, const String &name);
-	static flecs::entity _create_viewport(const flecs::world *world, Viewport *viewport);
-	static flecs::entity _create_voxel_gi(const flecs::world *world, const RID &voxel_gi_id, const Transform3D& transform, const String &name);
-	static flecs::entity _create_voxel_gi(const flecs::world *world, const Transform3D &transform, const String &name);
-	static flecs::entity _create_voxel_gi(const flecs::world *world, VoxelGI *voxel_gi);
-	static flecs::entity _create_scenario(const flecs::world *world, const RID &scenario_id, const String &name);
-	static flecs::entity _create_scenario(const flecs::world *world, const String &name);
-	static flecs::entity _create_occluder(const flecs::world *world, const String &name);
-	static flecs::entity _create_occluder(const flecs::world *world, const RID& occluder_id, const String &name);
-	static flecs::entity _create_occluder(const flecs::world *world, OccluderInstance3D* occluder_instance);
-	static bool _bake_material_check(const Ref<Material> &p_material);
-	static void _bake_surface(const Transform3D &p_transform, const Array& p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, const PackedVector3Array &r_vertices, const PackedInt32Array &r_indices);
-	static Ref<FlecsEntity> create_mesh_instance(FlecsWorld* flecs_world, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id);
-	static Ref<FlecsEntity> create_mesh_instance_with_object(FlecsWorld* flecs_world, MeshInstance3D* mesh_instance_3d);
-	static TypedArray<FlecsEntity> create_multi_mesh(FlecsWorld* flecs_world, const Transform3D& transform, uint32_t size, const RID& mesh_id, const TypedArray<RID>& material_ids, const RID& scenario_id, const String& name, bool use_colors = false, bool use_custom_data = false, bool use_indirect = false);
-	static TypedArray<FlecsEntity> create_multi_mesh_with_object(FlecsWorld* flecs_world, MultiMeshInstance3D* multi_mesh_instance_3d);
-	static Ref<FlecsEntity> create_camera(FlecsWorld* flecs_world, const Transform3D& transform, const String& name);
-	static Ref<FlecsEntity> create_camera_with_object(FlecsWorld* flecs_world, Camera3D *camera_3d);
-	static Ref<FlecsEntity> create_directional_light(FlecsWorld* flecs_world, const Transform3D& transform, const String& name);
-	static Ref<FlecsEntity> create_directional_light_with_object(FlecsWorld* flecs_world, DirectionalLight3D *directional_light_3d);
-	static Ref<FlecsEntity> create_voxel_gi(FlecsWorld* flecs_world,const RID &voxel_gi_rid, const Transform3D& transform, const String& name);
-	static Ref<FlecsEntity> create_spot_light(FlecsWorld* flecs_world, const RID &light_id, const Transform3D& transform, const String& name);
-	static Ref<FlecsEntity> create_spot_light_with_object(FlecsWorld* flecs_world, SpotLight3D *spot_light);
-	static Ref<FlecsEntity> create_omni_light(FlecsWorld* flecs_world, const RID &light_id, const Transform3D& transform, const RID& scenario_id);
-	static Ref<FlecsEntity> create_omni_light_with_object(FlecsWorld* flecs_world, OmniLight3D *omni_light);
-	static Ref<FlecsEntity> create_reflection_probe(FlecsWorld* flecs_world, const RID& probe_id, const Transform3D& transform, const String& name);
-	static Ref<FlecsEntity> create_reflection_probe_with_object(FlecsWorld* flecs_world, ReflectionProbe *reflection_probe);
-	static Ref<FlecsEntity> create_scenario(FlecsWorld* flecs_world, const RID &scenario_id, const String& name);
-	static Ref<FlecsEntity> create_particles(FlecsWorld* flecs_world, const Transform3D& transform,const RID &particles_id, const RID& scenario_id, const String& name);
-	static Ref<FlecsEntity> create_particles_with_object(FlecsWorld* flecs_world, GPUParticles3D* gpu_particles_3d);
-	static Ref<FlecsEntity> create_viewport(FlecsWorld* flecs_world, const RID& viewport_id, const String& name);
-	static Ref<FlecsEntity> create_viewport_with_object(FlecsWorld* flecs_world, Viewport* viewport);
-	static Ref<FlecsEntity> create_voxel_gi_with_object(FlecsWorld* flecs_world, VoxelGI* voxel_gi);
-	static Ref<FlecsEntity> create_environment(FlecsWorld* flecs_world, const RID& environment_id, const String& name);
-	static Ref<FlecsEntity> create_environment_with_object(FlecsWorld* flecs_world, WorldEnvironment* world_environment);
-	static Ref<FlecsEntity> create_skeleton(FlecsWorld* flecs_world, const RID& skeleton_id, const String& name);
-	static Ref<FlecsEntity> create_skeleton_with_object(FlecsWorld* flecs_world, Skeleton3D* skeleton_3d);
-	static Ref<FlecsEntity> create_compositor(FlecsWorld* flecs_world, const RID& compositor_id, const String& name);
-	static Ref<FlecsEntity> create_compositor_with_object(FlecsWorld* flecs_world, Compositor *compositor);
-	static Ref<FlecsEntity> create_occluder_with_object(FlecsWorld* flecs_world, OccluderInstance3D* occluder_instance);
-	static Ref<FlecsEntity> create_occluder(FlecsWorld* flecs_world, const RID& occluder_id, const String& name);
+	static TypedArray<RID> create_multi_mesh_with_object(const RID &world_id, MultiMeshInstance3D* multi_mesh_instance);
+	static RID create_multi_mesh_instance(const RID &world_id,const Transform3D &transform,const uint32_t index,const RID &multi_mesh_id,const String &name);
+	static TypedArray<RID> create_multi_mesh_instances(const RID &world_id,const TypedArray<Transform3D> &transform, const RID &multi_mesh_id);
+	static RID create_particles(const RID &world_id,const Transform3D &transform,const RID &particles_id,const int particle_count,const RID &scenario_id,const String &name);
+	static RID create_particles_with_object(const RID &world_id, GPUParticles3D *gpu_particles_3d);
+	static RID create_reflection_probe(const RID &world_id, const RID &probe_id, const Transform3D &transform, const String& name) ;
+	static RID create_reflection_probe_with_object(const RID &world_id, ReflectionProbe *reflection_probe);
+	static RID create_skeleton(const RID &world_id, const RID &skeleton_id, const String &name);
+	static RID create_skeleton_with_object(const RID &world_id, Skeleton3D* skeleton_3d);
+	static RID create_environment(const RID &world_id, const RID &environment_id, const String &name);
+	static RID create_environment_with_object(const RID &world_id, WorldEnvironment* world_environment);
+	static RID create_camera_with_id(const RID &world_id, const RID &camera_id,const Transform3D &transform, const String& name);
+	static RID create_camera(const RID &world_id, const Transform3D &transform, const String &name);
+	static RID create_camera_with_object(const RID &world_id, Camera3D *camera_3d);
+	static RID create_compositor(const RID &world_id, const RID &compositor_id, const String& name);
+	static RID create_compositor_with_object(const RID &world_id, const Ref<Compositor> &compositor);
+	static RID create_directional_light_with_id(const RID &world_id, const RID &light_id, const Transform3D& transform, const String &name);
+	static RID create_directional_light(const RID &world_id, const Transform3D &transform, const String &name);
+	static RID create_directional_light_with_object(const RID &world_id, DirectionalLight3D *directional_light);
+	static RID create_omni_light_with_id(const RID &world_id, const RID &light_id, const Transform3D &transform, const RID &scenario_id, const String &name);
+	static RID create_omni_light(const RID &world_id, const Transform3D &transform, const RID &scenario_id, const String &name);
+	static RID create_omni_light_with_object(const RID &world_id, OmniLight3D *omni_light);
+	static RID create_spot_light_with_id(const RID &world_id, const RID &light_id, const Transform3D &transform, const String &name);
+	static RID create_spot_light(const RID &world_id, const Transform3D &transform, const String &name);
+	static RID create_spot_light_with_object(const RID &world_id, SpotLight3D *spot_light);
+	static RID create_viewport_with_id(const RID &world_id, const RID &viewport_id, const String &name);
+	static RID create_viewport_with_object(const RID &world_id, Viewport *viewport);
+	static RID create_voxel_gi_with_id(const RID &world_id, const RID &voxel_gi_id, const Transform3D& transform, const String &name);
+	static RID create_voxel_gi(const RID &world_id, const Transform3D &transform, const String &name);
+	static RID create_voxel_gi_with_object(const RID &world_id, VoxelGI *voxel_gi);
+	static RID create_scenario_with_id(const RID &world_id, const RID &scenario_id, const String &name);
+	static RID create_scenario(const RID &world_id, const String &name);
+	static RID create_occluder(const RID &world_id, const String &name);
+	static RID create_occluder_with_id(const RID &world_id, const RID &occluder_id, const String &name);
+	static RID create_occluder_with_object(const RID &world_id, OccluderInstance3D* occluder_instance);
+	static bool bake_material_check(const Ref<Material> &p_material);
+	static void bake_surface(const Transform3D &p_transform, const Array& p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, const PackedVector3Array &r_vertices, const PackedInt32Array &r_indices);
+	
 	static void _bind_methods();
 	
 

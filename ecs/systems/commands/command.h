@@ -6,10 +6,8 @@
 #define COMMAND_H
 #include <utility>
 #include "thirdparty/concurrentqueue/concurrentqueue.h"
-#include "core/object/ref_counted.h"
-#include "core/templates/rid.h"
 #include "core/object/class_db.h"
-
+#include "core/object/ref_counted.h"
 
 struct ICommand {
 	virtual ~ICommand() = default;
@@ -44,12 +42,12 @@ public:
 
 	void* allocate() {
 		void* ptr = nullptr;
-		if (!freelist.try_dequeue(ptr)) return nullptr;
+		if (!freelist.try_dequeue(ptr)) { return nullptr; }
 		return ptr;
 	}
 
 	void deallocate(void* ptr) {
-		if(!ptr) return;
+		if(!ptr) { return; }
 		freelist.enqueue(ptr);
 
 	}
@@ -126,7 +124,8 @@ private:
 };
 
 class CommandHandler : public RefCounted {
-	GDCLASS(CommandHandler, RefCounted);
+	GDCLASS(CommandHandler, RefCounted)
+
 	CommandQueue command_queue;
 
 public:

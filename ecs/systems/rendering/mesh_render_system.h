@@ -37,20 +37,20 @@ public:
 							.each([&](flecs::entity entity, const RenderInstanceComponent& render_instance_comp, const Transform3DComponent& transform_3d_component, const VisibilityComponent& visibility_comp) {
 						if (visibility_comp.visible) {
 							if(!entity.has<Occluded>()){
-								if(!render_instance_comp.render_instance_id.is_valid()) {
+								if(!render_instance_comp.instance_id.is_valid()) {
 									ERR_PRINT_ONCE("MeshRenderSystem::create_rendering: render_instance_id is 0, this should not happen");
 									return;
 								}
-								if (render_instance_comp.render_instance_id.is_null()) {
+								if (render_instance_comp.instance_id.is_null()) {
 									ERR_PRINT_ONCE("MeshRenderSystem::create_rendering: render_instance_id is null, this should not happen");
 									return;
 								}
-								if(!render_instance_comp.render_instance_id.is_valid()){
+								if(!render_instance_comp.instance_id.is_valid()){
 									ERR_PRINT_ONCE("MeshRenderSystem::create_rendering: render_instance_id is not valid, this should not happen");
 									return;
 								}
 								command_handler->enqueue_command([=]() {
-									RS::get_singleton()->instance_set_transform(render_instance_comp.render_instance_id, transform_3d_component.transform);
+									RS::get_singleton()->instance_set_transform(render_instance_comp.instance_id, transform_3d_component.transform);
 								});
 								return;
 								
@@ -60,7 +60,7 @@ public:
 						const Vector3 far_pos = Vector3(far_dist,far_dist,far_dist);
 						transform_far.set_origin(far_pos);
 						//command_queue.enqueue([=]() {
-							RS::get_singleton()->instance_set_transform(render_instance_comp.render_instance_id, transform_far);
+							RS::get_singleton()->instance_set_transform(render_instance_comp.instance_id, transform_far);
 						//});
 						return;
 					

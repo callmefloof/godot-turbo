@@ -1,14 +1,14 @@
 //
 // Created by Floof on 28-7-2025.
 //
+#include "mulitmesh_render_system.h"
+
 #include "core/math/aabb.h"
 #include "core/math/plane.h"
 #include "ecs/components/worldcomponents.h"
-#include "core/os/os.h"
 #include "servers/rendering_server.h"
 #include "ecs/components/transform_3d_component.h"
 #include "../commands/command.h"
-#include "mulitmesh_render_system.h"
 #include "ecs/components/rendering/rendering_components.h"
 #include "ecs/components/visibility_component.h"
 #include "ecs/components/dirty_transform.h"
@@ -150,17 +150,3 @@ void MultiMeshRenderSystem::create_rendering(Ref<CommandHandler>& command_handle
 	frustum_culling_system.set_name("MultiMeshRenderSystem: FrustumCulling");
 	pipeline_manager.add_to_pipeline(frustum_culling_system, flecs::OnUpdate);
 }
-
-void MultiMeshRenderSystem::_bind_methods() {
- 	//ClassDB::bind_static_method(get_class_static(),"get_singleton",&MultiMeshRenderSystem::get_singleton);
-}
-
-
-
-// MultiMeshRenderSystem *MultiMeshRenderSystem::get_singleton() {
-//  	if (!Engine::get_singleton()->has_singleton("MultiMeshRenderSystem")) {
-//  		Engine::get_singleton()->add_singleton(Engine::Singleton("MultiMeshRenderSystem",memnew(MultiMeshRenderSystem), "MultiMeshRenderSystem"));
-//  	}
-//  	static MultiMeshRenderSystem* singleton = cast_to<MultiMeshRenderSystem>(Engine::get_singleton()->get_singleton_object("MultiMeshRenderSystem"));
-//  	return singleton;
-// }

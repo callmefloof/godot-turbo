@@ -4,41 +4,33 @@
 
 #ifndef FLECS_SCRIPT_SYSTEM_H
 #define FLECS_SCRIPT_SYSTEM_H
-#include "core/io/resource.h"
-#include "core/object/object.h"
 #include "core/string/ustring.h"
-#include "core/templates/vector.h"
+#include "core/templates/rid.h"
 #include "core/typedefs.h"
 #include "core/variant/callable.h"
+#include "core/variant/variant.h"
 #include "thirdparty/flecs/distr/flecs.h"
-#include "ecs/systems/commands/command.h"
-#include "ecs/systems/flecs_system.h"
 
-class FlecsEntity;
-class Variant;
-struct QueryableComponent;
-
-class FlecsScriptSystem : public FlecsSystem {
-	GDCLASS(FlecsScriptSystem, FlecsSystem)
-private:
+class FlecsScriptSystem {
 	Callable callback;
-	Vector<String> required_components;
-	flecs::query<> get_query(const Vector<String> &component_names);
-	
+	PackedStringArray required_components;
+	flecs::query<> get_query(const PackedStringArray &component_names);
+	RID world_id;
+	flecs::world *world = nullptr;
 	flecs::query<> query;
-	
-
-protected:
-	static void _bind_methods();
 
 public:
-	void init(const Ref<FlecsWorld> &p_world, const Vector<String> &p_required_components, const Callable& p_callable);
-	void reset(const Ref<FlecsWorld> &p_world, const Vector<String> &p_required_components, const Callable& p_callable);
+	void init(const RID &world_id, const PackedStringArray &req_comps, const Callable& p_callable);
+	void reset(const RID &world_id, const PackedStringArray &req_comps, const Callable& p_callable);
 	void run() const;
-	void set_required_components(const Vector<String> &p_required_components);
-	Vector<String> get_required_components() const;
+	void set_required_components(const PackedStringArray &req_comps);
+	PackedStringArray get_required_components() const;
 	void set_callback(const Callable& p_callback);
 	Callable get_callback() const;
-	Vector<String> get_required_components();
+	PackedStringArray get_required_components();
+	flecs::world* _get_world() const;
+	void _set_world(flecs::world *p_world);
+	RID get_world();
+	void set_world(const RID &world_id);
 };
 #endif //FLECS_SCRIPT_SYSTEM_H

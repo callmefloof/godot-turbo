@@ -4,17 +4,16 @@
 
 #ifndef TILE_H
 #define TILE_H
-#include "core/object/ref_counted.h"
+#include "core/error/error_macros.h"
 #include "core/math/projection.h"
 #include "core/math/vector2.h"
 #include "core/math/vector2i.h"
 #include "core/math/vector3.h"
 #include "core/math/transform_3d.h"
 #include "core/variant/variant.h"
-#include "core/variant/typed_array.h"
 #include "core/templates/vector.h"
+#include "core/variant/dictionary.h"
 #include <algorithm>
-#include <vector>
 
 constexpr int OCCLUSION_WIDTH = 320;
 constexpr int OCCLUSION_HEIGHT = 180;
@@ -24,13 +23,54 @@ constexpr int TILE_RES = TILE_SIZE; // 1:1 sample-to-pixel in each tile
 constexpr int SCREEN_TILES_X = OCCLUSION_WIDTH / TILE_SIZE;
 constexpr int SCREEN_TILES_Y = OCCLUSION_HEIGHT / TILE_SIZE;
 
-class ScreenTriangle : public RefCounted {
-	GDCLASS(ScreenTriangle, RefCounted);
+struct ScreenTriangle {
+
 public:
 	ScreenTriangle() {
 		z0 = 0;
 		z1 = 0;
 		z2 = 0;
+	}
+
+	ScreenTriangle(const Vector2 &v0, const Vector2 &v1, const Vector2 &v2, float z0, float z1, float z2)
+		: v0(v0), v1(v1), v2(v2), z0(z0), z1(z1), z2(z2) {}
+
+	ScreenTriangle(const Dictionary &dict) {
+		if(!dict.has("v0")) { WARN_PRINT("Missing v0 in ScreenTriangle dictionary"); }
+		v0 = dict["v0"];
+		if(!dict.has("v1")) { WARN_PRINT("Missing v1 in ScreenTriangle dictionary"); }
+		v1 = dict["v1"];
+		if(!dict.has("v2")) { WARN_PRINT("Missing v2 in ScreenTriangle dictionary"); }
+		v2 = dict["v2"];
+		if(!dict.has("z0")) { WARN_PRINT("Missing z0 in ScreenTriangle dictionary"); }
+		z0 = dict["z0"];
+		if(!dict.has("z1")) { WARN_PRINT("Missing z1 in ScreenTriangle dictionary"); }
+		z1 = dict["z1"];
+		if(!dict.has("z2")) { WARN_PRINT("Missing z2 in ScreenTriangle dictionary"); }
+		z2 = dict["z2"];
+	}
+	Dictionary to_dict() const {
+		Dictionary dict;
+		dict["v0"] = v0;
+		dict["v1"] = v1;
+		dict["v2"] = v2;
+		dict["z0"] = z0;
+		dict["z1"] = z1;
+		dict["z2"] = z2;
+		return dict;
+	}
+
+	static Vector<ScreenTriangle> from_dict(const Dictionary &dict) {
+		Vector<ScreenTriangle> triangles;
+		for (const String key : dict.keys()) {
+			if (dict.has(key)) {
+				ScreenTriangle triangle(dict[key]);
+				triangles.push_back(triangle);
+			} else {
+				WARN_PRINT("Missing key in ScreenTriangle dictionary: " + key);
+			}
+		}
+		return triangles;
 	}
 
 	static Vector2 world_to_screen(const Vector3 &world_pos, const Transform3D &cam_view, const Projection &cam_proj, const Vector2 &screen_size) {
@@ -48,15 +88,13 @@ public:
 		return screen_pos;
 	}
 
-
-	static Vector<Ref<ScreenTriangle>> convert_to_screen_triangles(
+	static Vector<ScreenTriangle> convert_to_screen_triangles(
     const PackedVector3Array &vertices,
     const PackedInt32Array &indices,
     const Transform3D& cam_view,
     const Projection& cam_proj,
-    const Vector2& screen_size
-) {
-    Vector<Ref<ScreenTriangle>> screen_tris;
+    const Vector2& screen_size) {
+    Vector<ScreenTriangle> screen_tris;
     const size_t triangle_count = indices.size() / 3;
 
     for (size_t i = 0; i < triangle_count; ++i) {
@@ -90,22 +128,18 @@ public:
         Vector2 v2_screen = ((v2_ndc + Vector2(1,1)) * 0.5f) * screen_size;
 
         // Create ScreenTriangle
-        Ref<ScreenTriangle> tri = memnew(ScreenTriangle);
-        tri->v0 = v0_screen; tri->z0 = v0_view.z;
-        tri->v1 = v1_screen; tri->z1 = v1_view.z;
-        tri->v2 = v2_screen; tri->z2 = v2_view.z;
-
-        screen_tris.push_back(tri);
+        screen_tris.push_back({v0_screen, v1_screen, v2_screen, v0_view.z, v1_view.z, v2_view.z});
     }
 
-    return screen_tris;
+	return screen_tris;
 }
+
+
 	Vector2 v0, v1, v2;       // screen-space coordinates
 	float z0, z1, z2;         // depth values
 };
 
-class ScreenAABB : public RefCounted {
-	GDCLASS(ScreenAABB, RefCounted);
+struct ScreenAABB {
 public:
 	ScreenAABB() {
 		position = Vector2i(0, 0);
@@ -131,14 +165,14 @@ public:
 		return position.y + size.y;
 	}
 
-	static Ref<ScreenAABB> aabb_to_screen_aabb(
+	static ScreenAABB aabb_to_screen_aabb(
 		const AABB &aabb,
 		const Vector2i &screen_size,
 		const Projection &cam_projection,
 		const Transform3D &cam_transform,
 		const Vector2 &cam_view_offset
 	) {
-		Ref<ScreenAABB> screen_aabb = memnew(ScreenAABB);
+		ScreenAABB screen_aabb;
 
 		Transform3D cam_view = cam_transform.affine_inverse();
 
@@ -166,8 +200,8 @@ public:
 			if (clip_pos.z <= 0.0f) // Behind camera
 				continue;
 
-			screen_aabb->min_z = std::min(screen_aabb->min_z, view_pos.z);
-			screen_aabb->max_z = std::max(screen_aabb->max_z, view_pos.z);
+			screen_aabb.min_z = std::min(screen_aabb.min_z, view_pos.z);
+			screen_aabb.max_z = std::max(screen_aabb.max_z, view_pos.z);
 
 			Vector2 ndc = Vector2(clip_pos.x, clip_pos.y) / clip_pos.z;
 			Vector2 screen_pos = ((ndc + Vector2(1.0f, 1.0f)) * 0.5f) * screen_size + cam_view_offset;
@@ -176,15 +210,15 @@ public:
 			max_screen = max_screen.max(screen_pos);
 		}
 
-		screen_aabb->position = min_screen.floor();
-		screen_aabb->size = (max_screen - min_screen).ceil();
+		screen_aabb.position = min_screen.floor();
+		screen_aabb.size = (max_screen - min_screen).ceil();
 
 		return screen_aabb;
 	}
 };
 
 struct TileBin {
-	Vector<Ref<ScreenTriangle>> triangles;
+	Vector<ScreenTriangle> triangles;
 	Vector<float> depth_buffer; // tileWidth * tileHeight
 	int tile_width;
 

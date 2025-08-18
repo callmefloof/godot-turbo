@@ -1,14 +1,16 @@
 #include "render_system.h"
-
-
-void RenderSystem::_bind_methods(){
-
-}
+#include "servers/display_server.h"
 
 Vector2i RenderSystem::get_window_size() const {
-	return window_size;
+	return DisplayServer::get_singleton()->window_get_size();
 }
 
-void RenderSystem::set_window_size(const Vector2i &p_window_size) {
-	this->window_size = p_window_size;
+
+flecs::world* RenderSystem::get_world() const {
+    return world;
+}
+
+
+void RenderSystem::set_world(flecs::world *p_world) {
+    world = p_world;
 }

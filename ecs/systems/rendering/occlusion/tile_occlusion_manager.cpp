@@ -1,6 +1,7 @@
 #include "tile_occlusion_manager.h"
 #include "core/math/vector2i.h"
 #include "core/math/vector2.h"
+#include "thirdparty/concurrentqueue/concurrentqueue.h"
 
 
 // Each tile is accessed by only one thread — thread-safe with write[] access.
@@ -27,7 +28,7 @@ void TileOcclusionManager::rasterize_all_bins_parallel(const int thread_count) {
                 }
                 tile_buffers.write[i].clear();
 
-                for (const Ref<ScreenTriangle> &tri : tile_bins[i].triangles) {
+                for (const ScreenTriangle &tri : tile_bins[i].triangles) {
                     rasterize_triangle_to_tile(tri, tile_buffers.write[i], tile_origin);
                 }
             }
@@ -51,15 +52,15 @@ void TileOcclusionManager::initialize(const int p_screen_width, const int p_scre
         tile_bins.get(i).init(TILE_SIZE);
     }
 }
-Ref<ScreenAABB> TileOcclusionManager::compute_2d_aabb(const Vector2& v0, const Vector2& v1, const Vector2& v2) {
+ScreenAABB TileOcclusionManager::compute_2d_aabb(const Vector2& v0, const Vector2& v1, const Vector2& v2) {
     const float min_x = std::min({ v0.x, v1.x, v2.x });
     const float max_x = std::max({ v0.x, v1.x, v2.x });
     const float min_y = std::min({ v0.y, v1.y, v2.y });
     const float max_y = std::max({v0.y, v1.y, v2.y});
 
-    Ref<ScreenAABB> aabb = memnew(ScreenAABB);
-    aabb->position = Vector2i(static_cast<int>(min_x), static_cast<int>(min_y));
-    aabb->size = Vector2i(static_cast<int>(max_x - min_x), static_cast<int>(max_y - min_y));
+    ScreenAABB aabb;
+    aabb.position = Vector2i(static_cast<int>(min_x), static_cast<int>(min_y));
+    aabb.size = Vector2i(static_cast<int>(max_x - min_x), static_cast<int>(max_y - min_y));
     return aabb;
 }
 
@@ -78,14 +79,14 @@ void TileOcclusionManager::reset(const int32_t p_screen_width, const int32_t p_s
     initialize(p_screen_width, p_screen_height);
 }
 
-void TileOcclusionManager::bin_triangles(const Vector<Ref<ScreenTriangle>> &tris) {
+void TileOcclusionManager::bin_triangles(const Vector<ScreenTriangle> &tris) {
     for (auto &tri : tris) {
-        Ref<ScreenAABB> bb = compute_2d_aabb(tri->v0, tri->v1, tri->v2);
+        ScreenAABB bb = compute_2d_aabb(tri.v0, tri.v1, tri.v2);
 
-        const int min_tile_x = CLAMP(bb->min_x() / TILE_SIZE, 0, num_tiles_x - 1);
-        const int max_tile_x = CLAMP(bb->max_x() / TILE_SIZE, 0, num_tiles_x - 1);
-        const int min_tile_y = CLAMP(bb->min_y() / TILE_SIZE, 0, num_tiles_y - 1);
-        const int max_tile_y = CLAMP(bb->max_y() / TILE_SIZE, 0, num_tiles_y - 1);
+        const int min_tile_x = CLAMP(bb.min_x() / TILE_SIZE, 0, num_tiles_x - 1);
+        const int max_tile_x = CLAMP(bb.max_x() / TILE_SIZE, 0, num_tiles_x - 1);
+        const int min_tile_y = CLAMP(bb.min_y() / TILE_SIZE, 0, num_tiles_y - 1);
+        const int max_tile_y = CLAMP(bb.max_y() / TILE_SIZE, 0, num_tiles_y - 1);
 
         for (int ty = min_tile_y; ty <= max_tile_y; ++ty) {
             for (int tx = min_tile_x; tx <= max_tile_x; ++tx) {
@@ -118,10 +119,10 @@ bool TileOcclusionManager::is_inside_triangle(const Vector3 &bary){
     return bary.x >= 0.0f && bary.y >= 0.0f && bary.z >= 0.0f;
 }
 
-void TileOcclusionManager::rasterize_triangle_to_tile(const Ref<ScreenTriangle>& tri, TileBuffer& tile, const Vector2i & tile_origin) {
-    const Vector2 v0 = tri->v0 - tile_origin;
-    const Vector2 v1 = tri->v1 - tile_origin;
-    const Vector2 v2 = tri->v2 - tile_origin;
+void TileOcclusionManager::rasterize_triangle_to_tile(const ScreenTriangle& tri, TileBuffer& tile, const Vector2i & tile_origin) {
+    const Vector2 v0 = tri.v0 - tile_origin;
+    const Vector2 v1 = tri.v1 - tile_origin;
+    const Vector2 v2 = tri.v2 - tile_origin;
 
     // 2D bounding box in tile space
     int min_x = floor(min3(v0.x, v1.x, v2.x));
@@ -141,7 +142,7 @@ void TileOcclusionManager::rasterize_triangle_to_tile(const Ref<ScreenTriangle>&
             auto p = Vector2(x + 0.5f, y + 0.5f); // Pixel center
             if (Vector3 bary = compute_barycentric(p, v0, v1, v2); is_inside_triangle(bary)) {
                 // ReSharper disable once CppDFAUnreachableCode
-                if (const float z = bary.x * tri->z0 + bary.y * tri->z1 + bary.z * tri->z2; z < tile.depth[y][x]) {
+                if (const float z = bary.x * tri.z0 + bary.y * tri.z1 + bary.z * tri.z2; z < tile.depth[y][x]) {
                     tile.depth[y][x] = z;
                 }
             }
@@ -156,18 +157,18 @@ void TileOcclusionManager::rasterize_all_bins() {
             tile_buffers.write[idx].clear();
             Vector2i tile_origin(tile_x * TILE_SIZE, tile_y * TILE_SIZE);
             auto &tris = tile_bins[idx].triangles;
-            for (const Ref<ScreenTriangle> &tri : tris) {
+            for (const ScreenTriangle &tri : tris) {
                 rasterize_triangle_to_tile(tri, tile_buffers.write[idx], tile_origin);
             }
         }
     }
 }
 
-bool TileOcclusionManager::test_visibility(const Ref<ScreenAABB> &box, const float *occlusion_buffer, const int buffer_width, const int buffer_height) {
-    const int min_x = std::clamp(box->min_x(), 0, buffer_width - 1);
-    const int max_x = std::clamp(box->max_x(), 0, buffer_width - 1);
-    const int min_y = std::clamp(box->min_y(), 0, buffer_height - 1);
-    const int max_y = std::clamp(box->max_y(), 0, buffer_height - 1);
+bool TileOcclusionManager::test_visibility(const ScreenAABB &box, const float *occlusion_buffer, const int buffer_width, const int buffer_height) {
+    const int min_x = std::clamp(box.min_x(), 0, buffer_width - 1);
+    const int max_x = std::clamp(box.max_x(), 0, buffer_width - 1);
+    const int min_y = std::clamp(box.min_y(), 0, buffer_height - 1);
+    const int max_y = std::clamp(box.max_y(), 0, buffer_height - 1);
 
     // Sample some points (e.g. corners and center) for a coarse test
     constexpr int sample_count = 5;
@@ -189,7 +190,7 @@ bool TileOcclusionManager::test_visibility(const Ref<ScreenAABB> &box, const flo
         }
 
         // If our object is closer than what's already drawn, it's visible
-        if (const float occluder_depth = occlusion_buffer[index]; box->min_z < occluder_depth - 0.01f) { // Add epsilon to prevent z-fighting errors
+        if (const float occluder_depth = occlusion_buffer[index]; box.min_z < occluder_depth - 0.01f) { // Add epsilon to prevent z-fighting errors
             return true;
         }
     }
@@ -197,9 +198,9 @@ bool TileOcclusionManager::test_visibility(const Ref<ScreenAABB> &box, const flo
     return false; // Fully occluded
 }
 
-bool TileOcclusionManager::is_visible(const Ref<ScreenAABB> &aabb) const {
-    for (int ty = aabb->min_y() / TILE_RES; ty <= aabb->max_y() / TILE_RES; ++ty) {
-        for (int tx = aabb->min_x() / TILE_RES; tx <= aabb->max_x() / TILE_RES; ++tx) {
+bool TileOcclusionManager::is_visible(const ScreenAABB &aabb) const {
+    for (int ty = aabb.min_y() / TILE_RES; ty <= aabb.max_y() / TILE_RES; ++ty) {
+        for (int tx = aabb.min_x() / TILE_RES; tx <= aabb.max_x() / TILE_RES; ++tx) {
             const int tile_index = ty * num_tiles_x + tx;
             const TileBuffer &tile_buffer = tile_buffers[tile_index];
             if (test_visibility(aabb ,&tile_buffer.depth[0][0], TILE_RES, TILE_RES)) {return true;}
@@ -208,7 +209,7 @@ bool TileOcclusionManager::is_visible(const Ref<ScreenAABB> &aabb) const {
     return false;
 }
 
-std::vector<bool> TileOcclusionManager::test_all_visibility_concurrent(const std::vector<Ref<ScreenAABB>> &boxes, unsigned int thread_count) const {
+std::vector<bool> TileOcclusionManager::test_all_visibility_concurrent(const std::vector<ScreenAABB> &boxes, unsigned int thread_count) const {
     const int total = static_cast<int>(boxes.size());
     std::vector<bool> results(total, false);
 

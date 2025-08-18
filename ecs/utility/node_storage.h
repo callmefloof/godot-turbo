@@ -25,14 +25,14 @@ struct NodeContainer {
 
 class NodeStorage {
 private:
-	static inline Vector<NodeContainer> object_pool;
-	static inline Window* scene_node = nullptr;
+	Vector<NodeContainer> object_pool;
+	Window* scene_node = nullptr;
 public:
 	NodeStorage() = default;
 	~NodeStorage() {
 		release_all();
 	}
-	static void make_inert(Node *p_node) {
+	 void make_inert(Node *p_node) {
 		if (!p_node) return;
 
 		p_node->set_process(false);
@@ -65,7 +65,7 @@ public:
 
 	// Add Node + ObjectID to storage
 	template <typename T = Node>
-	static bool add(T* p_node, const ObjectID &p_id) {
+	 bool add(T* p_node, const ObjectID &p_id) {
 		if (!p_node || !p_id.is_valid()) {
 			return false;
 		}
@@ -97,7 +97,7 @@ public:
 	}
 
 	// Remove resource by RID
-	static bool release(const ObjectID &p_id) {
+	 bool release(const ObjectID &p_id) {
 		for (auto it = object_pool.begin(); it != object_pool.end(); ++it) {
 			if (it->id != p_id) {
 				continue;
@@ -113,7 +113,7 @@ public:
 	}
 
 	// Remove all resources
-	static void release_all() {
+	 void release_all() {
 		for (NodeContainer &container : object_pool) {
 			if (container.node) {
                 container.node->queue_free();
@@ -124,7 +124,7 @@ public:
 	}
 
 	// Check if RID exists
-	static bool has(const ObjectID &p_id) {
+	 bool has(const ObjectID &p_id) {
 		for (const NodeContainer &container : object_pool) {
 			if (container.id == p_id) {
                 return true;
@@ -135,7 +135,7 @@ public:
 	}
 
 	// Get container by ID
-	static NodeContainer *try_get(const ObjectID &p_id) {
+	 NodeContainer *try_get(const ObjectID &p_id) {
 		for (auto it = object_pool.begin(); it != object_pool.end(); ++it) {
 			if (it->id == p_id) {
 				return &*it;

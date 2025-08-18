@@ -1,44 +1,46 @@
 #include "bad_apple_system.h"
-#include "ecs/flecs_types/flecs_entity.h"
+#include "flecs_server.h"
 #include "scene/resources/texture.h"
 #include "ecs/components/rendering/rendering_components.h"
-#include "ecs/flecs_types/flecs_world.h"
 #include "servers/rendering_server.h"
+#include "core/math/vector2i.h"
+
 
 void BadAppleSystem::start() {
-    if(!world) {
-        ERR_PRINT_ONCE("World is not set for BadAppleSystem.");
-        return;
-    }
-    if(!flecs_world_ref) {
-        ERR_PRINT_ONCE("FlecsWorld reference is not set for BadAppleSystem.");
-        return;
-    }
-    if (!video_player) {
-        ERR_PRINT_ONCE("Video player is not set for BadAppleSystem.");
-        return;
-    }
-    if (!mm_entity.is_valid()) {
-        ERR_PRINT_ONCE("MM entity is not set for BadAppleSystem.");
-        return;
-    }
-    if(!mm_entity.has<MultiMeshComponent>()) {
-        ERR_PRINT_ONCE("MM entity does not have MultiMeshComponent for BadAppleSystem.");
-        return;
-    }
+    // if(!world) {
+    //     ERR_PRINT_ONCE("World is not set for BadAppleSystem.");
+    //     return;
+    // }
+    // if(!flecs_world_ref) {
+    //     ERR_PRINT_ONCE("FlecsWorld reference is not set for BadAppleSystem.");
+    //     return;
+    // }
+    // if (!video_player) {
+    //     ERR_PRINT_ONCE("Video player is not set for BadAppleSystem.");
+    //     return;
+    // }
+    // if (!mm_entity.is_valid()) {
+    //     ERR_PRINT_ONCE("MM entity is not set for BadAppleSystem.");
+    //     return;
+    // }
+    // if(!mm_entity.has<MultiMeshComponent>()) {
+    //     ERR_PRINT_ONCE("MM entity does not have MultiMeshComponent for BadAppleSystem.");
+    //     return;
+    // }
 
 
-    command_handler = flecs_world_ref->get_command_handler();
-    if(!command_handler.is_valid()) {
-        ERR_PRINT_ONCE("CommandHandler is not set for BadAppleSystem.");
-        return;
-    }
-    pipeline_manager = &flecs_world_ref->get_pipeline_manager();
-    if(!pipeline_manager) {
-        ERR_PRINT_ONCE("PipelineManager is not set for BadAppleSystem.");
-        return;
-    }
-    video_player->play();
+    // command_handler = world->get_command_handler();
+    // if(!command_handler.is_valid()) {
+    //     ERR_PRINT_ONCE("CommandHandler is not set for BadAppleSystem.");
+    //     return;
+    // }
+    // pipeline_manager = &flecs_world_ref->get_pipeline_manager();
+    // if(!pipeline_manager) {
+    //     ERR_PRINT_ONCE("PipelineManager is not set for BadAppleSystem.");
+    //     return;
+    // }
+    // video_player->play();
+    flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
     auto bad_apple_system = world->system<const MultiMeshInstanceComponent>()
         .with(flecs::ChildOf, mm_entity)
         .multi_threaded()
@@ -92,10 +94,7 @@ void BadAppleSystem::start() {
         });
 }
 
-void BadAppleSystem::set_mm_entity(FlecsEntity* p_mm_entity) {
-    mm_entity = p_mm_entity->get_internal_entity();
-    gd_mm_entity = p_mm_entity;
-}
+
 
 void BadAppleSystem::set_video_player(VideoStreamPlayer *p_video_player) {
     video_player = p_video_player;
@@ -105,17 +104,5 @@ VideoStreamPlayer *BadAppleSystem::get_video_player() const {
 	return video_player;
 }
 
-FlecsEntity* BadAppleSystem::get_mm_entity() const {
-	return gd_mm_entity;
-}
 
-void BadAppleSystem::_bind_methods() {
-    ClassDB::bind_method(D_METHOD("start"), &BadAppleSystem::start);
-    ClassDB::bind_method(D_METHOD("set_mm_entity", "mm_entity"), &BadAppleSystem::set_mm_entity);
-    ClassDB::bind_method(D_METHOD("set_video_player", "video_player"), &BadAppleSystem::set_video_player);
-    ClassDB::bind_method(D_METHOD("get_video_player"), &BadAppleSystem::get_video_player);
-    ClassDB::bind_method(D_METHOD("get_mm_entity"), &BadAppleSystem::get_mm_entity);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mm_entity", PROPERTY_HINT_RESOURCE_TYPE, "FlecsEntity"), "set_mm_entity", "get_mm_entity");
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_player", PROPERTY_HINT_RESOURCE_TYPE, "VideoStreamPlayer"), "set_video_player", "get_video_player");
-    
-}
+
