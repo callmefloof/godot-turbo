@@ -211,10 +211,17 @@ struct Navigation3DBaseComponents {
 	flecs::component<NavRegion3DComponent> region;
 	flecs::component<SourceGeometryParser3DComponent> source_geometry_parser;
 
-	explicit Navigation3DBaseComponents(const flecs::world &world) :
+	explicit Navigation3DBaseComponents(flecs::world &world) :
 			agent(world.component<NavAgent3DComponent>("NavAgent3DComponent")),
 			link(world.component<NavLink3DComponent>("NavLink3DComponent")),
 			obstacle(world.component<NavObstacle3DComponent>("NavObstacle3DComponent")),
 			region(world.component<NavRegion3DComponent>("NavRegion3DComponent")),
-			source_geometry_parser(world.component<SourceGeometryParser3DComponent>("SourceGeometryParser3DComponent")) {}
+			source_geometry_parser(world.component<SourceGeometryParser3DComponent>("SourceGeometryParser3DComponent")) {
+				ComponentRegistry::bind_to_world("NavAgent3DComponent", agent.id());
+				ComponentRegistry::bind_to_world("NavLink3DComponent", link.id());
+				ComponentRegistry::bind_to_world("NavObstacle3DComponent", obstacle.id());
+				ComponentRegistry::bind_to_world("NavRegion3DComponent", region.id());
+				ComponentRegistry::bind_to_world("SourceGeometryParser3DComponent", source_geometry_parser.id());
+			}
+
 };

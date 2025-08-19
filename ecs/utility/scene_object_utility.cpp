@@ -427,7 +427,8 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
         return result;
     }
     flecs::world *flecs_world = FlecsServer::get_singleton()->_get_world(world_id);
-    const String name = node->get_name();
+    String name = node->get_name();
+    name = name + "_" + itos(Math::rand());
     flecs::entity e = flecs_world->entity();
     e.set_name(name.ascii().get_data());
     SceneNodeComponent scene_node_component;

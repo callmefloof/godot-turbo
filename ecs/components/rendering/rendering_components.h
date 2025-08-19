@@ -1090,6 +1090,7 @@ struct Occluder : CompBase {
 		}
 	}
 };
+REGISTER_COMPONENT(Occluder);
 
 struct Occludee : CompBase {
 	AABB worldAABB;
@@ -1131,6 +1132,8 @@ struct Occludee : CompBase {
 		}
 	}
 };
+REGISTER_COMPONENT(Occludee);
+
 
 struct RenderingBaseComponents{
 	flecs::component<MeshComponent> mesh;
@@ -1158,30 +1161,57 @@ struct RenderingBaseComponents{
 	flecs::component<FrustumCulled> frustum_culled;
 	flecs::component<Occluded> occluded;
 
-	explicit RenderingBaseComponents(const flecs::world *world) :
-			mesh(world->component<MeshComponent>("MeshComponent")),
-			multi_mesh(world->component<MultiMeshComponent>("MultiMeshComponent")),
-			mesh_instance(world->component<MultiMeshInstanceComponent>("MultiMeshInstanceComponent")),
-			particles(world->component<ParticlesComponent>("ParticlesComponent")),
-			probe(world->component<ReflectionProbeComponent>("ReflectionProbeComponent")),
-			skeleton(world->component<SkeletonComponent>("SkeletonComponent")),
-			environment(world->component<EnvironmentComponent>("EnvironmentComponent")),
-			camera(world->component<CameraComponent>("CameraComponent")),
-			main_camera(world->component<MainCamera>("MainCamera")),
-			compositor(world->component<CompositorComponent>("CompositorComponent")),
-			directional_light(world->component<DirectionalLight3DComponent>("DirectionalLightComponent")),
-			directional_light_2d(world->component<DirectionalLight2DComponent>("DirectionalLight2DComponent")),
-			point_light(world->component<PointLightComponent>("PointLightComponent")),
-			omni_light(world->component<OmniLightComponent>("OmniLightComponent")),
-			spot_light(world->component<SpotLightComponent>("SpotLightComponent")),
-			viewport(world->component<ViewportComponent>("ViewportComponent")),
-			scenario(world->component<ScenarioComponent>("ScenarioComponent")),
-			voxel_gi(world->component<VoxelGIComponent>("VoxelGIComponent")),
-			instance(world->component<RenderInstanceComponent>("RenderInstanceComponent")),
-			canvas_item(world->component<CanvasItemComponent>("CanvasItemComponent")),
-			occluder(world->component<Occluder>("Occluder")),
-			occludee(world->component<Occludee>("Occludee")),
-			frustum_culled(world->component<FrustumCulled>("FrustumCulled")),
-			occluded(world->component<Occluded>("Occluded"))
-			{}
+	RenderingBaseComponents(flecs::world &world) :
+			mesh(world.component<MeshComponent>("MeshComponent")),
+			multi_mesh(world.component<MultiMeshComponent>("MultiMeshComponent")),
+			mesh_instance(world.component<MultiMeshInstanceComponent>("MultiMeshInstanceComponent")),
+			particles(world.component<ParticlesComponent>("ParticlesComponent")),
+			probe(world.component<ReflectionProbeComponent>("ReflectionProbeComponent")),
+			skeleton(world.component<SkeletonComponent>("SkeletonComponent")),
+			environment(world.component<EnvironmentComponent>("EnvironmentComponent")),
+			camera(world.component<CameraComponent>("CameraComponent")),
+			main_camera(world.component<MainCamera>("MainCamera")),
+			compositor(world.component<CompositorComponent>("CompositorComponent")),
+			directional_light(world.component<DirectionalLight3DComponent>("DirectionalLightComponent")),
+			directional_light_2d(world.component<DirectionalLight2DComponent>("DirectionalLight2DComponent")),
+			point_light(world.component<PointLightComponent>("PointLightComponent")),
+			omni_light(world.component<OmniLightComponent>("OmniLightComponent")),
+			spot_light(world.component<SpotLightComponent>("SpotLightComponent")),
+			viewport(world.component<ViewportComponent>("ViewportComponent")),
+			scenario(world.component<ScenarioComponent>("ScenarioComponent")),
+			voxel_gi(world.component<VoxelGIComponent>("VoxelGIComponent")),
+			instance(world.component<RenderInstanceComponent>("RenderInstanceComponent")),
+			canvas_item(world.component<CanvasItemComponent>("CanvasItemComponent")),
+			occluder(world.component<Occluder>("Occluder")),
+			occludee(world.component<Occludee>("Occludee")),
+			frustum_culled(world.component<FrustumCulled>("FrustumCulled")),
+			occluded(world.component<Occluded>("Occluded"))
+			{
+				// Register components with the world
+
+				ComponentRegistry::bind_to_world("MeshComponent", mesh.id());
+				ComponentRegistry::bind_to_world("MultiMeshComponent", multi_mesh.id());
+				ComponentRegistry::bind_to_world("MultiMeshInstanceComponent", mesh_instance.id());
+				ComponentRegistry::bind_to_world("ParticlesComponent", particles.id());
+				ComponentRegistry::bind_to_world("ReflectionProbeComponent", probe.id());
+				ComponentRegistry::bind_to_world("SkeletonComponent", skeleton.id());
+				ComponentRegistry::bind_to_world("EnvironmentComponent", environment.id());
+				ComponentRegistry::bind_to_world("CameraComponent", camera.id());
+				ComponentRegistry::bind_to_world("MainCamera", main_camera.id());
+				ComponentRegistry::bind_to_world("CompositorComponent", compositor.id());
+				ComponentRegistry::bind_to_world("DirectionalLight3DComponent", directional_light.id());
+				ComponentRegistry::bind_to_world("DirectionalLight2DComponent", directional_light_2d.id());
+				ComponentRegistry::bind_to_world("PointLightComponent", point_light.id());
+				ComponentRegistry::bind_to_world("OmniLightComponent", omni_light.id());
+				ComponentRegistry::bind_to_world("SpotLightComponent", spot_light.id());
+				ComponentRegistry::bind_to_world("ViewportComponent", viewport.id());
+				ComponentRegistry::bind_to_world("ScenarioComponent", scenario.id());
+				ComponentRegistry::bind_to_world("VoxelGIComponent", voxel_gi.id());
+				ComponentRegistry::bind_to_world("RenderInstanceComponent", instance.id());
+				ComponentRegistry::bind_to_world("CanvasItemComponent", canvas_item.id());
+				ComponentRegistry::bind_to_world("Occluder", occluder.id());
+				ComponentRegistry::bind_to_world("Occludee", occludee.id());
+				ComponentRegistry::bind_to_world("FrustumCulled", frustum_culled.id());
+				ComponentRegistry::bind_to_world("Occluded", occluded.id());
+			}
 };

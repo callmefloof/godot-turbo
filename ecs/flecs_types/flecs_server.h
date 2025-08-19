@@ -160,7 +160,6 @@ public:
 
 	bool progress_world(const RID& world_id, const double delta);
 	RID add_script_system(const RID& world_id, const Array &component_types, const Callable &callable);
-	void remove_script_system(const RID& world_id, const Callable &callable);
 	RID create_entity(const RID& world_id);
 	RID create_entity_with_name(const RID& world_id, const String &name);
 	RID create_entity_with_name_and_comps(const RID& world_id, const String &name, const TypedArray<RID> &components_type_ids);
@@ -226,7 +225,7 @@ public:
 	void set_world_singleton_with_id(const RID &world_id, const RID &comp_type_id, const Dictionary& comp_data);
 	Dictionary get_world_singleton_with_name(const RID &world_id, const String& comp_type);
 	Dictionary get_world_singleton_with_id(const RID &world_id, const RID &comp_type_id);
-	
+
 
 
 private:

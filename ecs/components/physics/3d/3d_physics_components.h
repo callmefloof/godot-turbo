@@ -172,9 +172,14 @@ struct Physics3DBaseComponents {
 	flecs::component<Joint3DComponent> joint;
 	flecs::component<SoftBody3DComponent> soft_body;
 
-	explicit Physics3DBaseComponents(const flecs::world *world) :
-			area(world->component<Area3DComponent>("Area3DComponent")),
-			body(world->component<Body3DComponent>("Body3DComponent")),
-			joint(world->component<Joint3DComponent>("Joint3DComponent")),
-			soft_body(world->component<SoftBody3DComponent>("SoftBody3DComponent")) {}
+	explicit Physics3DBaseComponents(flecs::world &world) :
+			area(world.component<Area3DComponent>("Area3DComponent")),
+			body(world.component<Body3DComponent>("Body3DComponent")),
+			joint(world.component<Joint3DComponent>("Joint3DComponent")),
+			soft_body(world.component<SoftBody3DComponent>("SoftBody3DComponent")) {
+				ComponentRegistry::bind_to_world("Area3DComponent", area.id());
+				ComponentRegistry::bind_to_world("Body3DComponent", body.id());
+				ComponentRegistry::bind_to_world("Joint3DComponent", joint.id());
+				ComponentRegistry::bind_to_world("SoftBody3DComponent", soft_body.id());
+			}
 };

@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "../../core/object/class_db.h"
+#include "core/os/memory.h"
 #include "ecs/utility/world_utility.h"
 #include "ecs/utility/scene_object_utility.h"
 #include "ecs/utility/resource_object_utility.h"
@@ -22,6 +23,8 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 	ClassDB::register_class<FlecsServer>();
+	FlecsServer* p_fs = memnew(FlecsServer);
+	Engine::get_singleton()->add_singleton(Engine::Singleton("FlecsServer", p_fs));
 	ClassDB::register_runtime_class<RenderUtility2D>();
 	ClassDB::register_runtime_class<RenderUtility3D>();
 	ClassDB::register_runtime_class<Physics3DUtility>();

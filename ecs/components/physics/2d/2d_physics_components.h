@@ -132,8 +132,12 @@ struct Physics2DBaseComponents {
 	flecs::component<Body2DComponent> body;
 	flecs::component<Joint2DComponent> joint;
 
-	explicit Physics2DBaseComponents(const flecs::world *world) :
-			area(world->component<Area2DComponent>("Area2DComponent")),
-			body(world->component<Body2DComponent>("Body2DComponent")),
-			joint(world->component<Joint2DComponent>("Joint2DComponent")){}
+	explicit Physics2DBaseComponents(flecs::world &world) :
+			area(world.component<Area2DComponent>("Area2DComponent")),
+			body(world.component<Body2DComponent>("Body2DComponent")),
+			joint(world.component<Joint2DComponent>("Joint2DComponent")){
+				ComponentRegistry::bind_to_world("Area2DComponent", area.id());
+				ComponentRegistry::bind_to_world("Body2DComponent", body.id());
+				ComponentRegistry::bind_to_world("Joint2DComponent", joint.id());
+			}
 };

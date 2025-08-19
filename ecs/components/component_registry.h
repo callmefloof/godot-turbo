@@ -28,26 +28,26 @@ struct ComponentRegistry {
         flecs::entity_t comp_id{};  // Flecs component ID in this world
     };
 
-    static HashMap<StringName, Entry>& get_map() {
-        static HashMap<StringName, Entry> map;
+    static HashMap<String, Entry>& get_map() {
+        static HashMap<String, Entry> map;
         return map;
     }
 
-    static void register_type(const StringName& name, Entry entry) {
+    static void register_type(const String& name, Entry entry) {
         get_map()[name] = entry;
     }
 
-    static Entry* lookup(const StringName& name) {
+    static Entry* lookup(const String& name) {
         return get_map().getptr(name);
     }
 
-    static void bind_to_world(const StringName& name, flecs::entity_t id) {
+    static void bind_to_world(const String& name, flecs::entity_t id) {
         if (Entry* e = lookup(name)) {
             e->comp_id = id;
         }
     }
 
-    static Dictionary to_dict(const flecs::entity& entity, const StringName& type_name) {
+    static Dictionary to_dict(const flecs::entity& entity, const String& type_name) {
         if (const Entry* entry = lookup(type_name)) {
             return entry->to_dict(entity);
         }
@@ -55,7 +55,7 @@ struct ComponentRegistry {
         return Dictionary();
     }
 
-    static Dictionary to_dict(flecs::world* world, const StringName& type_name) {
+    static Dictionary to_dict(flecs::world* world, const String& type_name) {
         if (const Entry* entry = lookup(type_name)) {
             flecs::entity comp_type = world->component(entry->comp_id);
             if (comp_type.is_valid()) {
@@ -86,7 +86,7 @@ struct ComponentRegistry {
         return Dictionary();
     }
 
-    static void from_dict(flecs::entity& entity, const Dictionary& dict, const StringName& type_name) {
+    static void from_dict(flecs::entity& entity, const Dictionary& dict, const String& type_name) {
         if (Entry* entry = lookup(type_name)) {
             entry->from_dict(entity, dict);
         } else {
@@ -104,7 +104,7 @@ struct ComponentRegistry {
         ERR_PRINT("ComponentRegistry::from_dict: type_id not found or entity does not have component");
     }
 
-    static void from_dict(flecs::world* world, const Dictionary& dict, const StringName& type_name) {
+    static void from_dict(flecs::world* world, const Dictionary& dict, const String& type_name) {
         if (const Entry* entry = lookup(type_name)) {
             flecs::entity comp_type = world->component(entry->comp_id);
             if (comp_type.is_valid()) {
@@ -139,13 +139,16 @@ struct ComponentRegistry {
         if (w->has<TYPE>()) {                                                           \
             return w->get<TYPE>().to_dict();                                            \
         }                                                                               \
+        ERR_PRINT("ComponentRegistry::to_dict: type_name not found");                   \
         return Dictionary();                                                            \
     }                                                                                   \
     static void TYPE##_from_dict_singleton(flecs::world *w, const Dictionary& d) {      \
         if (w->has<TYPE>()) {                                                           \
             w->get_mut<TYPE>().from_dict(d);                                            \
         } else {                                                                        \
-            ERR_PRINT("ComponentRegistry::from_dict: type_name not found");             \
+            TYPE comp;                                                                  \
+            comp.from_dict(d);                                                          \
+            w->set<TYPE>(comp);                                                         \
         }                                                                               \
     }                                                                                   \
                                                                                         \
@@ -153,6 +156,7 @@ struct ComponentRegistry {
         if (e.has<TYPE>()) {                                                            \
             return e.get<TYPE>().to_dict();                                             \
         }                                                                               \
+        ERR_PRINT("ComponentRegistry::to_dict: type_name not found");                   \
         return Dictionary();                                                            \
     }                                                                                   \
                                                                                         \
@@ -160,13 +164,15 @@ struct ComponentRegistry {
         if (e.has<TYPE>()) {                                                            \
             e.get_mut<TYPE>().from_dict(d);                                             \
         } else {                                                                        \
-            ERR_PRINT("ComponentRegistry::from_dict: type_name not found");             \
+            TYPE comp;                                                                  \
+            comp.from_dict(d);                                                          \
+            e.set<TYPE>(comp);                                                          \
         }                                                                               \
     }                                                                                   \
     struct TYPE##_AutoRegister {                                                        \
         TYPE##_AutoRegister() {                                                         \
             ComponentRegistry::register_type(                                           \
-                #TYPE,                                                                  \
+                String(#TYPE),                                                          \
                 ComponentRegistry::Entry{                                               \
                     []() -> std::unique_ptr<CompBase> { return std::make_unique<TYPE>(TYPE()); },       \
                     [](const flecs::entity &e) -> std::unique_ptr<CompBase> {           \

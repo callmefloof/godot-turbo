@@ -220,10 +220,16 @@ struct Navigation2DBaseComponents {
 	flecs::component<NavRegion2DComponent> region;
 	flecs::component<SourceGeometryParser2DComponent> source_geometry_parser;
 
-	explicit Navigation2DBaseComponents(const flecs::world *world) :
-			agent(world->component<NavAgent2DComponent>("NavAgent2DComponent")),
-			link(world->component<NavLink2DComponent>("NavLink2DComponent")),
-			obstacle(world->component<NavObstacle2DComponent>("NavObstacle2DComponent")),
-			region(world->component<NavRegion2DComponent>("NavRegion2DComponent")),
-			source_geometry_parser(world->component<SourceGeometryParser2DComponent>("SourceGeometryParser2DComponent")) {}
+	explicit Navigation2DBaseComponents(flecs::world &world) :
+			agent(world.component<NavAgent2DComponent>("NavAgent2DComponent")),
+			link(world.component<NavLink2DComponent>("NavLink2DComponent")),
+			obstacle(world.component<NavObstacle2DComponent>("NavObstacle2DComponent")),
+			region(world.component<NavRegion2DComponent>("NavRegion2DComponent")),
+			source_geometry_parser(world.component<SourceGeometryParser2DComponent>("SourceGeometryParser2DComponent")) {
+				ComponentRegistry::bind_to_world("NavAgent2DComponent", agent.id());
+				ComponentRegistry::bind_to_world("NavLink2DComponent", link.id());
+				ComponentRegistry::bind_to_world("NavObstacle2DComponent", obstacle.id());
+				ComponentRegistry::bind_to_world("NavRegion2DComponent", region.id());
+				ComponentRegistry::bind_to_world("SourceGeometryParser2DComponent", source_geometry_parser.id());
+			}
 };

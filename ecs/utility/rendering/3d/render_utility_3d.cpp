@@ -298,17 +298,17 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_with_object(const RID &world_
 	for (uint32_t i = 0; i < size; ++i) {
 		transforms[i] = multi_mesh_instance->get_transform();
 	}
-	entities.append_array(create_multi_mesh_instances(world_id, transforms, multi_mesh_id));
+	entities.append_array(create_multi_mesh_instances(world_id, transforms, entity));
 
 
 
 	return entities;
 }
 
-TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id,const TypedArray<Transform3D> &transforms, const RID &multi_mesh_id) {
+TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id,const TypedArray<Transform3D> &transforms, const RID &multi_mesh_entity_id) {
 	TypedArray<RID> entities;
 	flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
-	flecs::entity mm_entity = FlecsServer::get_singleton()->_get_entity(multi_mesh_id, world_id);
+	flecs::entity mm_entity = FlecsServer::get_singleton()->_get_entity(multi_mesh_entity_id, world_id);
 	uint32_t instance_count = mm_entity.get<MultiMeshComponent>().instance_count;
 
 
@@ -1113,7 +1113,7 @@ void RenderUtility3D::_bind_methods(){
 	ClassDB::bind_static_method(get_class_static(), "create_spot_light",
 		&RenderUtility3D::create_spot_light, "flecs_world", "transform", "name");
 
-		
+
 	ClassDB::bind_static_method(get_class_static(), "create_spot_light_with_id",
 		&RenderUtility3D::create_spot_light_with_id, "flecs_world", "light_id", "transform", "name");
 	ClassDB::bind_static_method(get_class_static(), "create_spot_light_with_object",
