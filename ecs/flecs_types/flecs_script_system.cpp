@@ -27,19 +27,19 @@ flecs::query<> FlecsScriptSystem::get_query(const Vector<String> &component_name
 	return q.build();
 }
 
-void FlecsScriptSystem::init(const RID &world_id, const PackedStringArray &req_comps, const Callable& p_callable) {
+void FlecsScriptSystem::init(const RID &game_world_id, const PackedStringArray &req_comps, const Callable& p_callable) {
 	if(query.c_ptr()){
 		query.destruct();
 	}
-	set_world(world_id);
+	set_world(game_world_id);
 	set_required_components(req_comps);
 	set_callback(p_callable);
 	query = get_query(req_comps);
 
 }
 
-void FlecsScriptSystem::reset(const RID &world_id, const PackedStringArray &req_comps, const Callable& p_callable){
-	init(world_id, req_comps, p_callable);
+void FlecsScriptSystem::reset(const RID &game_world_id, const PackedStringArray &req_comps, const Callable& p_callable){
+	init(game_world_id, req_comps, p_callable);
 }
 void FlecsScriptSystem::run() const {
 	// Get the query based on required_components

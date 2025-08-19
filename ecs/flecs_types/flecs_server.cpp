@@ -1,6 +1,8 @@
 #include "flecs_server.h"
 
 #include "component_registry.h"
+#include "core/object/class_db.h"
+#include "core/object/object.h"
 #include "core/object/ref_counted.h"
 #include "core/string/string_name.h"
 #include "core/error/error_macros.h"
@@ -14,6 +16,7 @@
 #include "flecs_script_system.h"
 #include "ecs/components/rendering/rendering_components.h"
 #include "ecs/components/script_visible_component.h"
+#include "node_storage.h"
 #include "ref_storage.h"
 #include "systems/rendering/mulitmesh_render_system.h"
 #include "core/string/ustring.h"
@@ -46,6 +49,9 @@ Error FlecsServer::init() {
 FlecsServer *FlecsServer::singleton = nullptr;
 
 FlecsServer *FlecsServer::get_singleton() {
+	if(!singleton){
+		singleton = memnew(FlecsServer);
+	}
 	return singleton;
 }
 
@@ -64,6 +70,64 @@ void FlecsServer::finish() {
 }
 
 void FlecsServer::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("create_world"), &FlecsServer::create_world);
+	ClassDB::bind_method(D_METHOD("init_world", "world_id"), &FlecsServer::init_world);
+	ClassDB::bind_method(D_METHOD("progress_world", "world_id", "delta"), &FlecsServer::progress_world);
+	ClassDB::bind_method(D_METHOD("create_entity", "world_id"), &FlecsServer::create_entity);
+	ClassDB::bind_method(D_METHOD("create_entity_with_name", "world_id", "name"), &FlecsServer::create_entity_with_name);
+	ClassDB::bind_method(D_METHOD("create_entity_with_name_and_comps", "world_id", "name", "components_type_ids"), &FlecsServer::create_entity_with_name_and_comps);
+	ClassDB::bind_method(D_METHOD("lookup", "world_id", "entity_name"), &FlecsServer::lookup);
+	ClassDB::bind_method(D_METHOD("get_world_of_entity", "entity_id"), &FlecsServer::get_world_of_entity);
+	//all underscore types are not exposed and are only used internally
+	ClassDB::bind_method(D_METHOD("init_render_system", "world_id"), &FlecsServer::init_render_system);
+	ClassDB::bind_method(D_METHOD("register_component_type", "world_id", "type_name", "script_visible_component_data"), &FlecsServer::register_component_type);
+	ClassDB::bind_method(D_METHOD("add_component", "entity_id", "component_type_id"), &FlecsServer::add_component);
+	ClassDB::bind_method(D_METHOD("has_component", "entity_id", "component_type"), &FlecsServer::has_component);
+	ClassDB::bind_method(D_METHOD("get_render_system_command_handler", "world_id"), &FlecsServer::get_render_system_command_handler);
+	ClassDB::bind_method(D_METHOD("remove_all_components_from_entity", "entity_id"), &FlecsServer::remove_all_components_from_entity);
+	ClassDB::bind_method(D_METHOD("get_component_types_as_name", "entity_id"), &FlecsServer::get_component_types_as_name);
+	ClassDB::bind_method(D_METHOD("get_component_types_as_id", "entity_id"), &FlecsServer::get_component_types_as_id);
+	ClassDB::bind_method(D_METHOD("get_entity_name", "entity_id"), &FlecsServer::get_entity_name);
+	ClassDB::bind_method(D_METHOD("set_entity_name", "entity_id", "name"), &FlecsServer::set_entity_name);
+	ClassDB::bind_method(D_METHOD("set_component", "entity_id", "component_name", "comp_data"), &FlecsServer::set_component);
+	ClassDB::bind_method(D_METHOD("remove_component_from_entity_with_id", "entity_id", "component_type_id"), &FlecsServer::remove_component_from_entity_with_id);
+	ClassDB::bind_method(D_METHOD("remove_component_from_entity_with_name", "entity_id", "component_type"), &FlecsServer::remove_component_from_entity_with_name);
+	ClassDB::bind_method(D_METHOD("get_component_by_name", "entity_id", "component_type"), &FlecsServer::get_component_by_name);
+	ClassDB::bind_method(D_METHOD("get_component_by_id", "entity_id", "component_type_id"), &FlecsServer::get_component_by_id);
+	ClassDB::bind_method(D_METHOD("get_component_type_by_name", "entity_id", "component_type"), &FlecsServer::get_component_type_by_name);
+	ClassDB::bind_method(D_METHOD("get_parent", "entity_id"), &FlecsServer::get_parent);
+	ClassDB::bind_method(D_METHOD("set_parent", "entity_id", "parent_id"), &FlecsServer::set_parent);
+	ClassDB::bind_method(D_METHOD("add_child", "parent_id", "child_id"), &FlecsServer::add_child);
+	ClassDB::bind_method(D_METHOD("remove_child", "child"), &FlecsServer::remove_child);
+	ClassDB::bind_method(D_METHOD("get_children", "parent_id"), &FlecsServer::get_children);
+	ClassDB::bind_method(D_METHOD("get_child", "parent_id", "index"), &FlecsServer::get_child);
+
+	ClassDB::bind_method(D_METHOD("set_children", "parent_id", "children"), &FlecsServer::set_children);
+	ClassDB::bind_method(D_METHOD("get_child_by_name", "parent_id", "name"), &FlecsServer::get_child_by_name);
+	ClassDB::bind_method(D_METHOD("remove_child_by_name", "parent_id", "name"), &FlecsServer::remove_child_by_name);
+	ClassDB::bind_method(D_METHOD("remove_child_by_index", "parent_id", "index"), &FlecsServer::remove_child_by_index);
+	ClassDB::bind_method(D_METHOD("remove_all_children", "parent_id"), &FlecsServer::remove_all_children);
+	ClassDB::bind_method(D_METHOD("add_relationship", "entity_id", "relationship"), &FlecsServer::add_relationship);
+	ClassDB::bind_method(D_METHOD("remove_relationship", "entity_id", "relationship"), &FlecsServer::remove_relationship);
+	ClassDB::bind_method(D_METHOD("get_relationships", "entity_id"), &FlecsServer::get_relationships);
+	ClassDB::bind_method(D_METHOD("get_relationship", "entity_id", "relationship"), &FlecsServer::get_relationship);
+	ClassDB::bind_method(D_METHOD("free_world", "world_id"), &FlecsServer::free_world);
+	ClassDB::bind_method(D_METHOD("free_system", "world_id", "system_id"), &FlecsServer::free_system);
+	ClassDB::bind_method(D_METHOD("free_script_system", "world_id", "script_system_id"), &FlecsServer::free_script_system);
+	ClassDB::bind_method(D_METHOD("free_entity", "world_id", "entity_id"), &FlecsServer::free_entity);
+	ClassDB::bind_method(D_METHOD("free_type_id", "world_id", "type_id"), &FlecsServer::free_type_id);
+	ClassDB::bind_method(D_METHOD("add_to_ref_storage", "resource", "world_id"), &FlecsServer::add_to_ref_storage);
+	ClassDB::bind_method(D_METHOD("remove_from_ref_storage", "resource_rid", "world_id"), &FlecsServer::remove_from_ref_storage);
+	ClassDB::bind_method(D_METHOD("get_resource_from_ref_storage", "resource_id", "world_id"), &FlecsServer::get_resource_from_ref_storage);
+	ClassDB::bind_method(D_METHOD("add_to_node_storage", "node", "world_id"), &FlecsServer::add_to_node_storage);
+	ClassDB::bind_method(D_METHOD("remove_from_node_storage", "node_id", "world_id"), &FlecsServer::remove_from_node_storage);
+	ClassDB::bind_method(D_METHOD("get_node_from_node_storage", "node_id", "world_id"), &FlecsServer::get_node_from_node_storage);
+	ClassDB::bind_method(D_METHOD("set_world_singleton_with_name", "world_id", "name"), &FlecsServer::set_world_singleton_with_name);
+	ClassDB::bind_method(D_METHOD("set_world_singleton_with_id", "world_id", "comp_type_id", "comp_data"), &FlecsServer::set_world_singleton_with_id);
+	ClassDB::bind_method(D_METHOD("get_world_singleton_with_name", "world_id", "name"), &FlecsServer::get_world_singleton_with_name);
+	ClassDB::bind_method(D_METHOD("get_world_singleton_with_id", "world_id", "comp_type_id"), &FlecsServer::get_world_singleton_with_id);
+
+	ClassDB::bind_static_method(get_class_static(), "get_singleton", &FlecsServer::get_singleton);
 }
 
 FlecsServer::FlecsServer() {
@@ -72,6 +136,10 @@ FlecsServer::FlecsServer() {
 	worlds.resize(MAX_WORLD_COUNT);
 	command_handler_callback = Callable(render_system_command_handler.ptr(), "process_command");
 
+}
+
+FlecsServer::~FlecsServer() {
+	singleton = nullptr;
 }
 
 RID FlecsServer::create_world() {
@@ -143,6 +211,7 @@ RID FlecsServer::create_entity(const RID &world_id) {
 }
 
 RID FlecsServer::create_entity_with_name(const RID &world_id, const String &p_name) {
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_entity_with_name);
 	RID flecs_entity = create_entity(world_id);
 	FlecsEntityVariant *flecs_entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(flecs_entity);
 	if (flecs_entity_variant) {
@@ -152,6 +221,7 @@ RID FlecsServer::create_entity_with_name(const RID &world_id, const String &p_na
 }
 
 RID FlecsServer::create_entity_with_name_and_comps(const RID& world_id, const String &name, const TypedArray<RID> &components_type_ids) {
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_entity_with_name);
 	RID flecs_entity = create_entity_with_name(world_id,name);
 	for(const RID comp_type_id : components_type_ids) {
 		FlecsTypeIDVariant *type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
@@ -165,9 +235,8 @@ RID FlecsServer::create_entity_with_name_and_comps(const RID& world_id, const St
 }
 
 RID FlecsServer::lookup(const RID &world_id, const String &entity_name) {
-	FlecsWorldVariant* world_variant = flecs_world_owners.get_or_null(world_id);
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_entity_with_name);
 	if (world_variant) {
-		flecs::world *world = &world_variant->get_world();
 		flecs::entity entity = world->lookup(entity_name.ascii().get_data());
 		if (!entity.is_valid()) {
 			ERR_PRINT("FlecsServer::lookup: entity not found");
@@ -179,6 +248,10 @@ RID FlecsServer::lookup(const RID &world_id, const String &entity_name) {
 }
 
 flecs::world *FlecsServer::_get_world(const RID &world_id) {
+	if (!worlds.has(world_id)) {
+		ERR_PRINT("FlecsServer::_get_world: world_id is not a valid world");
+		return nullptr;
+	}
 	FlecsWorldVariant *world_variant = flecs_world_owners.get_or_null(world_id);
 	if (world_variant) {
 		return &world_variant->get_world();
@@ -199,11 +272,8 @@ RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 }
 
 void FlecsServer::init_render_system(const RID &world_id) {
-	flecs::world *world = _get_world(world_id);
-	if (!world) {
-		ERR_PRINT("FlecsServer::init_render_system: world not found");
-		return;
-	}
+	CHECK_WORLD_VALIDITY(world_id, create_entity_with_name);
+
 	flecs::entity main_camera;
 
 	world->each<CameraComponent>([&](flecs::entity e, const CameraComponent& cam) {
@@ -226,7 +296,7 @@ void FlecsServer::init_render_system(const RID &world_id) {
 	mesh_render_systems.get(world_id).set_main_camera(main_camera);
 
 	auto render_command_handler = get_render_system_command_handler(world_id);
-	auto pipeline_manager = get_pipeline_manager(world_id);
+	auto pipeline_manager = _get_pipeline_manager(world_id);
 	if(!pipeline_manager.has_value()) {
 		ERR_PRINT("FlecsServer::init_render_system: PipelineManager not found for world_id: " + itos(world_id.get_id()));
 		return;
@@ -253,6 +323,7 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp));
 }
  RID FlecsServer::add_script_system(const RID& world_id, const Array &component_types, const Callable &callable) {
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), add_script_system);
 	FlecsScriptSystem flecs_script_system;
 	flecs_script_system.set_world(world_id);
 	PackedStringArray component_names;
@@ -267,7 +338,8 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 }
 
 
-std::optional<PipelineManager> FlecsServer::get_pipeline_manager(const RID &world_id) {
+std::optional<PipelineManager> FlecsServer::_get_pipeline_manager(const RID &world_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, std::nullopt, _get_pipeline_manager);
 	if (worlds.has(world_id)) {
 		auto it = pipeline_managers.find(world_id);
 		if (it != pipeline_managers.end()) {
@@ -278,24 +350,29 @@ std::optional<PipelineManager> FlecsServer::get_pipeline_manager(const RID &worl
 }
 
 Ref<CommandHandler> FlecsServer::get_render_system_command_handler(const RID &world_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, nullptr, get_render_system_command_handler);
 	return render_system_command_handler;
 }
 
 
 void FlecsServer::remove_all_components_from_entity(const RID &entity_id) {
 	RID world_id = get_world_of_entity(entity_id);
-	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
-	if (entity_variant) {
-		entity_variant->get_entity().clear();
-	} else {
-		ERR_PRINT("FlecsServer::remove_all_components_from_entity: entity_id is not a valid entity");
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::remove_all_components_from_entity: world_id is not valid");
+		return;
 	}
+	CHECK_ENTITY_VALIDITY(entity_id, world_id, remove_all_components_from_entity);
+	entity.clear(); // Clear all components from the entity
 }
 
 
 Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String &component_type)  {
 	Dictionary component_data;
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::get_component_by_name: world_id is not valid");
+		return component_data;
+	}
 	FlecsEntityVariant *entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -306,6 +383,10 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 }
 bool FlecsServer::has_component(const RID& entity_id, const String &component_type) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::has_component: world_id is not valid");
+		return false;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -315,8 +396,14 @@ bool FlecsServer::has_component(const RID& entity_id, const String &component_ty
 	ERR_PRINT("FlecsServer::has_component: entity_id is not a valid entity");
 	return false;
 }
+
+
 PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::get_component_types_as_name: world_id is not valid");
+		return PackedStringArray();
+	}
 	flecs::world *world = _get_world(world_id);
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
@@ -330,8 +417,32 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 	ERR_PRINT("FlecsServer::get_component_types_as_name: entity_id is not a valid entity");
 	return PackedStringArray();
 }
+
+TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
+	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::get_component_types_as_id: world_id is not valid");
+		return TypedArray<RID>();
+	}
+	TypedArray<RID> component_ids;
+	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
+	if (entity_variant) {
+		flecs::entity entity = entity_variant->get_entity();
+		entity.each([&](flecs::id type) {
+			component_ids.push_back(flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(type)));
+		});
+		return component_ids;
+	}
+	ERR_PRINT("FlecsServer::get_component_types_as_id: entity_id is not a valid entity");
+	return TypedArray<RID>();
+}
+
 String FlecsServer::get_entity_name(const RID &entity_id) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::get_entity_name: world_id is not valid");
+		return String();
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -342,6 +453,10 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 }
  void FlecsServer::set_entity_name(const RID& entity_id, const String &p_name) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::set_component: world_id is not valid");
+		return;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -353,6 +468,10 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 
 void FlecsServer::set_component(const RID& entity_id, const String& component_type, const Dictionary &comp_data) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::set_component: world_id is not valid");
+		return;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -365,8 +484,31 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 	}
 }
 
+void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, const RID &component_id) {
+	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::remove_component_from_entity_with_id: world_id is not valid");
+		return;
+	}
+	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
+	if (entity_variant) {
+		flecs::entity entity = entity_variant->get_entity();
+		flecs::entity_t comp_id = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_id)->get_type();
+		flecs::entity comp_type = entity.world().component(comp_id);
+		if (comp_type.is_valid()) {
+			entity.remove(comp_type);
+		}
+	} else {
+		ERR_PRINT("FlecsServer::remove_component_from_entity_with_id: entity_id is not a valid entity");
+	}
+}
+
 void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, const String &component_type) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: world_id is not valid");
+		return;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -381,6 +523,10 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 
 Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& component_type_id) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::get_component_by_id: world_id is not valid");
+		return Dictionary();
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
@@ -399,6 +545,10 @@ Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& com
 
 RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &component_type) {
 	RID world_id = get_world_of_entity(entity_id);
+	if(!world_id.is_valid()){
+		ERR_PRINT("FlecsServer::get_component_type_by_name: world_id is not valid");
+		return RID();
+	}
 	FlecsEntityVariant* flecs_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (flecs_entity) {
 		flecs::entity entity = flecs_entity->get_entity();
@@ -423,6 +573,20 @@ RID FlecsServer::get_parent(const RID& entity_id) {
 	}
 	ERR_FAIL_V_MSG(RID(), "Parent not found for entity_id: " + itos(entity_id.get_id()));
 }
+
+void FlecsServer::set_parent(const RID& entity_id, const RID& parent_id) {
+	RID world_id = get_world_of_entity(entity_id);
+	FlecsEntityVariant* flecs_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
+	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
+	if (flecs_entity && parent_variant) {
+		flecs::entity entity = flecs_entity->get_entity();
+		flecs::entity parent = parent_variant->get_entity();
+		entity.add(flecs::ChildOf, parent);
+	} else {
+		ERR_PRINT("FlecsServer::set_parent: entity_id or parent_id is not a valid entity");
+	}
+}
+
 
 
 RID FlecsServer::get_child(const RID& entity_id, int index) {
@@ -455,6 +619,67 @@ void FlecsServer::set_children(const RID &parent_id, const TypedArray<RID> &p_ch
 	}
 }
 
+RID FlecsServer::get_child_by_name(const RID &parent_id,const String &name){
+	RID world_id = get_world_of_entity(parent_id);
+	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
+	if (parent_variant) {
+		flecs::entity parent = parent_variant->get_entity();
+		RID child_rid;
+		parent.children([&](flecs::entity child) {
+			if (child.name() == name.ascii().get_data()) {
+				child_rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(child));
+			}
+		});
+		return child_rid;
+	}
+	ERR_FAIL_V_MSG(RID(), "Child not found for parent_id: " + itos(parent_id.get_id()) + " with name: " + name);
+}
+
+void FlecsServer::remove_child_by_name(const RID &parent_id, const String &name){
+	RID world_id = get_world_of_entity(parent_id);
+	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
+	if (parent_variant) {
+		flecs::entity parent = parent_variant->get_entity();
+		parent.children([&](flecs::entity child) {
+			if (child.name() == name.ascii().get_data()) {
+				child.remove(flecs::ChildOf);
+			}
+		});
+	} else {
+		ERR_PRINT("FlecsServer::remove_child_by_name: parent_id is not a valid entity");
+	}
+	
+}
+void FlecsServer::remove_child_by_index(const RID &parent_id, int index) {
+	RID world_id = get_world_of_entity(parent_id);
+	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
+	if (parent_variant) {
+		flecs::entity parent = parent_variant->get_entity();
+		int i = 0;
+		parent.children([&](flecs::entity child) {
+			if (i == index) {
+				child.remove(flecs::ChildOf);
+			}
+			i++;
+		});
+	} else {
+		ERR_PRINT("FlecsServer::remove_child_by_index: parent_id is not a valid entity");
+	}
+}
+
+void FlecsServer::remove_all_children(const RID &parent_id) {
+	RID world_id = get_world_of_entity(parent_id);
+	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
+	if (parent_variant) {
+		flecs::entity parent = parent_variant->get_entity();
+		parent.children([&](flecs::entity child) {
+			child.remove(flecs::ChildOf);
+		});
+	} else {
+		ERR_PRINT("FlecsServer::remove_all_children: parent_id is not a valid entity");
+	}
+}
+
 void FlecsServer::add_child(const RID &parent_id, const RID& child_id) {
 	// Implementation for adding a child entity
 	RID world_id = get_world_of_entity(parent_id);
@@ -467,6 +692,23 @@ void FlecsServer::add_child(const RID &parent_id, const RID& child_id) {
 		return;
 	}
 	ERR_PRINT("FlecsServer::add_child: parent or child entity not found");
+}
+
+void FlecsServer::remove_child(const RID& parent_id, const RID &child_id) {
+	RID world_id = get_world_of_entity(parent_id);
+	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
+	FlecsEntityVariant* child_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(child_id);
+	if (parent_variant && child_variant) {
+		flecs::entity parent = parent_variant->get_entity();
+		flecs::entity child = child_variant->get_entity();
+		if(child.parent() != parent) {
+			ERR_PRINT("FlecsServer::remove_child: child is not a child of the specified parent");
+			return;
+		}
+		child.remove(flecs::ChildOf);
+		return;
+	}
+	ERR_PRINT("FlecsServer::remove_child: parent or child entity not found");
 }
 
 TypedArray<RID> FlecsServer::get_children(const RID &parent_id) {
@@ -498,20 +740,6 @@ void FlecsServer::add_component(const RID& entity_id, const RID& component_id) {
 		ERR_PRINT("FlecsServer::add_component: entity_id or component_id is not valid");
 	}
 
-}
-
-
-void FlecsServer::remove_all_children(const RID &parent_id) {
-	RID world_id = get_world_of_entity(parent_id);
-	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
-	if (parent_variant) {
-		flecs::entity parent = parent_variant->get_entity();
-		parent.children([&](flecs::entity child) {
-			child.remove(flecs::ChildOf);
-		});
-	} else {
-		ERR_PRINT("FlecsServer::remove_all_children: parent_id is not a valid entity");
-	}
 }
 
 void FlecsServer::add_relationship(const RID& entity_id, const RID &relationship) {
@@ -749,9 +977,9 @@ void FlecsServer::add_to_node_storage(Node *node, const RID &world_id) {
 	}
 }
 
-void FlecsServer::remove_from_node_storage(const ObjectID &node_id, const RID &world_id) {
+void FlecsServer::remove_from_node_storage(const int64_t node_id, const RID &world_id) {
 	if (node_storages.has(world_id)) {
-		node_storages.get(world_id).release(node_id);
+		node_storages.get(world_id).release(ObjectID(node_id));
 	} else {
 		ERR_PRINT("FlecsServer::remove_from_node_storage: world_id is not a valid world");
 	}
@@ -767,6 +995,19 @@ Ref<Resource> FlecsServer::get_resource_from_ref_storage(const RID &resource_rid
 	ERR_PRINT("FlecsServer::get_resource_from_ref_storage: world_id is not a valid world");
 	return Ref<Resource>();
 	
+}
+
+Node* FlecsServer::get_node_from_node_storage(const int64_t node_id, const RID &world_id) {
+	if (node_storages.has(world_id)) {
+		NodeContainer* node_storage = node_storages.get(world_id).try_get(ObjectID(node_id));
+		if (node_storage) {
+			return node_storage->node;
+		}
+		ERR_PRINT("FlecsServer::get_node_from_node_storage: Node not found in storage for node_id: " + itos(node_id));
+		return nullptr;
+	}
+	ERR_PRINT("FlecsServer::get_node_from_node_storage: world_id is not a valid world");
+	return nullptr;
 }
 
 RID FlecsServer::_get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity) {
@@ -806,4 +1047,50 @@ FlecsScriptSystem FlecsServer::_get_script_system(const RID &script_system_id, c
 flecs::entity_t FlecsServer::_get_type_id(const RID &entity_id, const RID &world_id) {
 	CHECK_TYPE_ID_VALIDITY_V(entity_id, world_id, flecs::entity_t(), _get_type_id);
 	return type_id;
+}
+
+void FlecsServer::set_world_singleton_with_name(const RID &world_id, const String& comp_type, const Dictionary& comp_data){
+	RID comp_type_id = get_component_type_by_name(world_id, comp_type);
+	if (!comp_type_id.is_valid()) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_name: Component type not found: " + comp_type);
+		return;
+	}
+	set_world_singleton_with_id(world_id, comp_type_id, comp_data);
+}	
+void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &comp_type_id, const Dictionary& comp_data){
+	CHECK_WORLD_VALIDITY(world_id, set_world_singleton_with_id);
+	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
+	if (!type_variant) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_id: Component type ID not found: " + itos(comp_type_id.get_id()));
+		return;
+	}
+	flecs::entity comp_type = world->component(type_variant->get_type());
+	if (!comp_type.is_valid()) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_id: Component type is not valid");
+		return;
+	}
+	ComponentRegistry::from_dict(world, comp_data, comp_type);
+}
+Dictionary FlecsServer::get_world_singleton_with_name(const RID &world_id, const String& comp_type){
+	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_singleton_with_name);
+	RID comp_type_id = get_component_type_by_name(world_id, comp_type);
+	if (!comp_type_id.is_valid()) {
+		ERR_PRINT("FlecsServer::get_world_singleton_with_name: Component type not found: " + comp_type);
+		return Dictionary();
+	}
+	return get_world_singleton_with_id(world_id, comp_type_id);
+}
+Dictionary FlecsServer::get_world_singleton_with_id(const RID &world_id, const RID &comp_type_id){
+	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_singleton_with_id);
+	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
+	if (!type_variant) {
+		ERR_PRINT("FlecsServer::get_world_singleton_with_id: Component type ID not found: " + itos(comp_type_id.get_id()));
+		return Dictionary();
+	}
+	flecs::entity comp_type = world->component(type_variant->get_type());
+	if (!comp_type.is_valid()) {
+		ERR_PRINT("FlecsServer::get_world_singleton_with_id: Component type is not valid");
+		return Dictionary();
+	}
+	return ComponentRegistry::to_dict(world, comp_type);
 }

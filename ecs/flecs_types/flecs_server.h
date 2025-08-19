@@ -2,6 +2,7 @@
 #include "core/object/object_id.h"
 #include "core/templates/a_hash_map.h"
 #include "core/templates/vector.h"
+#include "core/variant/dictionary.h"
 #include "core/variant/typed_array.h"
 #include "thirdparty/flecs/distr/flecs.h"
 #include "core/object/object.h"
@@ -152,6 +153,7 @@ public:
 	void unlock();
 	void finish();
 	FlecsServer();
+	~FlecsServer();
 	RID create_world();
 	int8_t get_world_count() const;
 	void init_world(const RID& world_id);
@@ -169,9 +171,8 @@ public:
 	void set_log_level(const int level);
 	RID register_component_type(const RID& world_id, const String &type_name, const Dictionary &script_visible_component_data);
 	Ref<CommandHandler> get_render_system_command_handler(const RID &world_id);
-	std::optional<PipelineManager> get_pipeline_manager(const RID &world_id);
+	std::optional<PipelineManager> _get_pipeline_manager(const RID &world_id);
 	void remove_all_components_from_entity(const RID &entity_id);
-	RID get_component(const RID &entity_id,const String &component_type);
 	bool has_component(const RID &entity_id,const String &component_type);
 	PackedStringArray get_component_types_as_name(const RID &entity_id);
 	TypedArray<RID> get_component_types_as_id(const RID &entity_id);
@@ -185,11 +186,10 @@ public:
 	Dictionary get_component_by_id(const RID& entity_id, const RID& component_type_id);
 	RID get_component_type_by_name(const RID& entity_id, const String &component_type);
 	RID get_parent(const RID &entity_id);
-	void set_parent(const RID &p_parent);
-	void clear_components(const RID &entity_id);
+	void set_parent(const RID& entity_id, const RID& parent_id);
 	void add_component(const RID &entity_id, const RID &comp_rid);
 	void add_child(const RID &parent_id, const RID &child_id);
-	void remove_child(const RID &child);
+	void remove_child(const RID& parent_id, const RID &child_id);
 	TypedArray<RID> get_children(const RID &parent_id);
 	RID get_child(const RID &parent_id, int index);
 	void set_children(const RID &parent_id, const TypedArray<RID> &children);
@@ -215,13 +215,19 @@ public:
 	void add_to_ref_storage(const Ref<Resource> &resource, const RID &world_id);
 	void remove_from_ref_storage(const RID &resource_rid, const RID &world_id);
 	void add_to_node_storage(Node *node, const RID &world_id);
-	void remove_from_node_storage(const ObjectID &node_id, const RID &world_id);
+	void remove_from_node_storage(const  int64_t node_id, const RID &world_id);
 	Ref<Resource> get_resource_from_ref_storage(const RID &resource_id, const RID &world_id);
-	Node *get_node_from_node_storage(const ObjectID &node_id, const RID &world_id);
-	RID _get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity); 
+	Node *get_node_from_node_storage(const int64_t node_id, const RID &world_id);
+	RID _get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity);
 	flecs::system _get_system(const RID &system_id, const RID &world_id);
 	flecs::entity_t _get_type_id(const RID &type_id, const RID &world_id);
 	FlecsScriptSystem _get_script_system(const RID &script_system_id, const RID &world_id);
+	void set_world_singleton_with_name(const RID &world_id, const String& comp_type, const Dictionary& comp_data);
+	void set_world_singleton_with_id(const RID &world_id, const RID &comp_type_id, const Dictionary& comp_data);
+	Dictionary get_world_singleton_with_name(const RID &world_id, const String& comp_type);
+	Dictionary get_world_singleton_with_id(const RID &world_id, const RID &comp_type_id);
+	
+
 
 private:
 	struct RID_Owner_Wrapper {
@@ -240,20 +246,28 @@ private:
 		RID_Owner_Wrapper(const RID_Owner_Wrapper& other) {
 			List<RID> *p_owned = nullptr;
 			other.entity_owner.get_owned_list(p_owned);
-			for (RID rid : *p_owned) {
-				entity_owner.make_rid(FlecsEntityVariant(FlecsServer::get_singleton()->_get_entity(rid, world_id)));
+			if(p_owned){
+				for (RID rid : *p_owned) {
+					entity_owner.make_rid(FlecsEntityVariant(FlecsServer::get_singleton()->_get_entity(rid, world_id)));
+				}
 			}
 			other.type_id_owner.get_owned_list(p_owned);
-			for (RID rid : *p_owned) {
-				type_id_owner.make_rid(FlecsTypeIDVariant(FlecsServer::get_singleton()->_get_type_id(rid, world_id)));
+			if(p_owned) {
+				for (RID rid : *p_owned) {
+					type_id_owner.make_rid(FlecsTypeIDVariant(FlecsServer::get_singleton()->_get_type_id(rid, world_id)));
+				}
 			}
 			other.system_owner.get_owned_list(p_owned);
-			for (RID rid : *p_owned) {
-				system_owner.make_rid(FlecsSystemVariant(FlecsServer::get_singleton()->_get_system(rid, world_id)));
+			if(p_owned) {
+				for (RID rid : *p_owned) {
+					system_owner.make_rid(FlecsSystemVariant(FlecsServer::get_singleton()->_get_system(rid, world_id)));
+				}
 			}
 			other.script_system_owner.get_owned_list(p_owned);
-			for (RID rid : *p_owned) {
-				script_system_owner.make_rid(FlecsScriptSystem(FlecsServer::get_singleton()->_get_script_system(rid, world_id)));
+			if(p_owned) {
+				for (RID rid : *p_owned) {
+					script_system_owner.make_rid(FlecsScriptSystem(FlecsServer::get_singleton()->_get_script_system(rid, world_id)));
+				}
 			}
 		}
 		RID_Owner_Wrapper operator=(const RID_Owner_Wrapper& other) {
@@ -263,37 +277,47 @@ private:
 				List<RID> *p_owned = nullptr;
 
 				type_id_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					FlecsServer::get_singleton()->free_type_id(world_id, rid);
-				}
-				entity_owner.get_owned_list(p_owned);
-				for(RID rid : *p_owned) {
-					FlecsServer::get_singleton()->free_entity(world_id, rid);
+				if(p_owned) {
+					for(RID rid : *p_owned) {
+						FlecsServer::get_singleton()->free_type_id(world_id, rid);
+					}
 				}
 				system_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					FlecsServer::get_singleton()->free_system(world_id, rid);
+				if(p_owned) {
+					for (RID rid : *p_owned) {
+						FlecsServer::get_singleton()->free_system(world_id, rid);
+					}
 				}
 				script_system_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					FlecsServer::get_singleton()->free_script_system(world_id, rid);
+				if(p_owned) {
+					for (RID rid : *p_owned) {
+						FlecsServer::get_singleton()->free_script_system(world_id, rid);
+					}
 				}
 
 				other.entity_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					entity_owner.make_rid(FlecsEntityVariant(get_singleton()->_get_entity(rid, world_id)));
+				if(p_owned) {
+					for (RID rid : *p_owned) {
+						entity_owner.make_rid(FlecsEntityVariant(get_singleton()->_get_entity(rid, world_id)));
+					}
 				}
 				other.type_id_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					type_id_owner.make_rid(FlecsTypeIDVariant(get_singleton()->_get_type_id(rid, world_id)));
+				if(p_owned) {
+					for (RID rid : *p_owned) {
+						type_id_owner.make_rid(FlecsTypeIDVariant(get_singleton()->_get_type_id(rid, world_id)));
+					}
 				}
 				other.system_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					system_owner.make_rid(FlecsSystemVariant(get_singleton()->_get_system(rid, world_id)));
+				if(p_owned) {
+					for (RID rid : *p_owned) {
+						system_owner.make_rid(FlecsSystemVariant(get_singleton()->_get_system(rid, world_id)));
+					}
 				}
 				other.script_system_owner.get_owned_list(p_owned);
-				for (RID rid : *p_owned) {
-					script_system_owner.make_rid(FlecsScriptSystem(get_singleton()->_get_script_system(rid, world_id)));
+				if(p_owned) {
+					for (RID rid : *p_owned) {
+						script_system_owner.make_rid(FlecsScriptSystem(get_singleton()->_get_script_system(rid, world_id)));
+					}
 				}
 			}
 			return *this;

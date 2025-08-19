@@ -188,20 +188,28 @@ RID Navigation3DUtility::create_sgp_with_callable(const RID &world_id, const Cal
 }
 
 void Navigation3DUtility::_bind_methods() {
-   ClassDB::bind_static_method(get_class_static(), "create_nav_agent",
-            &Navigation3DUtility::create_nav_agent, "world", "agent", "name");
+    ClassDB::bind_static_method(get_class_static(), "create_nav_agent",
+            &Navigation3DUtility::create_nav_agent, "world", "name");
+    ClassDB::bind_static_method(get_class_static(), "create_nav_agent_with_id",
+            &Navigation3DUtility::create_nav_agent_with_id, "world", "agent", "name");
     ClassDB::bind_static_method(get_class_static(), "create_nav_agent_with_object",
             &Navigation3DUtility::create_nav_agent_with_object, "world", "nav_agent");
     ClassDB::bind_static_method(get_class_static(), "create_nav_link",
-            &Navigation3DUtility::create_nav_link, "world", "link", "name");
+            &Navigation3DUtility::create_nav_link, "world", "name");
+    ClassDB::bind_static_method(get_class_static(), "create_nav_link_with_id",
+            &Navigation3DUtility::create_nav_link_with_id, "world", "link", "name");
     ClassDB::bind_static_method(get_class_static(), "create_nav_link_with_object",  
             &Navigation3DUtility::create_nav_link_with_object, "world", "nav_link");
     ClassDB::bind_static_method(get_class_static(), "create_nav_obstacle",
-            &Navigation3DUtility::create_nav_obstacle, "world", "obstacle", "name");
+            &Navigation3DUtility::create_nav_obstacle, "world", "name");
+    ClassDB::bind_static_method(get_class_static(), "create_nav_obstacle_with_id",
+            &Navigation3DUtility::create_nav_obstacle_with_id, "world", "obstacle", "name");
     ClassDB::bind_static_method(get_class_static(), "create_nav_obstacle_with_object",
             &Navigation3DUtility::create_nav_obstacle_with_object, "world", "nav_obstacle");
     ClassDB::bind_static_method(get_class_static(), "create_nav_region",
-            &Navigation3DUtility::create_nav_region, "world", "region", "name");
+            &Navigation3DUtility::create_nav_region, "world", "name");
+    ClassDB::bind_static_method(get_class_static(), "create_nav_region_with_id",
+            &Navigation3DUtility::create_nav_region_with_id, "world", "region", "name");
     ClassDB::bind_static_method(get_class_static(), "create_nav_region_with_object",
             &Navigation3DUtility::create_nav_region_with_object, "world", "nav_region");
     ClassDB::bind_static_method(get_class_static(), "create_sgp_with_callable",

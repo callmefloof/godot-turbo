@@ -442,8 +442,9 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
         result.append(script_entity);
     }
     result.append(entity);
+    
+    }
     return result;
-}
 }
 
 RID SceneObjectUtility::get_node_script(const RID &world_id, const Node *node, const RID& entity_id) {
