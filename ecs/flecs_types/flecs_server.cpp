@@ -130,8 +130,8 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_relationship", "entity_id", "relationship"), &FlecsServer::get_relationship);
 	ClassDB::bind_method(D_METHOD("free_world", "world_id"), &FlecsServer::free_world);
 	ClassDB::bind_method(D_METHOD("free_system", "world_id", "system_id", "include_flecs_world"), &FlecsServer::free_system);
-	ClassDB::bind_method(D_METHOD("free_script_system", "world_id", "script_system_id", "include_flecs_world"), &FlecsServer::free_script_system);
-	ClassDB::bind_method(D_METHOD("free_entity", "world_id", "entity_id"), &FlecsServer::free_entity);
+	ClassDB::bind_method(D_METHOD("free_script_system", "world_id", "script_system_id"), &FlecsServer::free_script_system);
+	ClassDB::bind_method(D_METHOD("free_entity", "world_id", "entity_id", "include_flecs_world"), &FlecsServer::free_entity);
 	ClassDB::bind_method(D_METHOD("free_type_id", "world_id", "type_id"), &FlecsServer::free_type_id);
 	ClassDB::bind_method(D_METHOD("add_to_ref_storage", "resource", "world_id"), &FlecsServer::add_to_ref_storage);
 	ClassDB::bind_method(D_METHOD("remove_from_ref_storage", "resource_rid", "world_id"), &FlecsServer::remove_from_ref_storage);

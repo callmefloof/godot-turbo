@@ -1,3 +1,4 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/callmefloof/godot-turbo)
 # build instructions:
 
 1. Clone the [Godot](https://github.com/godotengine/godot) repository to any branch at or later than Godot version 4.4 (4.5 beta unconfirmed).
