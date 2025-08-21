@@ -24,4 +24,6 @@ class PipelineManager {
         void add_to_pipeline(flecs::system system);
         void add_to_pipeline(flecs::system system, flecs::entity_t phase);
         flecs::entity create_custom_phase(const String &phase_name, const String &depends_on = "");
+        void set_world(flecs::world* p_world);
+        flecs::world* get_world();
 };

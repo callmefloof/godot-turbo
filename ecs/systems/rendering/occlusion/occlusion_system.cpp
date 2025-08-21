@@ -10,7 +10,7 @@
 #include "ecs/components/dirty_transform.h"
 
 
-void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_handler, PipelineManager &pipeline_manager) {
+void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_handler_ref, PipelineManager &pipeline_manager_ref) {
 	if(!world){
 		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 		return;
@@ -23,6 +23,8 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: World3D not found");
 		return;
 	}
+	pipeline_manager = &pipeline_manager_ref;
+	command_handler = command_handler_ref;
 	
 	flecs::system occlusion_update_tris = world->system<Occluder>()
 	.multi_threaded()
@@ -63,8 +65,8 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	});
 	
 	occlusion_update_tris.set_name("OcclusionSystem/Occluder: UpdateTris");
-	flecs::entity_t phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occluder: UpdateTris", "MultiMeshRenderSystem: FrustumCulling");
-	pipeline_manager.add_to_pipeline(occlusion_update_tris, phase);
+	flecs::entity_t phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: UpdateTris", "MultiMeshRenderSystem: FrustumCulling");
+	pipeline_manager->add_to_pipeline(occlusion_update_tris, phase);
 
 	flecs::system occlusion_update_aabbs = world->system<Occludee>()
 	.multi_threaded()
@@ -79,8 +81,8 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 		occludee.worldAABB.size = transform.transform.get_basis().get_scale()*occludee.aabb.size;
 	});
 	occlusion_update_aabbs.set_name("OcclusionSystem/Occludee: UpdateAABBs");
-	flecs::entity_t occlusion_update_aabbs_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occludee: UpdateAABBs", "OcclusionSystem/Occluder: UpdateTris");
-	pipeline_manager.add_to_pipeline(occlusion_update_aabbs, occlusion_update_aabbs_phase);
+	flecs::entity_t occlusion_update_aabbs_phase = pipeline_manager_ref.create_custom_phase("OcclusionSystem/Occludee: UpdateAABBs", "OcclusionSystem/Occluder: UpdateTris");
+	pipeline_manager->add_to_pipeline(occlusion_update_aabbs, occlusion_update_aabbs_phase);
 
 
 	flecs::system binning = world->system<const Occluder>()
@@ -102,8 +104,8 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 		tile_occlusion_manager.bin_triangles(occ.screen_triangles);
 	});
 	binning.set_name("OcclusionSystem/Occluder: Binning");
-	flecs::entity_t binning_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occluder: Binning", "OcclusionSystem/Occluder: UpdateTris");
-	pipeline_manager.add_to_pipeline(binning, binning_phase);
+	flecs::entity_t binning_phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: Binning", "OcclusionSystem/Occluder: UpdateTris");
+	pipeline_manager->add_to_pipeline(binning, binning_phase);
 
 
 	flecs::system rasterize = world->system().run([=](flecs::iter& it) {
@@ -111,8 +113,8 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	});
 	rasterize.set_name("OcclusionSystem/Occluder: Rasterize");
 
-	flecs::entity_t rasterize_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occluder: Rasterize", "OcclusionSystem/Occluder: Binning");
-	pipeline_manager.add_to_pipeline(rasterize, rasterize_phase);
+	flecs::entity_t rasterize_phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: Rasterize", "OcclusionSystem/Occluder: Binning");
+	pipeline_manager->add_to_pipeline(rasterize, rasterize_phase);
 
 	flecs::system occlusion_cull = world->system<Occludee>()
 	.multi_threaded()
@@ -138,8 +140,8 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 		}
 	});
 	occlusion_cull.set_name("OcclusionSystem/Occludee: OcclusionCull");
-	flecs::entity_t occlusion_cull_phase = pipeline_manager.create_custom_phase("OcclusionSystem/Occludee: OcclusionCull", "OcclusionSystem/Occluder: Rasterize");
-	pipeline_manager.add_to_pipeline(occlusion_cull, occlusion_cull_phase);
+	flecs::entity_t occlusion_cull_phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occludee: OcclusionCull", "OcclusionSystem/Occluder: Rasterize");
+	pipeline_manager->add_to_pipeline(occlusion_cull, occlusion_cull_phase);
 
 
 }

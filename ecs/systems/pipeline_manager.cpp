@@ -108,3 +108,12 @@ flecs::entity PipelineManager::create_custom_phase(const String &phase_name, con
     print_line("Custom phase created: " + phase_name);
     return custom_phase;
 }
+
+void PipelineManager::set_world(flecs::world *p_world) {
+    world = p_world;
+    pipeline = world->get_pipeline();
+}
+
+flecs::world *PipelineManager::get_world() {
+    return world;
+}

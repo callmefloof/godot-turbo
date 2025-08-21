@@ -8,19 +8,25 @@
 #include "flecs.h"
 #include "ecs/flecs_types/flecs_server.h"
 
-flecs::query<> FlecsScriptSystem::get_query(const Vector<String> &component_names) {
-	flecs::query_builder<> q = world->query_builder<>().cache_kind(flecs::QueryCacheAuto).with(component_names.get(0).ascii().get_data());
+flecs::query<> FlecsScriptSystem::get_query(const PackedStringArray &component_names) {
+	if (component_names.size() == 0) {
+		// Create a query that matches all entities
+		return world->query_builder<>().cache_kind(flecs::QueryCacheAuto).with(flecs::Wildcard).build();
+	}
+
+	// Start the builder and add the first component (will be added again in the loop but that's fine)
+	flecs::query_builder<> q = world->query_builder<>().cache_kind(flecs::QueryCacheAuto);
 
 	for (int i = 0; i < component_names.size(); i++) {
-		String cname = component_names[i];
-		flecs::id comp_id = world->lookup(cname.ascii().get_data());
+		String cname = component_names.get(i);
+		flecs::entity e = world->component(cname.ascii().get_data());
 
-		if (!flecs::entity(*world, comp_id).is_valid()) {
-			print_line("Invalid component name: %s", cname);
+		if (!e.is_valid()) {
+			print_line(String("Invalid component name: ") + cname);
 			continue;
 		}
 
-		q.term().id(comp_id);  // simple presence test
+		q.term().id(e.id());  // simple presence test
 	}
 
 	q.cache_kind(flecs::QueryCacheAll);
@@ -45,13 +51,15 @@ void FlecsScriptSystem::run() const {
 	// Get the query based on required_components
 	query.each([=](flecs::entity e) {
 		RID wrapped = FlecsServer::get_singleton()->_get_or_create_rid_for_entity(world_id,e);
-		Array vargs;
-		vargs.append(wrapped); // No need for manual Variant
+		// Array vargs;
+		// vargs.append(wrapped); // No need for manual Variant
 		if (!callback.is_valid()) {
 			WARN_PRINT("Callable is not valid!");
 			return;
 		}
-		const Variant ret = callback.callv(vargs);
+
+		callback.call_deferred (wrapped);
+		FlecsServer::get_singleton()->free_entity(world_id, wrapped, false);
 	});
 }
 

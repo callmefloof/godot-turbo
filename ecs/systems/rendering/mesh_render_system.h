@@ -17,13 +17,27 @@ public:
 	MeshRenderSystem() = default;
 	~MeshRenderSystem() override = default;
 	float far_dist = 9999;
-	void create_mesh_render_system(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const {
+	void create_mesh_render_system(Ref<CommandHandler>& command_handler_ref, PipelineManager& pipeline_manager_ref) {
 		if(!world){
 			ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
 			return;
 		}
 		if (!world->c_ptr()) {
 			ERR_PRINT("World is not initialized!");
+			return;
+		}
+		if(command_handler.is_null()){
+			command_handler = command_handler_ref;
+		}
+		if(command_handler.is_null()){
+			ERR_PRINT("MultiMeshRenderSystem::create_rendering: command_handler is null");
+			return;
+		}
+		if(!pipeline_manager){
+			pipeline_manager = &pipeline_manager_ref;
+		}
+		if(!pipeline_manager){
+			ERR_PRINT("MultiMeshRenderSystem::create_rendering: pipeline_manager is null");
 			return;
 		}
 
@@ -73,8 +87,8 @@ public:
 
 		// Debug: Check if dependency exists
 		print_line("Checking dependency: OcclusionSystem/Occludee: OcclusionCull");
-		flecs::entity_t phase = pipeline_manager.create_custom_phase("MeshRenderSystem: Render", "OcclusionSystem/Occludee: OcclusionCull");
-		pipeline_manager.add_to_pipeline(mesh_render_system,phase);
+		flecs::entity_t phase = pipeline_manager->create_custom_phase("MeshRenderSystem: Render", "OcclusionSystem/Occludee: OcclusionCull");
+		pipeline_manager->add_to_pipeline(mesh_render_system,phase);
 
 		// Debug: Confirm system added to pipeline
 		print_line("MeshRenderSystem added to pipeline with dependency: OcclusionSystem/Occludee: OcclusionCull");

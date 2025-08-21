@@ -36,6 +36,7 @@
 #include "core/string/ustring.h"
 #include "flecs_variant.h"
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include "ecs/components/rendering/rendering_components.h"
 
@@ -128,8 +129,8 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_relationships", "entity_id"), &FlecsServer::get_relationships);
 	ClassDB::bind_method(D_METHOD("get_relationship", "entity_id", "relationship"), &FlecsServer::get_relationship);
 	ClassDB::bind_method(D_METHOD("free_world", "world_id"), &FlecsServer::free_world);
-	ClassDB::bind_method(D_METHOD("free_system", "world_id", "system_id"), &FlecsServer::free_system);
-	ClassDB::bind_method(D_METHOD("free_script_system", "world_id", "script_system_id"), &FlecsServer::free_script_system);
+	ClassDB::bind_method(D_METHOD("free_system", "world_id", "system_id", "include_flecs_world"), &FlecsServer::free_system);
+	ClassDB::bind_method(D_METHOD("free_script_system", "world_id", "script_system_id", "include_flecs_world"), &FlecsServer::free_script_system);
 	ClassDB::bind_method(D_METHOD("free_entity", "world_id", "entity_id"), &FlecsServer::free_entity);
 	ClassDB::bind_method(D_METHOD("free_type_id", "world_id", "type_id"), &FlecsServer::free_type_id);
 	ClassDB::bind_method(D_METHOD("add_to_ref_storage", "resource", "world_id"), &FlecsServer::add_to_ref_storage);
@@ -153,6 +154,7 @@ FlecsServer::FlecsServer() {
 	worlds = Vector<RID>();
 	worlds.resize(MAX_WORLD_COUNT);
 	render_system_command_handler = Ref<CommandHandler>(memnew(CommandHandler));
+
 	command_handler_callback = Callable(render_system_command_handler.ptr(), "process_command");
 	exit_thread = false;
 }
@@ -195,8 +197,10 @@ RID FlecsServer::create_world() {
 	
 	node_storages.insert(flecs_world, NodeStorage());
 	ref_storages.insert(flecs_world, RefStorage());
-	pipeline_managers.insert(flecs_world, PipelineManager());
-	
+	auto pipeline_manager = PipelineManager();
+	pipeline_manager.set_world(world);
+	pipeline_managers.insert(flecs_world, pipeline_manager);
+
 	worlds.insert(counter++, flecs_world);
 
 
@@ -221,8 +225,8 @@ bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 		ERR_PRINT("FlecsServer::progress_world: world not found");
 		return false;
 	}
-	List<RID> *p_owned = nullptr;
-	flecs_variant_owners.get(world_id).script_system_owner.get_owned_list(p_owned);
+	std::unique_ptr<List<RID>> p_owned = std::make_unique<List<RID>>();
+	flecs_variant_owners.get(world_id).script_system_owner.get_owned_list(p_owned.get());
 	if(p_owned){
 		for (auto &sys_id :* p_owned) {
 			run_script_system(world_id, sys_id);
@@ -918,29 +922,29 @@ RID FlecsServer::_create_rid_for_script_system(const RID& world_id, const FlecsS
 
 void FlecsServer::free_world(const RID& rid) {
 	if (flecs_world_owners.owns(rid)) {
-		List<RID> *p_owned = nullptr;
-		flecs_variant_owners.get(rid).entity_owner.get_owned_list(p_owned);
+		std::unique_ptr<List<RID>> p_owned = std::make_unique<List<RID>>();
+		flecs_variant_owners.get(rid).entity_owner.get_owned_list(p_owned.get());
 		if (p_owned) {
 			for (const RID& owned : *p_owned) {
 				flecs_variant_owners.get(rid).entity_owner.free(owned);
 			}
 		}
 
-		flecs_variant_owners.get(rid).type_id_owner.get_owned_list(p_owned);
+		flecs_variant_owners.get(rid).type_id_owner.get_owned_list(p_owned.get());
 		if (p_owned) {
 			for (const RID& owned : *p_owned) {
 				flecs_variant_owners.get(rid).type_id_owner.free(owned);
 			}
 		}
 
-		flecs_variant_owners.get(rid).system_owner.get_owned_list(p_owned);
+		flecs_variant_owners.get(rid).system_owner.get_owned_list(p_owned.get());
 		if (p_owned) {
 			for (const RID& owned : *p_owned) {
 				flecs_variant_owners.get(rid).system_owner.free(owned);
 			}
 		}
 
-		flecs_variant_owners.get(rid).script_system_owner.get_owned_list(p_owned);
+		flecs_variant_owners.get(rid).script_system_owner.get_owned_list(p_owned.get());
 		if (p_owned) {
 			for (const RID& owned : *p_owned) {
 				flecs_variant_owners.get(rid).script_system_owner.free(owned);
@@ -965,8 +969,12 @@ void FlecsServer::free_world(const RID& rid) {
 
 }
 
-void FlecsServer::free_system(const RID& world_id, const RID& system_id) {
+void FlecsServer::free_system(const RID& world_id, const RID& system_id, const bool include_flecs_world) {
 	if (flecs_variant_owners.has(world_id)) {
+		if (include_flecs_world) {
+			FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id);
+			system_variant->get_system().destruct();
+		}
 		flecs_variant_owners.get(world_id).system_owner.free(system_id);
 	} else {
 		ERR_PRINT("FlecsServer::free_system: world_id is not a valid world");
@@ -981,8 +989,16 @@ void FlecsServer::free_script_system(const RID& world_id, const RID& script_syst
 	}
 }
 
-void FlecsServer::free_entity(const RID& world_id, const RID& entity_id) {
+void FlecsServer::free_entity(const RID& world_id, const RID& entity_id, bool include_flecs_world) {
 	if (flecs_variant_owners.has(world_id)) {
+		if (include_flecs_world) {
+			FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
+			if (entity_variant) {
+				entity_variant->get_entity().destruct();
+			} else {
+				ERR_PRINT("FlecsServer::free_entity: entity_id is not a valid entity");
+			}
+		}
 		flecs_variant_owners.get(world_id).entity_owner.free(entity_id);
 	} else {
 		ERR_PRINT("FlecsServer::free_entity: world_id is not a valid world");
@@ -1061,8 +1077,8 @@ Node* FlecsServer::get_node_from_node_storage(const int64_t node_id, const RID &
 
 RID FlecsServer::_get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity) {
 	if (flecs_variant_owners.has(world_id)) {
-		List<RID> *p_owned = nullptr;
-		flecs_variant_owners.get(world_id).entity_owner.get_owned_list(p_owned);
+		std::unique_ptr<List<RID>> p_owned = std::make_unique<List<RID>>();
+		flecs_variant_owners.get(world_id).entity_owner.get_owned_list(p_owned.get());
 		if (p_owned) {
 			for (const RID& owned : *p_owned) {
 				FlecsEntityVariant* owned_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(owned);

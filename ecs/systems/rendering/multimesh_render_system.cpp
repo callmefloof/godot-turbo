@@ -13,11 +13,25 @@
 #include "ecs/components/visibility_component.h"
 #include "ecs/components/dirty_transform.h"
 
-void MultiMeshRenderSystem::create_rendering(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const {
+void MultiMeshRenderSystem::create_rendering(Ref<CommandHandler>& command_handler_ref, PipelineManager& pipeline_manager_ref) {
 
 
 	world->component<FrameCounter>();
 	world->set<FrameCounter>({});
+	if(command_handler.is_null()){
+		command_handler = command_handler_ref;
+	}
+	if(command_handler.is_null()){
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: command_handler is null");
+		return;
+	}
+	if(!pipeline_manager){
+		pipeline_manager = &pipeline_manager_ref;
+	}
+	if(!pipeline_manager){
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: pipeline_manager is null");
+		return;
+	}
 
 	flecs::system multi_mesh_render_system = world->system<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
 			.multi_threaded()
@@ -81,15 +95,30 @@ void MultiMeshRenderSystem::create_rendering(Ref<CommandHandler>& command_handle
 					}
 		});
 	multi_mesh_render_system.set_name("MultiMeshRenderSystem: Render");
-	flecs::entity_t phase = pipeline_manager.create_custom_phase("MultiMeshRenderSystem: Render", "OcclusionSystem/Occludee: OcclusionCull");
-	pipeline_manager.add_to_pipeline(multi_mesh_render_system, phase);
+	flecs::entity_t phase = pipeline_manager->create_custom_phase("MultiMeshRenderSystem: Render", "OcclusionSystem/Occludee: OcclusionCull");
+	pipeline_manager->add_to_pipeline(multi_mesh_render_system, phase);
 
 }
 
 
- void MultiMeshRenderSystem::create_frustum_culling(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const {
+ void MultiMeshRenderSystem::create_frustum_culling(Ref<CommandHandler>& command_handler_ref, PipelineManager& pipeline_manager_ref) {
 	if(!world){
 		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
+		return;
+	}
+
+	if(command_handler.is_null()){
+		command_handler = command_handler_ref;
+	}
+	if(command_handler.is_null()){
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: command_handler is null");
+		return;
+	}
+	if(!pipeline_manager){
+		pipeline_manager = &pipeline_manager_ref;
+	}
+	if(!pipeline_manager){
+		ERR_PRINT("MultiMeshRenderSystem::create_rendering: pipeline_manager is null");
 		return;
 	}
 
@@ -148,5 +177,5 @@ void MultiMeshRenderSystem::create_rendering(Ref<CommandHandler>& command_handle
 					});
 				});
 	frustum_culling_system.set_name("MultiMeshRenderSystem: FrustumCulling");
-	pipeline_manager.add_to_pipeline(frustum_culling_system, flecs::OnUpdate);
+	pipeline_manager->add_to_pipeline(frustum_culling_system, flecs::OnUpdate);
 }

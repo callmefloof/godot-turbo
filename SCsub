@@ -59,5 +59,10 @@ module_env.Append(CPPPATH=[
 
 ])
 
+# NOTE: No build-level override for concurrentqueue is applied by default here.
+# If we need to force the mutex-fallback, define MCDBGQ_NOLOCKFREE_IMPLICITPRODHASH
+# via CPPDEFINES here and provide a compatibility header. Keep the vendored header
+# unchanged by default to attempt to reproduce earlier runtime behavior.
+
 # Optional optimizations
 # module_env.Append(CCFLAGS=["-O2"])

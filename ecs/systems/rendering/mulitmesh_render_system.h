@@ -18,6 +18,6 @@ public:
 		pipeline = world->get_pipeline();
 	}
 	~MultiMeshRenderSystem() override = default;
-	void create_rendering(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const;
-	void create_frustum_culling(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager) const;
+	void create_rendering(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager);
+	void create_frustum_culling(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager);
 };

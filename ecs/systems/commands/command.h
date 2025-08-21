@@ -6,6 +6,8 @@
 #define COMMAND_H
 #include <utility>
 #include "thirdparty/concurrentqueue/concurrentqueue.h"
+#include <memory>
+#include <unordered_map>
 #include "core/object/class_db.h"
 #include "core/object/ref_counted.h"
 
@@ -38,7 +40,11 @@ public:
 			freelist.enqueue(slot);
 		}
 	}
-	~Pool() { operator delete(data); }
+	~Pool() {
+		if(data){
+			operator delete(data);
+		} 
+	}
 
 	void* allocate() {
 		void* ptr = nullptr;
@@ -48,7 +54,10 @@ public:
 
 	void deallocate(void* ptr) {
 		if(!ptr) { return; }
-		freelist.enqueue(ptr);
+
+		// Use a short-lived ProducerToken on the stack so tokens don't outlive the freelist
+		moodycamel::ProducerToken temp_tok(freelist);
+		freelist.enqueue(temp_tok, ptr);
 
 	}
 private:
@@ -102,7 +111,17 @@ public:
 	template<typename F>
 	void enqueue(F&& func) {
 		ICommand* cmd = make_command(std::forward<F>(func));
-		queue.enqueue(cmd);
+		if (!cmd) return;
+
+		using TokenPtr = std::unique_ptr<moodycamel::ProducerToken>;
+		thread_local std::unordered_map<moodycamel::ConcurrentQueue<ICommand*>*, TokenPtr> prod_tokens;
+		auto pqueue = &queue;
+		auto it = prod_tokens.find(pqueue);
+		if (it == prod_tokens.end()) {
+			auto token = std::make_unique<moodycamel::ProducerToken>(queue);
+			it = prod_tokens.emplace(pqueue, std::move(token)).first;
+		}
+		queue.enqueue(*it->second, cmd);
 	}
 
 	void process() {
@@ -112,8 +131,11 @@ public:
 			destroy_command(cmd);
 		}
 	}
+	CommandQueue(){
+		queue = moodycamel::ConcurrentQueue<ICommand*>();
+	}
 	~CommandQueue() {
-		
+		clear();
 	}
 	
 	bool is_empty() {
@@ -129,7 +151,9 @@ class CommandHandler : public RefCounted {
 	CommandQueue command_queue;
 
 public:
-	CommandHandler() = default;
+	CommandHandler(){
+		
+	}
 	~CommandHandler() {
 	}
 	template<typename F>

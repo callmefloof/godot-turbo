@@ -206,9 +206,9 @@ public:
 	RID _create_rid_for_type_id(const RID& world_id, const flecs::entity_t &type_id);
 	RID _create_rid_for_script_system(const RID& world_id, const FlecsScriptSystem &system);
 	void free_world(const RID& world_id);
-	void free_system(const RID& world_id, const RID& system_id);
+	void free_system(const RID& world_id, const RID& system_id, const bool include_flecs_world);
 	void free_script_system(const RID& world_id, const RID& script_system_id);
-	void free_entity(const RID& world_id, const RID& entity_id);
+	void free_entity(const RID& world_id, const RID& entity_id, const bool include_flecs_world);
 	flecs::entity _get_entity(const RID& entity_id, const RID& world_id);
 	void free_type_id(const RID& world_id, const RID& type_id);
 	void add_to_ref_storage(const Ref<Resource> &resource, const RID &world_id);
@@ -284,7 +284,7 @@ private:
 				system_owner.get_owned_list(p_owned);
 				if(p_owned) {
 					for (RID rid : *p_owned) {
-						FlecsServer::get_singleton()->free_system(world_id, rid);
+						FlecsServer::get_singleton()->free_system(world_id, rid, true);
 					}
 				}
 				script_system_owner.get_owned_list(p_owned);

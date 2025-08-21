@@ -1,6 +1,8 @@
 #pragma once
 #include "flecs.h"
 #include "core/math/vector2i.h"
+#include "systems/commands/command.h"
+#include "systems/pipeline_manager.h"
 
 class RenderSystem {
 
@@ -8,6 +10,8 @@ class RenderSystem {
         flecs::entity main_camera;
         float far_dist = 9999;
         flecs::world* world = nullptr;
+        Ref<CommandHandler> command_handler;
+        PipelineManager* pipeline_manager = nullptr;
 
     public:
     RenderSystem() = default;

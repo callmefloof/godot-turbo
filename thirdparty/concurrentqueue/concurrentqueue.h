@@ -31,6 +31,9 @@
 
 #pragma once
 
+// NOTE: MCDBGQ_NOLOCKFREE_IMPLICITPRODHASH is intentionally not defined here.
+// Define it in the module build (SCsub) so vendored headers remain unchanged.
+
 #if defined(__GNUC__) && !defined(__INTEL_COMPILER)
 // Disable -Wconversion warnings (spuriously triggered when Traits::size_t and
 // Traits::index_t are set to < 32 bits, causing integer promotion, causing warnings
@@ -78,6 +81,10 @@
 #include <array>
 #include <thread>		// partly for __WINPTHREADS_VERSION if on MinGW-w64 w/ POSIX threading
 #include <mutex>        // used for thread exit synchronization
+
+// If a debug shim is required to support a mutex-only codepath, provide it via
+// the build system or a separate compatibility header. Keeping vendored headers
+// free of local shims avoids accidental divergence from upstream.
 
 // Platform-specific definitions of a numeric thread ID type and an invalid value
 namespace moodycamel { namespace details {
