@@ -43,6 +43,9 @@ RID RenderUtility2D::create_mesh_instance_with_id(const RID &world_id, const RID
      .set<Transform2DComponent>(tc)
      .set<CanvasItemComponent>(cic)
      .set<VisibilityComponent>(vc)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
+     .add<Occluded>()
      .set_name(name.ascii().get_data());
 
     RS::get_singleton()->canvas_item_add_mesh(canvas_item, mesh_id);
@@ -108,6 +111,9 @@ RID RenderUtility2D::create_mesh_instance_with_object(const RID &world_id, MeshI
      .set<Transform2DComponent>(tc).add<DirtyTransform>()
      .set<VisibilityComponent>(vc)
      .set<ObjectInstanceComponent>(object_instance_component)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
+     .add<Occluded>()
      .set_name(String(mesh_instance_2d->get_name()).ascii().get_data());
 
     return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -134,6 +140,11 @@ RID RenderUtility2D::create_multi_mesh(const RID &world_id, const Transform2D &t
     MultiMeshComponent mmc;
     mmc.multi_mesh_id = multi_mesh_id;
     mmc.instance_count = size;
+    mmc.has_color = use_colors;
+    mmc.has_data = use_custom_data;
+    mmc.is_instanced = use_indirect;
+    mmc.transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_2D;
+
     MeshComponent mc;
     mc.mesh_id = mesh->get_rid();
     mc.material_ids = material_ids;
@@ -148,8 +159,9 @@ RID RenderUtility2D::create_multi_mesh(const RID &world_id, const Transform2D &t
     e.set<MultiMeshComponent>(mmc)
      .set<MeshComponent>(mc)
      .set<CanvasItemComponent>(cic)
-     .set<Transform2DComponent>(tc).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc)
      .set<VisibilityComponent>(vc)
+     .add<DirtyTransform>()
      .set_name(name.ascii().get_data());
 
     return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -202,6 +214,10 @@ TypedArray<RID> RenderUtility2D::create_multi_mesh_with_object(const RID &world_
     MultiMeshComponent mmc;
     mmc.multi_mesh_id = multi_mesh_id;
     mmc.instance_count = static_cast<uint32_t>(multi_mesh_ref->get_instance_count());
+    mmc.has_color = multi_mesh_ref->is_using_colors();
+    mmc.has_data = multi_mesh_ref->is_using_custom_data();
+    mmc.is_instanced = false; //couldn't figure out what this should default to
+    mmc.transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_2D;
     MeshComponent mc;
     mc.mesh_id = mesh->get_rid();
     mc.material_ids = material_ids;
@@ -219,6 +235,7 @@ TypedArray<RID> RenderUtility2D::create_multi_mesh_with_object(const RID &world_
      .set<Transform2DComponent>(tc)
      .set<VisibilityComponent>(vc)
      .set<ObjectInstanceComponent>(object_instance_component)
+     .add<DirtyTransform>()
      .set_name(name.ascii().get_data());
 
     if (const Node2D *parent = Object::cast_to<Node2D>(multi_mesh_instance->get_parent()); parent != nullptr) {
@@ -250,20 +267,25 @@ RID RenderUtility2D::create_multi_mesh_instance(const RID &world_id, const Trans
     vc.visible = true;
 
     e.set<MultiMeshInstanceComponent>(mmic)
-     .set<Transform2DComponent>(tc).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc)
+     .add<DirtyTransform>()
      .set<VisibilityComponent>(vc)
+     .add<FrustumCulled>()
+     .add<Occluded>()
      .set_name(name.ascii().get_data());
 
     return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
+
+// TODO: Fix function to use bulk creationm
 TypedArray<RID> RenderUtility2D::create_multi_mesh_instances(
     const RID &world_id,
         const TypedArray<Transform2D>& transform,
         const RID &multi_mesh) {
     TypedArray<RID> instances;
     flecs::entity multi_mesh_entity = FlecsServer::get_singleton()->_get_entity(multi_mesh, world_id);
-    const auto &[multi_mesh_id, instance_count] = multi_mesh_entity.get<MultiMeshComponent>();
+    const auto &[multi_mesh_id, instance_count, has_colors, has_data, is_instanced, transform_format] = multi_mesh_entity.get<MultiMeshComponent>();
     instances.resize(instance_count);
     for (uint32_t i = 0; i < instance_count; ++i) {
         instances[i] = create_multi_mesh_instance(world_id, transform[i], i, multi_mesh_entity.name() + " - Instance: #" + String::num_int64(i));
@@ -404,7 +426,9 @@ RID RenderUtility2D::create_directional_light_with_object(const RID &world_id, D
     vc.visible = true;
 
     e.set<DirectionalLight2DComponent>(dlc)
-     .set<Transform2DComponent>(tc).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
      .set<ObjectInstanceComponent>(object_instance_component)
      .set<VisibilityComponent>(vc)
      .set_name(String(directional_light->get_name()).ascii().get_data());
@@ -435,7 +459,9 @@ RID RenderUtility2D::create_point_light(const RID &world_id, const Transform2D &
     vc2.visible = true;
 
     e.set<PointLightComponent>(plc2)
-     .set<Transform2DComponent>(tc2).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc2)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
      .set<VisibilityComponent>(vc2)
      .set_name(name.ascii().get_data());
 
@@ -496,7 +522,9 @@ RID RenderUtility2D::create_point_light_with_object(const RID &world_id, PointLi
 
     flecs::entity e = world->entity();
     e.set<PointLightComponent>(plc)
-     .set<Transform2DComponent>(tc).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
      .set<ObjectInstanceComponent>(object_instance_component)
      .set<VisibilityComponent>(vc)
      .set_name(String(point_light->get_name()).ascii().get_data());
@@ -529,7 +557,9 @@ RID RenderUtility2D::create_canvas_item_with_object(const RID &world_id, CanvasI
 
     flecs::entity e = world->entity();
     e.set<CanvasItemComponent>(cic)
-     .set<Transform2DComponent>(tc).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
      .set<ObjectInstanceComponent>(object_instance_component)
      .set<VisibilityComponent>(vc)
      .set_name(String(canvas_item->get_name()).ascii().get_data());
@@ -555,7 +585,9 @@ RID RenderUtility2D::create_canvas_item_with_id(const RID &world_id, const RID &
     vc2.visible = true;
 
     e.set<CanvasItemComponent>(cic2)
-     .set<Transform2DComponent>(tc2).add<DirtyTransform>()
+     .set<Transform2DComponent>(tc2)
+     .add<DirtyTransform>()
+     .add<FrustumCulled>()
      .set<VisibilityComponent>(vc2)
      .set_name(name.ascii().get_data());
 
@@ -577,6 +609,7 @@ RID RenderUtility2D::create_skeleton_with_id(const RID &world_id, const RID &ske
     e.set<SkeletonComponent>(sc)
      .set<Transform2DComponent>(tc)
      .set<VisibilityComponent>(vc)
+    .add<DirtyTransform>()
      .set_name(name.ascii().get_data());
 
     return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -614,6 +647,7 @@ RID RenderUtility2D::create_skeleton_with_object(const RID &world_id, Skeleton2D
     e.set<SkeletonComponent>(sc)
      .set<Transform2DComponent>(tc).add<DirtyTransform>()
      .set<ObjectInstanceComponent>(object_instance_component)
+     
      .set<VisibilityComponent>(skel_vc)
      .set_name(String(skeleton_2d->get_name()).ascii().get_data());
 
@@ -712,6 +746,7 @@ RID RenderUtility2D::create_gpu_particles_with_id(const RID &world_id, const RID
     e.set<ParticlesComponent>(pc)
      .set<Transform2DComponent>(tc)
      .set<VisibilityComponent>(vc)
+    .add<DirtyTransform>()
      .set_name(name.ascii().get_data());
 
     if (!world->has<World2DComponent>()) {

@@ -15,6 +15,7 @@
 #include "ecs/utility/rendering/3d/render_utility_3d.h"
 #include "ecs/systems/commands/command.h"
 #include "ecs/flecs_types/flecs_server.h"
+#include "ecs/systems/demo/bad_apple_system.h"
 
 
 
@@ -36,6 +37,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	ClassDB::register_runtime_class<SceneObjectUtility>();
 	ClassDB::register_runtime_class<ResourceObjectUtility>();
 	ClassDB::register_class<CommandHandler>();
+	ClassDB::register_runtime_class<BadAppleSystem>();
 
 }
 

@@ -26,12 +26,13 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	pipeline_manager = &pipeline_manager_ref;
 	command_handler = command_handler_ref;
 	
-	flecs::system occlusion_update_tris = world->system<Occluder>()
+	flecs::system occlusion_update_tris = world->system<Occluder, const VisibilityComponent, const FrustumCulled>()
 	.multi_threaded()
-	.without<FrustumCulled>()
 	.detect_changes()
-	.interval(0.016)
-	.each([&](flecs::entity entity, Occluder& occ ) {
+	.each([&](flecs::entity entity, Occluder& occ, const VisibilityComponent& visibility, const FrustumCulled& frustum_culled) {
+		if(frustum_culled.is_culled || !visibility.visible){
+			return;
+		}
 		const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
 		if (cam_camera_ref == nullptr) {
 			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_camera_ref not found");
@@ -68,14 +69,19 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	flecs::entity_t phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: UpdateTris", "MultiMeshRenderSystem: FrustumCulling");
 	pipeline_manager->add_to_pipeline(occlusion_update_tris, phase);
 
-	flecs::system occlusion_update_aabbs = world->system<Occludee>()
+	flecs::system occlusion_update_aabbs = world->system<Occludee, const VisibilityComponent, const FrustumCulled>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.with<Transform3DComponent>()
-	.with<VisibilityComponent>()
-	.interval(0.016)
 	.detect_changes()
-	.each([](flecs::entity entity, Occludee& occludee){
+	.each([](flecs::entity entity, Occludee& occludee, const VisibilityComponent& visibility, const FrustumCulled& frustum_culled){
+		if(frustum_culled.is_culled || !visibility.visible){
+			return;
+		}
+		if(!entity.parent().is_valid()){
+			//ERR_PRINT_ONCE("OcclusionSystem::create_occlusion_culling: entity parent is not valid");
+			return;
+		}
 		const auto& transform = entity.parent().get<Transform3DComponent>();
 		occludee.worldAABB.position = occludee.aabb.position + transform.transform.get_origin();
 		occludee.worldAABB.size = transform.transform.get_basis().get_scale()*occludee.aabb.size;
@@ -85,20 +91,18 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	pipeline_manager->add_to_pipeline(occlusion_update_aabbs, occlusion_update_aabbs_phase);
 
 
-	flecs::system binning = world->system<const Occluder>()
+	flecs::system binning = world->system<const Occluder, const FrustumCulled, const VisibilityComponent>()
 	.multi_threaded()
-	.without<FrustumCulled>()
 	.detect_changes()
-	.interval(0.016)
-	.each([&](flecs::entity entity, const Occluder& occ) {
+	.each([&](flecs::entity entity, const Occluder& occ, const FrustumCulled& frustum_culled, const VisibilityComponent& visibility) {
+		if(frustum_culled.is_culled || !visibility.visible){
+			return;
+		}
 		if(!entity.parent().is_valid()){
 			//ERR_PRINT_ONCE("OcclusionSystem::create_occlusion_culling: entity parent is not valid");
 			return;
 		}
-		if ((!entity.parent().has<Transform3DComponent>() && !entity.parent().has<VisibilityComponent>()) || entity.parent().has<FrustumCulled>()) {
-			return;
-		}
-		if (!entity.get<VisibilityComponent>().visible) {
+		if (!entity.parent().has<MultiMeshComponent>()) {
 			return;
 		}
 		tile_occlusion_manager.bin_triangles(occ.screen_triangles);
@@ -109,20 +113,24 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 
 
 	flecs::system rasterize = world->system().run([=](flecs::iter& it) {
-		tile_occlusion_manager.rasterize_all_bins_parallel(OS::get_singleton()->get_processor_count());
+		//tile_occlusion_manager.rasterize_all_bins_parallel(OS::get_singleton()->get_processor_count());
+		tile_occlusion_manager.rasterize_all_bins();
 	});
 	rasterize.set_name("OcclusionSystem/Occluder: Rasterize");
 
 	flecs::entity_t rasterize_phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: Rasterize", "OcclusionSystem/Occluder: Binning");
 	pipeline_manager->add_to_pipeline(rasterize, rasterize_phase);
 
-	flecs::system occlusion_cull = world->system<Occludee>()
+	flecs::system occlusion_cull = world->system<const Occludee, const FrustumCulled, Occluded, const VisibilityComponent>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.with<DirtyTransform>()
 	.detect_changes()
-	.interval(0.016)
-	.each([=](flecs::entity entity, Occludee& occludee){
+	.each([=](flecs::entity entity, const Occludee& occludee, const FrustumCulled& frustum_culled, Occluded& occluded, const VisibilityComponent& visibility){
+		if(frustum_culled.is_culled || !visibility.visible){
+			occluded.is_occluded = true;
+			return;
+		}
 		const auto cam_camera_ref = main_camera.try_get<CameraComponent>();
 		if (cam_camera_ref == nullptr) {
 			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_camera_ref not found");
@@ -133,11 +141,7 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 			ERR_PRINT("OcclusionSystem::create_occlusion_culling: cam_transform_ref not found");
 			return;
 		}
-		if (!tile_occlusion_manager.is_visible(ScreenAABB::aabb_to_screen_aabb(occludee.worldAABB,get_window_size(), cam_camera_ref->projection, cam_transform_ref->transform,cam_camera_ref->camera_offset))) {
-			entity.add<Occluded>();
-		}else {
-			entity.remove<Occluded>();
-		}
+		occluded.is_occluded = !tile_occlusion_manager.is_visible(ScreenAABB::aabb_to_screen_aabb(occludee.worldAABB,get_window_size(), cam_camera_ref->projection, cam_transform_ref->transform,cam_camera_ref->camera_offset));
 	});
 	occlusion_cull.set_name("OcclusionSystem/Occludee: OcclusionCull");
 	flecs::entity_t occlusion_cull_phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occludee: OcclusionCull", "OcclusionSystem/Occluder: Rasterize");

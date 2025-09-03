@@ -4,6 +4,7 @@
 #include "core/object/class_db.h"
 #include "core/object/object.h"
 #include "core/object/ref_counted.h"
+#include "core/string/print_string.h"
 #include "core/string/string_name.h"
 #include "core/error/error_macros.h"
 #include "core/templates/a_hash_map.h"
@@ -177,8 +178,8 @@ RID FlecsServer::create_world() {
 	world->import<Physics3DBaseComponents>();
 	world->import<Navigation2DBaseComponents>();
 	world->import<Navigation3DBaseComponents>();
-	world->component<Transform2DComponent>();
 	ComponentRegistry::bind_to_world("Transform2DComponent", world->component<Transform2DComponent>().id());
+	ComponentRegistry::bind_to_world("Transform3DComponent", world->component<Transform3DComponent>().id());
 	ComponentRegistry::bind_to_world("VisibilityComponent", world->component<VisibilityComponent>().id());
 	ComponentRegistry::bind_to_world("ObjectInstanceComponent", world->component<ObjectInstanceComponent>().id());
 	ComponentRegistry::bind_to_world("DirtyTransform", world->component<DirtyTransform>().id());
@@ -770,6 +771,7 @@ TypedArray<RID> FlecsServer::get_children(const RID &parent_id) {
 	FlecsEntityVariant *parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
+		print_line(itos(parent.id()));
 		parent.children([&](flecs::entity child) {
 			child_array.push_back(flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(child)).get_id());
 		});

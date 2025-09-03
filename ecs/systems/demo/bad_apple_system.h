@@ -4,12 +4,13 @@
 #include "ecs/systems/pipeline_manager.h"
 #include "scene/gui/video_stream_player.h"
 
-class FlecsEntity;
 
-class BadAppleSystem {
+class BadAppleSystem : public Object {
+    GDCLASS(BadAppleSystem, Object);
     flecs::entity mm_entity;
     RID gd_mm_entity;
     RID world_id;
+    flecs::world *world = nullptr;
     VideoStreamPlayer *video_player = nullptr;
     Ref<CommandHandler> command_handler;
     PipelineManager* pipeline_manager = nullptr;

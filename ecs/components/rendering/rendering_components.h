@@ -9,7 +9,7 @@
 #include "core/templates/vector.h"
 #include "core/variant/dictionary.h"
 #include "ecs/components/component_registry.h"
-#include <memory>
+#include "servers/rendering_server.h"
 
 struct MeshComponent : CompBase {
 	RID mesh_id;
@@ -70,16 +70,27 @@ REGISTER_COMPONENT(MeshComponent);
 struct MultiMeshComponent : CompBase {
 	RID multi_mesh_id;
 	uint32_t instance_count = 0U;
-	
+	bool has_data = false;
+	bool has_color = false;
+	bool is_instanced = false;
+	RS::MultimeshTransformFormat transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_3D;
+
 	Dictionary to_dict() const override {
 		Dictionary dict;
 		dict.set("multi_mesh_id", multi_mesh_id);
 		dict.set("instance_count", instance_count);
+		dict.set("has_data", has_data);
+		dict.set("has_color", has_color);
+		dict.set("is_instanced", is_instanced);
+		dict.set("transform_format", transform_format);
 		return dict;
 	}
 	void from_dict(const Dictionary &dict) override {
 		multi_mesh_id = dict["multi_mesh_id"];
 		instance_count = dict["instance_count"];
+		has_data = dict["has_data"];
+		has_color = dict["has_color"];
+		is_instanced = dict["is_instanced"];
 	}
 
 	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
@@ -88,10 +99,18 @@ struct MultiMeshComponent : CompBase {
 			const MultiMeshComponent &multi_mesh_component = entity.get<MultiMeshComponent>();
 			dict.set("multi_mesh_id", multi_mesh_component.multi_mesh_id);
 			dict.set("instance_count", multi_mesh_component.instance_count);
+			dict.set("has_data", multi_mesh_component.has_data);
+			dict.set("has_color", multi_mesh_component.has_color);
+			dict.set("is_instanced", multi_mesh_component.is_instanced);
+			dict.set("transform_format", multi_mesh_component.transform_format);
 		} else {
 			ERR_PRINT("MultiMeshComponent::to_dict: entity does not have MultiMeshComponent");
 			dict.set("multi_mesh_id", RID());
 			dict.set("instance_count", 0U);
+			dict.set("has_data", false);
+			dict.set("has_color", false);
+			dict.set("is_instanced", false);
+			dict.set("transform_format", RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_3D);
 		}
 		return dict;
 	}
@@ -101,6 +120,11 @@ struct MultiMeshComponent : CompBase {
 			MultiMeshComponent &multi_mesh_component = entity.get_mut<MultiMeshComponent>();
 			multi_mesh_component.multi_mesh_id = dict["multi_mesh_id"];
 			multi_mesh_component.instance_count = dict["instance_count"];
+			multi_mesh_component.has_data = dict["has_data"];
+			multi_mesh_component.has_color = dict["has_color"];
+			multi_mesh_component.is_instanced = dict["is_instanced"];
+			int transform_format = dict["transform_format"];
+			multi_mesh_component.transform_format = static_cast<RS::MultimeshTransformFormat>(transform_format);
 		} else {
 			ERR_PRINT("MultiMeshComponent::from_dict: entity does not have MultiMeshComponent");
 		}
@@ -114,15 +138,18 @@ REGISTER_COMPONENT(MultiMeshComponent);
 
 struct MultiMeshInstanceComponent : CompBase {
 	uint32_t index = 0; // Default initialization
+	AABB custom_aabb;
 
 	Dictionary to_dict() const override {
 		Dictionary dict;
 		dict.set("index", index);
+		dict.set("custom_aabb", custom_aabb);
 		return dict;
 	}
 
 	void from_dict(const Dictionary &dict) override {
 		index = dict["index"];
+		custom_aabb = dict["custom_aabb"];
 	}
 
 	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
@@ -130,9 +157,11 @@ struct MultiMeshInstanceComponent : CompBase {
 		if (entity.has<MultiMeshInstanceComponent>()) {
 			const MultiMeshInstanceComponent &instance_component = entity.get<MultiMeshInstanceComponent>();
 			dict.set("index", instance_component.index);
+			dict.set("custom_aabb", instance_component.custom_aabb);
 		} else {
 			ERR_PRINT("MultiMeshInstanceComponent::to_dict: entity does not have MultiMeshInstanceComponent");
 			dict.set("index", 0U);
+			dict.set("custom_aabb", AABB());
 		}
 		return dict;
 	}
@@ -141,6 +170,7 @@ struct MultiMeshInstanceComponent : CompBase {
 		if (entity.has<MultiMeshInstanceComponent>()) {
 			MultiMeshInstanceComponent &instance_component = entity.get_mut<MultiMeshInstanceComponent>();
 			instance_component.index = dict["index"];
+			instance_component.custom_aabb = dict["custom_aabb"];
 		} else {
 			ERR_PRINT("MultiMeshInstanceComponent::from_dict: entity does not have MultiMeshInstanceComponent");
 		}
@@ -151,6 +181,52 @@ struct MultiMeshInstanceComponent : CompBase {
 	}
 };
 REGISTER_COMPONENT(MultiMeshInstanceComponent);
+
+struct MultiMeshInstanceDataComponent : CompBase {
+	Vector4 data;
+	Color color;
+
+	Dictionary to_dict() const override {
+		Dictionary dict;
+		dict.set("data", data);
+		dict.set("color", color);
+		return dict;
+	}
+
+	void from_dict(const Dictionary &dict) override {
+		data = dict["data"];
+		color = dict["color"];
+	}
+
+	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
+		Dictionary dict;
+		if (entity.has<MultiMeshInstanceDataComponent>()) {
+			const MultiMeshInstanceDataComponent &instance_data_component = entity.get<MultiMeshInstanceDataComponent>();
+			dict.set("data", instance_data_component.data);
+			dict.set("color", instance_data_component.color);
+		} else {
+			ERR_PRINT("MultiMeshInstanceDataComponent::to_dict: entity does not have MultiMeshInstanceDataComponent");
+			dict.set("data", Vector4());
+			dict.set("color", Color());
+		}
+		return dict;
+	}
+
+	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
+		if (entity.has<MultiMeshInstanceDataComponent>()) {
+			MultiMeshInstanceDataComponent &instance_data_component = entity.get_mut<MultiMeshInstanceDataComponent>();
+			instance_data_component.data = dict["data"];
+			instance_data_component.color = dict["color"];
+		} else {
+			ERR_PRINT("MultiMeshInstanceDataComponent::from_dict: entity does not have MultiMeshInstanceDataComponent");
+		}
+	}
+
+	StringName get_type_name() const override {
+		return "MultiMeshInstanceDataComponent";
+	}
+};
+REGISTER_COMPONENT(MultiMeshInstanceDataComponent);
 
 struct ParticlesComponent : CompBase {
 	RID particles_id;
@@ -949,21 +1025,35 @@ REGISTER_COMPONENT(CanvasItemComponent);
 
 struct FrustumCulled : CompBase {
 
+	bool is_culled = false;
 	Dictionary to_dict() const override {
 		Dictionary dict;
+		dict.set("is_culled", is_culled);
 		return dict;
 	}
 
 	void from_dict(const Dictionary &dict) override {
+		is_culled = dict["is_culled"].operator bool();
 	}
 
 	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
 		Dictionary dict;
+		if (entity.has<FrustumCulled>()) {
+			const FrustumCulled &frustum_culled = entity.get<FrustumCulled>();
+			dict.set("is_culled", frustum_culled.is_culled);
+		} else {
+			ERR_PRINT("FrustumCulled::to_dict: entity does not have FrustumCulled");
+		}
 		return dict;
 	}
 
 	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
-		
+		if (entity.has<FrustumCulled>()) {
+			FrustumCulled &frustum_culled = entity.get_mut<FrustumCulled>();
+			frustum_culled.is_culled = dict["is_culled"].operator bool();
+		} else {
+			ERR_PRINT("FrustumCulled::from_dict: entity does not have FrustumCulled");
+		}
 	}
 
 	StringName get_type_name() const override {
@@ -974,21 +1064,35 @@ REGISTER_COMPONENT(FrustumCulled);
 
 struct Occluded : CompBase {
 
+	bool is_occluded = false;
 	Dictionary to_dict() const override {
 		Dictionary dict;
+		dict.set("is_occluded", is_occluded);
 		return dict;
 	}
 
 	void from_dict(const Dictionary &dict) override {
+		is_occluded = dict["is_occluded"].operator bool();
 	}
 
 	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
 		Dictionary dict;
+		if (entity.has<Occluded>()) {
+			const Occluded &occluded = entity.get<Occluded>();
+			dict.set("is_occluded", occluded.is_occluded);
+		} else {
+			ERR_PRINT("Occluded::to_dict: entity does not have Occluded");
+		}
 		return dict;
 	}
 
 	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
-		
+		if (entity.has<Occluded>()) {
+			Occluded &occluded = entity.get_mut<Occluded>();
+			occluded.is_occluded = dict["is_occluded"].operator bool();
+		} else {
+			ERR_PRINT("Occluded::from_dict: entity does not have Occluded");
+		}
 	}
 
 	StringName get_type_name() const override {
@@ -1139,6 +1243,7 @@ struct RenderingBaseComponents{
 	flecs::component<MeshComponent> mesh;
 	flecs::component<MultiMeshComponent> multi_mesh;
 	flecs::component<MultiMeshInstanceComponent> mesh_instance;
+	flecs::component<MultiMeshInstanceDataComponent> multi_mesh_instance_data;
 	flecs::component<ParticlesComponent> particles;
 	flecs::component<ReflectionProbeComponent> probe;
 	flecs::component<SkeletonComponent> skeleton;
@@ -1165,6 +1270,7 @@ struct RenderingBaseComponents{
 			mesh(world.component<MeshComponent>("MeshComponent")),
 			multi_mesh(world.component<MultiMeshComponent>("MultiMeshComponent")),
 			mesh_instance(world.component<MultiMeshInstanceComponent>("MultiMeshInstanceComponent")),
+			multi_mesh_instance_data(world.component<MultiMeshInstanceDataComponent>("MultiMeshInstanceDataComponent")),
 			particles(world.component<ParticlesComponent>("ParticlesComponent")),
 			probe(world.component<ReflectionProbeComponent>("ReflectionProbeComponent")),
 			skeleton(world.component<SkeletonComponent>("SkeletonComponent")),
@@ -1192,6 +1298,7 @@ struct RenderingBaseComponents{
 				ComponentRegistry::bind_to_world("MeshComponent", mesh.id());
 				ComponentRegistry::bind_to_world("MultiMeshComponent", multi_mesh.id());
 				ComponentRegistry::bind_to_world("MultiMeshInstanceComponent", mesh_instance.id());
+				ComponentRegistry::bind_to_world("MultiMeshInstanceDataComponent", multi_mesh_instance_data.id());
 				ComponentRegistry::bind_to_world("ParticlesComponent", particles.id());
 				ComponentRegistry::bind_to_world("ReflectionProbeComponent", probe.id());
 				ComponentRegistry::bind_to_world("SkeletonComponent", skeleton.id());

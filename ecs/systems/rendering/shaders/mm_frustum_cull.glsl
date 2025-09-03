@@ -1,23 +1,4 @@
-#pragma once
-#include "core/string/ustring.h"
-#include "core/templates/hash_map.h"
-#include "core/variant/variant.h"
-#include "render_system.h"
-#include "rendering/rendering_components.h"
-#include "thirdparty/flecs/distr/flecs.h"
-#include "../pipeline_manager.h"
-#include "ecs/systems/commands/command.h"
-#include "servers/rendering/rendering_device_binds.h"
-#include "transform_3d_component.h"
-#include "visibility_component.h"
-#include <cstdint>
-
-struct FrameCounter {
-	int frame = 0;
-};
-
-class MultiMeshRenderSystem : public RenderSystem {
-	String shader_code = R"<!>(
+#[compute]
 #version 450
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
@@ -26,9 +7,9 @@ layout(push_constant) uniform PushConstants {
 } camera_frustum;
 
 layout(set = 0, binding = 0, std430) restrict buffer MultiMeshData {
-    mat2x3 aabbs[!NUM_INSTANCES!];        // aabb[0] = pos, aabb[1] = size
-    mat4 transforms[!NUM_INSTANCES!];
-    uint culled_objects[!NUM_INSTANCES!];
+    mat2x3 aabbs[];        // aabb[0] = pos, aabb[1] = size
+    mat4 transforms[];
+    uint culled_objects[];
     int num_instances;
 } multimesh_data;
 
@@ -93,7 +74,7 @@ void main() {
 
     bool culled = false;
     for (int i = 0; i < 6; ++i) {
-        vec4 plane = camera_frustum.planes[i]; // use the declared name
+        vec4 plane = u_frustum.planes[i]; // use the declared name
         if (is_aabb_outside_plane(plane, world_aabb)) {
             culled = true;
             break;
@@ -102,36 +83,3 @@ void main() {
 
     multimesh_data.culled_objects[index] = culled ? 1u : 0u; // store as uint
 }
-
-
-)<!>";
-struct MultiMeshInstanceData{
-	PackedVector4Array transform;
-	PackedVector3Array aabb;
-	uint32_t index = 0;
-	Color color;
-	Vector4 data;
-
-};
-
-struct MultiMeshData {
-	Vector<MultiMeshInstanceData> instances;
-	Ref<RDShaderSPIRV> frustum_cull_shader = Ref<RDShaderSPIRV>(memnew(RDShaderSPIRV));
-	flecs::query<const MultiMeshInstanceComponent, const Transform3DComponent, const VisibilityComponent, FrustumCulled> query;
-	int num_instances = 0;
-};
-
-HashMap<flecs::entity, MultiMeshData> multimesh_data_map;
-
-protected:
-	flecs::entity pipeline;
-public:
-	MultiMeshRenderSystem() = default;
-	MultiMeshRenderSystem(flecs::world *p_world) {
-		world = p_world;
-		pipeline = world->get_pipeline();
-	}
-	~MultiMeshRenderSystem() override = default;
-	void create_rendering(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager);
-	void create_frustum_culling(Ref<CommandHandler>& command_handler, PipelineManager& pipeline_manager);
-};

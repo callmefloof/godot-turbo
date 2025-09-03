@@ -227,7 +227,6 @@ public:
 	Dictionary get_world_singleton_with_id(const RID &world_id, const RID &comp_type_id);
 
 
-
 private:
 	struct RID_Owner_Wrapper {
 		RID world_id;

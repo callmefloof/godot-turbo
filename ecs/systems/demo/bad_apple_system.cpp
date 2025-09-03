@@ -4,43 +4,35 @@
 #include "ecs/components/rendering/rendering_components.h"
 #include "servers/rendering_server.h"
 #include "core/math/vector2i.h"
+#include "systems/pipeline_manager.h"
+#include <optional>
 
 
 void BadAppleSystem::start() {
-    // if(!world) {
-    //     ERR_PRINT_ONCE("World is not set for BadAppleSystem.");
-    //     return;
-    // }
-    // if(!flecs_world_ref) {
-    //     ERR_PRINT_ONCE("FlecsWorld reference is not set for BadAppleSystem.");
-    //     return;
-    // }
-    // if (!video_player) {
-    //     ERR_PRINT_ONCE("Video player is not set for BadAppleSystem.");
-    //     return;
-    // }
-    // if (!mm_entity.is_valid()) {
-    //     ERR_PRINT_ONCE("MM entity is not set for BadAppleSystem.");
-    //     return;
-    // }
-    // if(!mm_entity.has<MultiMeshComponent>()) {
-    //     ERR_PRINT_ONCE("MM entity does not have MultiMeshComponent for BadAppleSystem.");
-    //     return;
-    // }
-
-
-    // command_handler = world->get_command_handler();
-    // if(!command_handler.is_valid()) {
-    //     ERR_PRINT_ONCE("CommandHandler is not set for BadAppleSystem.");
-    //     return;
-    // }
-    // pipeline_manager = &flecs_world_ref->get_pipeline_manager();
-    // if(!pipeline_manager) {
-    //     ERR_PRINT_ONCE("PipelineManager is not set for BadAppleSystem.");
-    //     return;
-    // }
-    // video_player->play();
-    flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
+    if(!world) {
+        ERR_PRINT_ONCE("World is not set for BadAppleSystem.");
+        return;
+    }
+    if (!video_player) {
+        ERR_PRINT_ONCE("Video player is not set for BadAppleSystem.");
+        return;
+    }
+    if (!mm_entity.is_valid()) {
+        ERR_PRINT_ONCE("MM entity is not set for BadAppleSystem.");
+        return;
+    }
+    if(!mm_entity.has<MultiMeshComponent>()) {
+        ERR_PRINT_ONCE("MM entity does not have MultiMeshComponent for BadAppleSystem.");
+        return;
+    }
+    if(!command_handler.is_valid()) {
+        ERR_PRINT_ONCE("CommandHandler is not set for BadAppleSystem.");
+        return;
+    }
+    if(!pipeline_manager) {
+        ERR_PRINT_ONCE("PipelineManager is not set for BadAppleSystem.");
+        return;
+    }
     auto bad_apple_system = world->system<const MultiMeshInstanceComponent>()
         .with(flecs::ChildOf, mm_entity)
         .multi_threaded()
@@ -94,7 +86,13 @@ void BadAppleSystem::start() {
         });
 }
 
+RID BadAppleSystem::get_mm_entity() const {
+    return gd_mm_entity;
+}
 
+void BadAppleSystem::set_mm_entity(const RID& mm_entity) {
+    gd_mm_entity = mm_entity;
+}
 
 void BadAppleSystem::set_video_player(VideoStreamPlayer *p_video_player) {
     video_player = p_video_player;
@@ -104,5 +102,14 @@ VideoStreamPlayer *BadAppleSystem::get_video_player() const {
 	return video_player;
 }
 
+void BadAppleSystem::set_world_id(const RID& p_world_id) {
+    world_id = p_world_id;
+    world = FlecsServer::get_singleton()->_get_world(world_id);
+    std::optional<PipelineManager> pipeline_opt = FlecsServer::get_singleton()->_get_pipeline_manager(world_id);
+    pipeline_manager = pipeline_opt ? &(*pipeline_opt) : nullptr;
+    command_handler = FlecsServer::get_singleton()->get_render_system_command_handler(world_id);
+}
 
-
+RID BadAppleSystem::get_world_id() const {
+    return world_id;
+}

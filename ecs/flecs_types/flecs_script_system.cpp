@@ -59,7 +59,6 @@ void FlecsScriptSystem::run() const {
 		}
 
 		callback.call_deferred (wrapped);
-		FlecsServer::get_singleton()->free_entity(world_id, wrapped, false);
 	});
 }
 
