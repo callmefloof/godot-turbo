@@ -61,7 +61,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	flecs::world *world = &world_variant->get_world();
+	flecs::world &world = world_variant->get_world();
 
 #define CHECK_SYSTEM_VALIDITY_V(system_id, world_id, default_value, func_name) \
 	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
@@ -241,7 +241,10 @@ private:
 			system_owner(SYSTEM_OWNER_CHUNK_SIZE, MAX_SYSTEM_COUNT),
 			script_system_owner(SCRIPT_SYSTEM_OWNER_CHUNK_SIZE, MAX_SCRIPT_SYSTEM_COUNT) {}
 		//fun hack to get around the lack of move semantics
+		// Ensure world_id is initialized before using it when rebuilding owners from another wrapper.
 		RID_Owner_Wrapper(const RID_Owner_Wrapper& other) {
+			// Initialize world_id first to ensure lookups use the correct world
+			world_id = other.world_id;
 			List<RID> *p_owned = nullptr;
 			other.entity_owner.get_owned_list(p_owned);
 			if(p_owned){

@@ -5,6 +5,7 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 #include <utility>
+#include <functional>
 #include "thirdparty/concurrentqueue/concurrentqueue.h"
 #include <memory>
 #include <unordered_map>
@@ -98,6 +99,20 @@ static void destroy_command(ICommand* cmd) {
 	cmd->release();
 }
 
+// Fallback unpooled command type for debugging/experimental paths where the
+// pooled allocator may be suspected of corrupting captured lambda state.
+struct UnpooledCommand : ICommand {
+	std::function<void()> func;
+	UnpooledCommand(std::function<void()>&& f) : func(std::move(f)) {}
+	void execute() override { func(); }
+	void release() override { delete this; }
+};
+
+template<typename F>
+static ICommand* make_command_unpooled(F&& func) {
+	return new UnpooledCommand(std::function<void()>(std::forward<F>(func)));
+}
+
 class CommandQueue {
 private:
 	void clear() {
@@ -111,8 +126,22 @@ public:
 	template<typename F>
 	void enqueue(F&& func) {
 		ICommand* cmd = make_command(std::forward<F>(func));
-		if (!cmd) return;
+	if (!cmd) { return; }
 
+		using TokenPtr = std::unique_ptr<moodycamel::ProducerToken>;
+		thread_local std::unordered_map<moodycamel::ConcurrentQueue<ICommand*>*, TokenPtr> prod_tokens;
+		auto pqueue = &queue;
+		auto it = prod_tokens.find(pqueue);
+		if (it == prod_tokens.end()) {
+			auto token = std::make_unique<moodycamel::ProducerToken>(queue);
+			it = prod_tokens.emplace(pqueue, std::move(token)).first;
+		}
+		queue.enqueue(*it->second, cmd);
+	}
+
+	// Enqueue a pre-constructed ICommand* (raw). Used by unpooled test paths.
+	void enqueue_raw(ICommand* cmd) {
+		if (!cmd) { return; }
 		using TokenPtr = std::unique_ptr<moodycamel::ProducerToken>;
 		thread_local std::unordered_map<moodycamel::ConcurrentQueue<ICommand*>*, TokenPtr> prod_tokens;
 		auto pqueue = &queue;
@@ -159,6 +188,13 @@ public:
 	template<typename F>
 	inline void enqueue_command(F&& func) {
 		command_queue.enqueue(func);
+	}
+
+	template<typename F>
+	inline void enqueue_command_unpooled(F&& func) {
+		ICommand* cmd = make_command_unpooled(std::forward<F>(func));
+		if (!cmd) { return; }
+		command_queue.enqueue_raw(cmd);
 	}
 
 	inline void process_commands() {

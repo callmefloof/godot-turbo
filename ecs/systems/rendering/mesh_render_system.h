@@ -18,11 +18,12 @@ public:
 	~MeshRenderSystem() override = default;
 	float far_dist = 9999;
 	void create_mesh_render_system(Ref<CommandHandler>& command_handler_ref, PipelineManager& pipeline_manager_ref) {
-		if(!world){
-			ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
+		flecs::world *w = resolve_world();
+		if (!w) {
+			ERR_PRINT("MeshRenderSystem::create_rendering: world is null");
 			return;
 		}
-		if (!world->c_ptr()) {
+		if (!w->c_ptr()) {
 			ERR_PRINT("World is not initialized!");
 			return;
 		}
@@ -44,7 +45,7 @@ public:
 		// Debug: Print before creating the system
 		print_line("Creating MeshRenderSystem...");
 
-		flecs::system mesh_render_system = world->system<const RenderInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
+		flecs::system mesh_render_system = w->system<const RenderInstanceComponent, const Transform3DComponent, const VisibilityComponent>()
 				.detect_changes()
 				.with<DirtyTransform>()
 				.multi_threaded()
@@ -64,7 +65,7 @@ public:
 									return;
 								}
 								command_handler->enqueue_command([=]() {
-									RS::get_singleton()->instance_set_transform(render_instance_comp.instance_id, transform_3d_component.transform);
+									//RS::get_singleton()->instance_set_transform(render_instance_comp.instance_id, transform_3d_component.transform);
 								});
 								return;
 								
@@ -74,7 +75,7 @@ public:
 						const Vector3 far_pos = Vector3(far_dist,far_dist,far_dist);
 						transform_far.set_origin(far_pos);
 						//command_queue.enqueue([=]() {
-							RS::get_singleton()->instance_set_transform(render_instance_comp.instance_id, transform_far);
+							//RS::get_singleton()->instance_set_transform(render_instance_comp.instance_id, transform_far);
 						//});
 						return;
 					

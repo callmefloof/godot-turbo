@@ -11,22 +11,23 @@
 
 
 void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_handler_ref, PipelineManager &pipeline_manager_ref) {
-	if(!world){
-		ERR_PRINT("MultiMeshRenderSystem::create_rendering: world is null");
+	flecs::world *w = resolve_world();
+	if (!w) {
+		ERR_PRINT("OcclusionSystem::create_occlusion_culling: world is null");
 		return;
 	}
 	if (!main_camera.has<CameraComponent>()) {
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: CameraComponent not found");
 		return;
 	}
-	if (!world->has<World3DComponent>()) {
+	if (!w->has<World3DComponent>()) {
 		ERR_PRINT("OcclusionSystem::create_occlusion_culling: World3D not found");
 		return;
 	}
 	pipeline_manager = &pipeline_manager_ref;
 	command_handler = command_handler_ref;
 	
-	flecs::system occlusion_update_tris = world->system<Occluder, const VisibilityComponent, const FrustumCulled>()
+	flecs::system occlusion_update_tris = w->system<Occluder, const VisibilityComponent, const FrustumCulled>()
 	.multi_threaded()
 	.detect_changes()
 	.each([&](flecs::entity entity, Occluder& occ, const VisibilityComponent& visibility, const FrustumCulled& frustum_culled) {
@@ -69,7 +70,7 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	flecs::entity_t phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: UpdateTris", "MultiMeshRenderSystem: FrustumCulling");
 	pipeline_manager->add_to_pipeline(occlusion_update_tris, phase);
 
-	flecs::system occlusion_update_aabbs = world->system<Occludee, const VisibilityComponent, const FrustumCulled>()
+	flecs::system occlusion_update_aabbs = w->system<Occludee, const VisibilityComponent, const FrustumCulled>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.with<Transform3DComponent>()
@@ -91,7 +92,7 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	pipeline_manager->add_to_pipeline(occlusion_update_aabbs, occlusion_update_aabbs_phase);
 
 
-	flecs::system binning = world->system<const Occluder, const FrustumCulled, const VisibilityComponent>()
+	flecs::system binning = w->system<const Occluder, const FrustumCulled, const VisibilityComponent>()
 	.multi_threaded()
 	.detect_changes()
 	.each([&](flecs::entity entity, const Occluder& occ, const FrustumCulled& frustum_culled, const VisibilityComponent& visibility) {
@@ -112,7 +113,7 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	pipeline_manager->add_to_pipeline(binning, binning_phase);
 
 
-	flecs::system rasterize = world->system().run([=](flecs::iter& it) {
+	flecs::system rasterize = w->system().run([=](flecs::iter& it) {
 		//tile_occlusion_manager.rasterize_all_bins_parallel(OS::get_singleton()->get_processor_count());
 		tile_occlusion_manager.rasterize_all_bins();
 	});
@@ -121,12 +122,12 @@ void OcclusionSystem::create_occlusion_culling(Ref<CommandHandler>& command_hand
 	flecs::entity_t rasterize_phase = pipeline_manager->create_custom_phase("OcclusionSystem/Occluder: Rasterize", "OcclusionSystem/Occluder: Binning");
 	pipeline_manager->add_to_pipeline(rasterize, rasterize_phase);
 
-	flecs::system occlusion_cull = world->system<const Occludee, const FrustumCulled, Occluded, const VisibilityComponent>()
+	flecs::system occlusion_cull = w->system<const Occludee, const FrustumCulled, Occluded, const VisibilityComponent>()
 	.multi_threaded()
 	.without<FrustumCulled>()
 	.with<DirtyTransform>()
 	.detect_changes()
-	.each([=](flecs::entity entity, const Occludee& occludee, const FrustumCulled& frustum_culled, Occluded& occluded, const VisibilityComponent& visibility){
+	.each([=](flecs::entity entity, const Occludee& occludee, const struct FrustumCulled& frustum_culled, Occluded& occluded, const struct VisibilityComponent& visibility){
 		if(frustum_culled.is_culled || !visibility.visible){
 			occluded.is_occluded = true;
 			return;

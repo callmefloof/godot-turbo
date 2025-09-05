@@ -156,7 +156,7 @@ FlecsServer::FlecsServer() {
 	worlds.resize(MAX_WORLD_COUNT);
 	render_system_command_handler = Ref<CommandHandler>(memnew(CommandHandler));
 
-	command_handler_callback = Callable(render_system_command_handler.ptr(), "process_command");
+	command_handler_callback = Callable(render_system_command_handler.ptr(), "process_commands");
 	exit_thread = false;
 }
 
@@ -192,8 +192,10 @@ RID FlecsServer::create_world() {
 		flecs_world
 	});
 
-	multi_mesh_render_systems.insert(flecs_world, MultiMeshRenderSystem());
+	multi_mesh_render_systems.insert(flecs_world, MultiMeshRenderSystem(flecs_world));
+
 	occlusion_systems.insert(flecs_world, OcclusionSystem());
+
 	mesh_render_systems.insert(flecs_world, MeshRenderSystem());
 	
 	node_storages.insert(flecs_world, NodeStorage());
@@ -210,12 +212,12 @@ RID FlecsServer::create_world() {
 
 void FlecsServer::init_world(const RID& world_id) {
 	CHECK_WORLD_VALIDITY(world_id, init_world);
-	world->import<flecs::stats>();
-	world->set<flecs::Rest>({});
-    print_line("World initialized: " + itos((uint64_t)world->c_ptr()));
+	world.import<flecs::stats>();
+	world.set<flecs::Rest>({});
+    print_line("World initialized: " + itos((uint64_t)world.c_ptr()));
 	auto threads = std::thread::hardware_concurrency();
 	print_line("Detected hardware concurrency: " + itos(threads));
-	world->set_threads(threads);
+	world.set_threads(threads);
 
 
 }
@@ -315,7 +317,7 @@ void FlecsServer::init_render_system(const RID &world_id) {
 
 	flecs::entity main_camera;
 
-	world->each<CameraComponent>([&](flecs::entity e, const CameraComponent& cam) {
+	world.each<CameraComponent>([&](flecs::entity e, const CameraComponent& cam) {
 		if (e.has<MainCamera>()) {
 			main_camera = e;
 			return; // early out
@@ -326,9 +328,9 @@ void FlecsServer::init_render_system(const RID &world_id) {
 		ERR_PRINT("Main camera not found! Cancelling init.");
 		return;
 	}
-	multi_mesh_render_systems.get(world_id).set_world(world);
-	occlusion_systems.get(world_id).set_world(world);
-	mesh_render_systems.get(world_id).set_world(world);
+	multi_mesh_render_systems.get(world_id).set_world(world_id);
+	occlusion_systems.get(world_id).set_world(world_id);
+	mesh_render_systems.get(world_id).set_world(world_id);
 
 	multi_mesh_render_systems.get(world_id).set_main_camera(main_camera);
 	occlusion_systems.get(world_id).set_main_camera(main_camera);
@@ -1136,7 +1138,7 @@ void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &co
 		ERR_PRINT("FlecsServer::set_world_singleton_with_id: Component type is not valid");
 		return;
 	}
-	ComponentRegistry::from_dict(world, comp_data, comp_type);
+	ComponentRegistry::from_dict(&world, comp_data, comp_type);
 }
 Dictionary FlecsServer::get_world_singleton_with_name(const RID &world_id, const String& comp_type){
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_singleton_with_name);
