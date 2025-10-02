@@ -44,8 +44,7 @@ RID RenderUtility2D::create_mesh_instance_with_id(const RID &world_id, const RID
      .set<CanvasItemComponent>(cic)
      .set<VisibilityComponent>(vc)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
-     .add<Occluded>()
+
      .set_name(name.ascii().get_data());
 
     RS::get_singleton()->canvas_item_add_mesh(canvas_item, mesh_id);
@@ -112,8 +111,7 @@ RID RenderUtility2D::create_mesh_instance_with_object(const RID &world_id, MeshI
      .set<VisibilityComponent>(vc)
      .set<ObjectInstanceComponent>(object_instance_component)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
-     .add<Occluded>()
+
      .set_name(String(mesh_instance_2d->get_name()).ascii().get_data());
 
     return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -270,8 +268,7 @@ RID RenderUtility2D::create_multi_mesh_instance(const RID &world_id, const Trans
      .set<Transform2DComponent>(tc)
      .add<DirtyTransform>()
      .set<VisibilityComponent>(vc)
-     .add<FrustumCulled>()
-     .add<Occluded>()
+
      .set_name(name.ascii().get_data());
 
     return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -428,7 +425,6 @@ RID RenderUtility2D::create_directional_light_with_object(const RID &world_id, D
     e.set<DirectionalLight2DComponent>(dlc)
      .set<Transform2DComponent>(tc)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
      .set<ObjectInstanceComponent>(object_instance_component)
      .set<VisibilityComponent>(vc)
      .set_name(String(directional_light->get_name()).ascii().get_data());
@@ -461,7 +457,6 @@ RID RenderUtility2D::create_point_light(const RID &world_id, const Transform2D &
     e.set<PointLightComponent>(plc2)
      .set<Transform2DComponent>(tc2)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
      .set<VisibilityComponent>(vc2)
      .set_name(name.ascii().get_data());
 
@@ -524,7 +519,6 @@ RID RenderUtility2D::create_point_light_with_object(const RID &world_id, PointLi
     e.set<PointLightComponent>(plc)
      .set<Transform2DComponent>(tc)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
      .set<ObjectInstanceComponent>(object_instance_component)
      .set<VisibilityComponent>(vc)
      .set_name(String(point_light->get_name()).ascii().get_data());
@@ -559,7 +553,6 @@ RID RenderUtility2D::create_canvas_item_with_object(const RID &world_id, CanvasI
     e.set<CanvasItemComponent>(cic)
      .set<Transform2DComponent>(tc)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
      .set<ObjectInstanceComponent>(object_instance_component)
      .set<VisibilityComponent>(vc)
      .set_name(String(canvas_item->get_name()).ascii().get_data());
@@ -587,7 +580,6 @@ RID RenderUtility2D::create_canvas_item_with_id(const RID &world_id, const RID &
     e.set<CanvasItemComponent>(cic2)
      .set<Transform2DComponent>(tc2)
      .add<DirtyTransform>()
-     .add<FrustumCulled>()
      .set<VisibilityComponent>(vc2)
      .set_name(name.ascii().get_data());
 

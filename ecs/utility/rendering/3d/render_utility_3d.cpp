@@ -86,8 +86,7 @@ RID RenderUtility3D::create_mesh_instance_with_id(const RID &world_id, const RID
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set<VisibilityComponent>(visibility_component)
 			.add<DirtyTransform>()
-			.add<FrustumCulled>()
-			.add<Occluded>()
+
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
@@ -165,8 +164,7 @@ RID RenderUtility3D::create_mesh_instance_with_object(const RID &world_id, MeshI
 			.set<VisibilityComponent>(visibility_component)
 			.set<ObjectInstanceComponent>(object_instance_component)
 			.add<DirtyTransform>()
-			.add<FrustumCulled>()
-			.add<Occluded>()
+
 			.set_name(String(mesh->get_name()).ascii().get_data());
 	FlecsServer::get_singleton()->add_to_node_storage(mesh_instance_3d, world_id);
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -256,7 +254,7 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_with_object(const RID &world_
 	const String name = multi_mesh_instance->get_name();
 	const Transform3D transform = multi_mesh_instance->get_transform();
 	const uint32_t size = multi_mesh_instance->get_multimesh()->get_instance_count();
-	entities.resize(size+1);
+	//entities.resize(size+1);
 	const int surface_count = multi_mesh_instance->get_multimesh()->get_mesh()->get_surface_count();
 	Vector<RID> material_ids;
 	for(int i = 0; i < surface_count; i++){
@@ -307,13 +305,14 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_with_object(const RID &world_
 		.add<DirtyTransform>()
 		.set_name(name.ascii().get_data());
 	const RID entity = FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
-	entities[0] = entity;
+	entities.append(entity);
 	TypedArray<Transform3D> transforms;
 	transforms.resize(size);
 	for (uint32_t i = 0; i < size; ++i) {
 		transforms[i] = multi_mesh_instance->get_transform();
 	}
-	entities.append_array(create_multi_mesh_instances(world_id, transforms, entity));
+	auto mm_instances = create_multi_mesh_instances(world_id, transforms, entity);
+	entities.append_array(mm_instances);
 
 
 
@@ -336,7 +335,6 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 	std::vector<MultiMeshInstanceComponent> mm_components(instance_count);
 	std::vector<Transform3DComponent> transform_components(instance_count);
 	std::vector<VisibilityComponent> visibility_components(instance_count);
-	std::vector<FrustumCulled> frustum_culled_components(instance_count);
 
 
 	const int base_offset = 12; // this is for Transform3D (12 floats)
@@ -364,9 +362,10 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 	data.push_back(mm_components.data());
 	data.push_back(transform_components.data());
 	data.push_back(visibility_components.data());
-	data.push_back(frustum_culled_components.data());
 	data.push_back(nullptr); // Needed for tag
 	data.push_back(nullptr); // Needed for pair
+	data.push_back(mm_data_components.data()); // Needed for pair
+
 
 	if(mm_use_colors || mm_use_data) {
 		data.push_back(mm_data_components.data());
@@ -380,7 +379,6 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 			world->component<MultiMeshInstanceComponent>(),
 			world->component<Transform3DComponent>(),
 			world->component<VisibilityComponent>(),
-			world->component<FrustumCulled>(),
 			world->component<DirtyTransform>(),
 			ecs_pair(flecs::ChildOf, mm_entity),
 			world->component<MultiMeshInstanceDataComponent>()
@@ -409,7 +407,6 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 			world->component<MultiMeshInstanceComponent>(),
 			world->component<Transform3DComponent>(),
 			world->component<VisibilityComponent>(),
-			world->component<FrustumCulled>(),
 			world->component<DirtyTransform>(),
 			ecs_pair(flecs::ChildOf, mm_entity),
 
@@ -450,7 +447,6 @@ RID RenderUtility3D::create_multi_mesh_instance(
 			.set<MultiMeshInstanceComponent>(multi_mesh_instance_component)
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
-			.add<FrustumCulled>()
 			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -531,7 +527,6 @@ RID RenderUtility3D::create_reflection_probe(const RID &world_id, const RID &pro
 			.set<ReflectionProbeComponent>(reflection_probe_component)
 			.set<Transform3DComponent>(transform_component)
 			.set<RenderInstanceComponent>(render_instance_component)
-			.add<FrustumCulled>()
 			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -581,7 +576,6 @@ RID RenderUtility3D::create_skeleton_with_object(const RID &world_id, Skeleton3D
 			.set<Transform3DComponent>(transform_component)
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set<ObjectInstanceComponent>(object_instance_component)
-			.add<FrustumCulled>()
 			.add<DirtyTransform>()
 			.set_name(String(skeleton_3d->get_name()).ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -747,7 +741,6 @@ RID RenderUtility3D::create_directional_light_with_id(const RID &world_id, const
 			.set<DirectionalLight3DComponent>(directional_light_component)
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
-			.add<FrustumCulled>()
 			.add<DirtyTransform>()
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set_name(name.ascii().get_data());
@@ -775,7 +768,6 @@ RID RenderUtility3D::create_directional_light(const RID &world_id, const Transfo
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.set<RenderInstanceComponent>(render_instance_component)
-			.add<FrustumCulled>()
 			.add<DirtyTransform>()
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -805,8 +797,6 @@ RID RenderUtility3D::create_directional_light_with_object(const RID &world_id, D
 										.set<ObjectInstanceComponent>(object_instance_component)
 										.set<RenderInstanceComponent>(render_instance_component)
 										.add<DirtyTransform>()
-										.add<FrustumCulled>()
-										.add<Occluded>()
 										.set_name(String(directional_light->get_name()).ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
@@ -826,8 +816,7 @@ RID RenderUtility3D::create_omni_light_with_id(const RID &world_id, const RID &l
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.add<DirtyTransform>()
-			.add<FrustumCulled>()
-			.add<Occluded>()
+
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set_name(name.ascii().get_data());
 
@@ -850,8 +839,7 @@ RID RenderUtility3D::create_omni_light(const RID &world_id, const Transform3D &t
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.add<DirtyTransform>()
-			.add<FrustumCulled>()
-			.add<Occluded>()
+
 			.set<RenderInstanceComponent>(render_instance_component);
 
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -881,8 +869,6 @@ RID RenderUtility3D::create_omni_light_with_object(const RID &world_id, OmniLigh
 										 .set<ObjectInstanceComponent>(object_instance_component)
 										 .set<VisibilityComponent>(visibility_component)
 										.add<DirtyTransform>()
-										.add<FrustumCulled>()
-										.add<Occluded>()
 										 .set_name(String(omni_light->get_name()).ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
@@ -906,8 +892,7 @@ RID RenderUtility3D::create_spot_light_with_id(const RID &world_id, const RID &l
 			.set<VisibilityComponent>(visibility_component)
 			.set<RenderInstanceComponent>(render_instance_component)
 			.add<DirtyTransform>()
-			.add<FrustumCulled>()
-			.add<Occluded>()
+
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
@@ -932,8 +917,6 @@ RID RenderUtility3D::create_spot_light(const RID &world_id, const Transform3D &t
 			.set<VisibilityComponent>(visibility_component)
 			.set<RenderInstanceComponent>(render_instance_component)
 			.add<DirtyTransform>()
-										.add<FrustumCulled>()
-										.add<Occluded>()
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 			
@@ -972,8 +955,6 @@ RID RenderUtility3D::create_spot_light_with_object(const RID &world_id, SpotLigh
 										 .set<VisibilityComponent>(visibility_component)
 										 .set<RenderInstanceComponent>(render_instance_component)
 										.add<DirtyTransform>()
-										.add<FrustumCulled>()
-										.add<Occluded>()
 										 .set<ObjectInstanceComponent>(object_instance_component)
 										 .set_name(String(spot_light->get_name()).ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -1022,8 +1003,7 @@ RID RenderUtility3D::create_voxel_gi_with_id(const RID &world_id, const RID &vox
 			.set<VoxelGIComponent>(voxel_gi_component)
 			.set<Transform3DComponent>(transform_component)
 			.add<DirtyTransform>()
-			.add<FrustumCulled>()
-			.add<Occluded>()
+
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set<VisibilityComponent>(visibility_component)
 			.set_name(name.ascii().get_data());
@@ -1050,8 +1030,6 @@ RID RenderUtility3D::create_voxel_gi(const RID &world_id, const Transform3D &tra
 			.set<Transform3DComponent>(transform_component)
 			.set<RenderInstanceComponent>(render_instance_component)
 			.add<DirtyTransform>()
-											.add<FrustumCulled>()
-											.add<Occluded>()
 			.set<VisibilityComponent>(visibility_component)
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -1080,8 +1058,6 @@ RID RenderUtility3D::create_voxel_gi_with_object(const RID &world_id, VoxelGI *v
 										 .set<RenderInstanceComponent>(render_instance_component)
 										 .set<VisibilityComponent>(visibility_component)
 										.add<DirtyTransform>()
-										.add<FrustumCulled>()
-										.add<Occluded>()
 										 .set<ObjectInstanceComponent>(object_instance_component)
 										 .set_name(String(voxel_gi->get_name()).ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -1104,99 +1080,6 @@ RID RenderUtility3D::create_scenario(const RID &world_id, const String &name) {
 			.set<ScenarioComponent>(scenario_component)
 			.set_name(name.ascii().get_data());
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
-}
-
-RID RenderUtility3D::create_occluder(const RID &world_id, const String &name) {
-	return create_occluder_with_id(world_id, RS::get_singleton()->occluder_create(), name);
-}
-
-RID RenderUtility3D::create_occluder_with_id(const RID &world_id, const RID &occluder_id, const String &name) {
-	flecs::world* world = FlecsServer::get_singleton()->_get_world(world_id);
-	Occluder occluder = {};
-	occluder.occluder_id = occluder_id;
-
-	flecs::entity e = world->entity().set<Occluder>(occluder).set_name(name.ascii().get_data());
-	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
-}
-
-RID RenderUtility3D::create_occluder_with_object(const RID &world_id, OccluderInstance3D *occluder_instance) {
-	if (occluder_instance == nullptr) {
-		ERR_FAIL_V(RID());
-	}
-	flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
-	const Ref<Occluder3D> occluder = occluder_instance->get_occluder();
-	const PackedVector3Array vertices = occluder->get_vertices();
-	const PackedInt32Array indices = occluder->get_indices();
-	ObjectInstanceComponent object_instance_component;
-	object_instance_component.object_instance_id = occluder_instance->get_instance_id();
-	FlecsServer::get_singleton()->add_to_node_storage(occluder_instance, world_id);
-	if(!FlecsServer::get_singleton()->_get_world(world_id)->has<World3DComponent>()) {
-		ERR_FAIL_COND_V(!FlecsServer::get_singleton()->_get_world(world_id)->has<World3DComponent>(), RID());
-	}
-	RenderInstanceComponent render_instance_component;
-	render_instance_component.instance_id = RS::get_singleton()->instance_create2(occluder->get_rid(), FlecsServer::get_singleton()->_get_world(world_id)->get<World3DComponent>().scenario_id);
-	Occluder occluder_component;
-	occluder_component.occluder_id = occluder->get_rid();
-	occluder_component.vertices = vertices;
-	occluder_component.indices = indices;
-	Transform3DComponent transform_component;
-	transform_component.transform = occluder_instance->get_transform();
-
-	const flecs::entity e = world->entity()
-		.set<RenderInstanceComponent>(render_instance_component)
-		.set<Occluder>(occluder_component).set_name(occluder->get_name().ascii().get_data())
-		.set<Transform3DComponent>(transform_component)
-		.add<DirtyTransform>()
-		.set<ObjectInstanceComponent>(object_instance_component);
-	FlecsServer::get_singleton()->add_to_ref_storage(occluder, world_id);
-
-	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
-}
-
-bool RenderUtility3D::bake_material_check(const Ref<Material> &p_material) {
-	const StandardMaterial3D *standard_mat = Object::cast_to<StandardMaterial3D>(p_material.ptr());
-	if (standard_mat && standard_mat->get_transparency() != StandardMaterial3D::TRANSPARENCY_DISABLED) {
-		return false;
-	}
-	return true;
-}
-
-void RenderUtility3D::bake_surface(const Transform3D &p_transform, const Array& p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, const PackedVector3Array &r_vertices, const PackedInt32Array &r_indices) {
-	if (!bake_material_check(p_material)) {
-		return;
-	}
-	ERR_FAIL_COND_MSG(p_surface_arrays.size() != Mesh::ARRAY_MAX, "Invalid surface array.");
-
-	PackedVector3Array vertices = p_surface_arrays[Mesh::ARRAY_VERTEX];
-	PackedInt32Array indices = p_surface_arrays[Mesh::ARRAY_INDEX];
-
-	if (vertices.size() == 0 || indices.size() == 0) {
-		return;
-	}
-
-	Vector3 *vertices_ptr = vertices.ptrw();
-	for (int j = 0; j < vertices.size(); j++) {
-		vertices_ptr[j] = p_transform.xform(vertices_ptr[j]);
-	}
-
-	if (!Math::is_zero_approx(p_simplification_dist) && SurfaceTool::simplify_func) {
-		Vector<float> vertices_f32 = vector3_to_float32_array(vertices.ptr(), vertices.size());
-
-		float error_scale = SurfaceTool::simplify_scale_func(vertices_f32.ptr(), vertices.size(), sizeof(float) * 3);
-		float target_error = p_simplification_dist / error_scale;
-		float error = -1.0f;
-		int target_index_count = MIN(indices.size(), 36);
-
-		const int simplify_options = SurfaceTool::SIMPLIFY_LOCK_BORDER;
-
-		uint32_t index_count = SurfaceTool::simplify_func(
-				(unsigned int *)indices.ptrw(),
-				(unsigned int *)indices.ptr(),
-				indices.size(),
-				vertices_f32.ptr(), vertices.size(), sizeof(float) * 3,
-				target_index_count, target_error, simplify_options, &error);
-		indices.resize(index_count);
-	}
 }
 
 void RenderUtility3D::_bind_methods(){
@@ -1260,14 +1143,4 @@ void RenderUtility3D::_bind_methods(){
 		&RenderUtility3D::create_compositor, "flecs_world", "compositor_id", "name");
 	ClassDB::bind_static_method(get_class_static(), "create_compositor_with_object",
 		&RenderUtility3D::create_compositor_with_object, "flecs_world", "compositor");
-	ClassDB::bind_static_method(get_class_static(), "create_occluder_with_object",
-		&RenderUtility3D::create_occluder_with_object, "flecs_world", "occluder_instance");
-	ClassDB::bind_static_method(get_class_static(), "create_occluder",
-		&RenderUtility3D::create_occluder, "world_id", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_occluder_with_id",
-		&RenderUtility3D::create_occluder_with_id, "world_id", "occluder_id", "name");
-	ClassDB::bind_static_method(get_class_static(), "bake_material_check",
-		&RenderUtility3D::bake_material_check, "p_material");
-	ClassDB::bind_static_method(get_class_static(), "bake_surface",
-		&RenderUtility3D::bake_surface, "p_transform", "p_surface_arrays", "p_material", "p_simplification_dist", "r_vertices", "r_indices");
 }

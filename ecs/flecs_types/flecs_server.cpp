@@ -33,7 +33,6 @@
 #include "ecs/components/resource_component.h"
 #include "ecs/components/scene_node_component.h"
 
-#include "systems/rendering/mulitmesh_render_system.h"
 #include "core/string/ustring.h"
 #include "flecs_variant.h"
 #include <cstdint>
@@ -95,7 +94,6 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("lookup", "world_id", "entity_name"), &FlecsServer::lookup);
 	ClassDB::bind_method(D_METHOD("get_world_of_entity", "entity_id"), &FlecsServer::get_world_of_entity);
 	//all underscore types are not exposed and are only used internally
-	ClassDB::bind_method(D_METHOD("init_render_system", "world_id"), &FlecsServer::init_render_system);
 	ClassDB::bind_method(D_METHOD("register_component_type", "world_id", "type_name", "script_visible_component_data"), &FlecsServer::register_component_type);
 	ClassDB::bind_method(D_METHOD("add_component", "entity_id", "component_type_id"), &FlecsServer::add_component);
 	ClassDB::bind_method(D_METHOD("has_component", "entity_id", "component_type"), &FlecsServer::has_component);
@@ -145,6 +143,9 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_world_singleton_with_name", "world_id", "name"), &FlecsServer::get_world_singleton_with_name);
 	ClassDB::bind_method(D_METHOD("get_world_singleton_with_id", "world_id", "comp_type_id"), &FlecsServer::get_world_singleton_with_id);
 
+	// Debug helpers
+	ClassDB::bind_method(D_METHOD("debug_check_rid", "rid"), &FlecsServer::debug_check_rid);
+
 	//ClassDB::bind_static_method(get_class_static(), "get_singleton", &FlecsServer::get_singleton);
 }
 
@@ -169,45 +170,82 @@ RID FlecsServer::create_world() {
 		ERR_PRINT("FlecsServer::create_world: Maximum number of worlds " + itos(std::numeric_limits<uint8_t>::max()) + " reached");
 		return RID();
 	}
+	// Create the FlecsWorldVariant locally first to avoid partially-published
+	// state being observed by other threads while we initialize maps.
+	FlecsWorldVariant tmp_world{flecs::world()};
 
+	// Lock the FlecsServer to serialize modifications to the owners/maps.
+	lock();
+	RID flecs_world = flecs_world_owners.make_rid(tmp_world);
 
-	RID flecs_world = flecs_world_owners.make_rid(FlecsWorldVariant(flecs::world()));
-	CHECK_WORLD_VALIDITY_V(flecs_world, RID(), create_world);
-	world->import<RenderingBaseComponents>();
-	world->import<Physics2DBaseComponents>();
-	world->import<Physics3DBaseComponents>();
-	world->import<Navigation2DBaseComponents>();
-	world->import<Navigation3DBaseComponents>();
-	ComponentRegistry::bind_to_world("Transform2DComponent", world->component<Transform2DComponent>().id());
-	ComponentRegistry::bind_to_world("Transform3DComponent", world->component<Transform3DComponent>().id());
-	ComponentRegistry::bind_to_world("VisibilityComponent", world->component<VisibilityComponent>().id());
-	ComponentRegistry::bind_to_world("ObjectInstanceComponent", world->component<ObjectInstanceComponent>().id());
-	ComponentRegistry::bind_to_world("DirtyTransform", world->component<DirtyTransform>().id());
-	ComponentRegistry::bind_to_world("ResourceComponent", world->component<ResourceComponent>().id());
-	ComponentRegistry::bind_to_world("SceneNodeComponent", world->component<SceneNodeComponent>().id());
-	ComponentRegistry::bind_to_world("World3DComponent", world->component<World3DComponent>().id());
-	ComponentRegistry::bind_to_world("World2DComponent", world->component<World2DComponent>().id());
+	// Ensure the RID is retrievable immediately while holding the lock.
+	FlecsWorldVariant *immediate = flecs_world_owners.get_or_null(flecs_world);
+	if (!immediate) {
+		bool owns = flecs_world_owners.owns(flecs_world);
+		uint32_t rid_count = flecs_world_owners.get_rid_count();
+		ERR_PRINT("FlecsServer::create_world: make_rid succeeded but get_or_null returned null; owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(rid_count));
+		unlock();
+		return RID();
+	}
+
+	// Use the world reference from the initialized variant
+	flecs::world &world_ref = immediate->get_world();
+	world_ref.import<RenderingBaseComponents>();
+	world_ref.import<Physics2DBaseComponents>();
+	world_ref.import<Physics3DBaseComponents>();
+	world_ref.import<Navigation2DBaseComponents>();
+	world_ref.import<Navigation3DBaseComponents>();
+	ComponentRegistry::bind_to_world("Transform2DComponent", world_ref.component<Transform2DComponent>().id());
+	ComponentRegistry::bind_to_world("Transform3DComponent", world_ref.component<Transform3DComponent>().id());
+	ComponentRegistry::bind_to_world("VisibilityComponent", world_ref.component<VisibilityComponent>().id());
+	ComponentRegistry::bind_to_world("ObjectInstanceComponent", world_ref.component<ObjectInstanceComponent>().id());
+	ComponentRegistry::bind_to_world("DirtyTransform", world_ref.component<DirtyTransform>().id());
+	ComponentRegistry::bind_to_world("ResourceComponent", world_ref.component<ResourceComponent>().id());
+	ComponentRegistry::bind_to_world("SceneNodeComponent", world_ref.component<SceneNodeComponent>().id());
+	ComponentRegistry::bind_to_world("World3DComponent", world_ref.component<World3DComponent>().id());
+	ComponentRegistry::bind_to_world("World2DComponent", world_ref.component<World2DComponent>().id());
 
 	flecs_variant_owners.insert(flecs_world, RID_Owner_Wrapper{
 		flecs_world
 	});
-
-	multi_mesh_render_systems.insert(flecs_world, MultiMeshRenderSystem(flecs_world));
-
-	occlusion_systems.insert(flecs_world, OcclusionSystem());
-
-	mesh_render_systems.insert(flecs_world, MeshRenderSystem());
-	
+    
 	node_storages.insert(flecs_world, NodeStorage());
 	ref_storages.insert(flecs_world, RefStorage());
-	auto pipeline_manager = PipelineManager();
-	pipeline_manager.set_world(world);
-	pipeline_managers.insert(flecs_world, pipeline_manager);
-
+	// Record the world RID in the worlds vector so _get_world can find it.
 	worlds.insert(counter++, flecs_world);
 
+	auto pipeline_manager = PipelineManager();
+	pipeline_manager.set_world(flecs_world);
+	pipeline_managers.insert(flecs_world, pipeline_manager);
+
+	// Print the created RID so we can compare it with values later passed from GDScript.
+	uint64_t created_id_u64 = flecs_world.get_id();
+	char hexbuf[32];
+	snprintf(hexbuf, sizeof(hexbuf), "%llx", (unsigned long long)created_id_u64);
+	ERR_PRINT("FlecsServer::create_world: created world_id=" + itos(created_id_u64) + " (hex=0x" + String(hexbuf) + ", local_index=" + itos(flecs_world.get_local_index()) + ")");
+
+	unlock();
 
 	return flecs_world;
+}
+
+void FlecsServer::debug_check_rid(const RID &rid) {
+	bool owns = flecs_world_owners.owns(rid);
+	uint32_t total = flecs_world_owners.get_rid_count();
+	uint64_t id_u64 = rid.get_id();
+	char hexbuf2[32];
+	snprintf(hexbuf2, sizeof(hexbuf2), "%llx", (unsigned long long)id_u64);
+	ERR_PRINT("debug_check_rid: rid=" + itos(id_u64) + " (hex=0x" + String(hexbuf2) + ", local_index=" + itos(rid.get_local_index()) + "), owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
+	ERR_PRINT("debug_check_rid: worlds vector size=" + itos(worlds.size()));
+	const int max_print = 64;
+	int printed = 0;
+	for (int i = 0; i < worlds.size() && printed < max_print; ++i) {
+		const RID &r = worlds[i];
+		if (r != RID()) {
+			ERR_PRINT("debug_check_rid: worlds[" + itos(i) + "] -> rid_id=" + itos(r.get_id()));
+			++printed;
+		}
+	}
 }
 
 void FlecsServer::init_world(const RID& world_id) {
@@ -223,6 +261,12 @@ void FlecsServer::init_world(const RID& world_id) {
 }
 
 bool FlecsServer::progress_world(const RID& world_id, const double delta) {
+	// Log the incoming RID and snapshot owner/vector state immediately so we can
+	// detect any mismatches that occur when the value is stored in GDScript
+	// and later passed back into C++.
+	// ERR_PRINT("FlecsServer::progress_world: called with world_id=" + itos(world_id.get_id()));
+	// debug_check_rid(world_id);
+
 	flecs::world *world = _get_world(world_id);
 	if (!world) {
 		ERR_PRINT("FlecsServer::progress_world: world not found");
@@ -289,16 +333,48 @@ RID FlecsServer::lookup(const RID &world_id, const String &entity_name) {
 }
 
 flecs::world *FlecsServer::_get_world(const RID &world_id) {
+	// Diagnostic flow: check both the worlds vector and the RID owner so we can
+	// print helpful information when an invalid world_id is observed.
 	if (!worlds.has(world_id)) {
+		FlecsWorldVariant *world_variant = flecs_world_owners.get_or_null(world_id);
+		bool owns = flecs_world_owners.owns(world_id);
+		uint32_t total = flecs_world_owners.get_rid_count();
+
+		ERR_PRINT("FlecsServer::_get_world: worlds.has returned false for world_id=" + itos(world_id.get_id()) + ", owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
+		ERR_PRINT("FlecsServer::_get_world: worlds vector size=" + itos(worlds.size()));
+
+		// Print a compact listing of currently stored world RIDs (avoid huge logs).
+		const int max_print = 32;
+		int printed = 0;
+		for (int i = 0; i < worlds.size() && printed < max_print; ++i) {
+			const RID &r = worlds[i];
+			if (r != RID()) {
+				ERR_PRINT("FlecsServer::_get_world: worlds[" + itos(i) + "] -> rid_id=" + itos(r.get_id()));
+				++printed;
+			}
+		}
+
+		if (world_variant) {
+			// Strange: the worlds vector doesn't have the entry but the owner does.
+			ERR_PRINT("FlecsServer::_get_world: flecs_world_owners.get_or_null returned a variant despite worlds.has == false; returning its world reference.");
+			return &world_variant->get_world();
+		}
+
 		ERR_PRINT("FlecsServer::_get_world: world_id is not a valid world");
 		return nullptr;
 	}
+
+	// If the worlds vector reports the RID exists, try to fetch the stored variant.
 	FlecsWorldVariant *world_variant = flecs_world_owners.get_or_null(world_id);
 	if (world_variant) {
 		return &world_variant->get_world();
 	}
-	ERR_PRINT("FlecsServer::_get_world: world_id is not a valid world");
-	ERR_FAIL_V(nullptr);
+
+	bool owns = flecs_world_owners.owns(world_id);
+	uint32_t total = flecs_world_owners.get_rid_count();
+	ERR_PRINT("FlecsServer::_get_world: lookup returned null for world_id=" + itos(world_id.get_id()) + ", owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
+	ERR_PRINT("FlecsServer::_get_world: available worlds (worlds vector size)=" + itos(worlds.size()));
+	return nullptr;
 	
 }
 
@@ -312,41 +388,7 @@ RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 	ERR_FAIL_V_MSG(RID(), "FlecsServer::get_world_of_entity: entity_id is not a valid entity");
 }
 
-void FlecsServer::init_render_system(const RID &world_id) {
-	CHECK_WORLD_VALIDITY(world_id, create_entity_with_name);
 
-	flecs::entity main_camera;
-
-	world.each<CameraComponent>([&](flecs::entity e, const CameraComponent& cam) {
-		if (e.has<MainCamera>()) {
-			main_camera = e;
-			return; // early out
-		}
-	});
-	
-	if(!main_camera.is_alive()){
-		ERR_PRINT("Main camera not found! Cancelling init.");
-		return;
-	}
-	multi_mesh_render_systems.get(world_id).set_world(world_id);
-	occlusion_systems.get(world_id).set_world(world_id);
-	mesh_render_systems.get(world_id).set_world(world_id);
-
-	multi_mesh_render_systems.get(world_id).set_main_camera(main_camera);
-	occlusion_systems.get(world_id).set_main_camera(main_camera);
-	mesh_render_systems.get(world_id).set_main_camera(main_camera);
-
-	auto render_command_handler = get_render_system_command_handler(world_id);
-	auto pipeline_manager = _get_pipeline_manager(world_id);
-	if(!pipeline_manager.has_value()) {
-		ERR_PRINT("FlecsServer::init_render_system: PipelineManager not found for world_id: " + itos(world_id.get_id()));
-		return;
-	}
-	multi_mesh_render_systems.get(world_id).create_frustum_culling(render_command_handler, pipeline_manager.value());
-	occlusion_systems.get(world_id).create_occlusion_culling(render_command_handler, pipeline_manager.value());
-	multi_mesh_render_systems.get(world_id).create_rendering(render_command_handler, pipeline_manager.value());
-	mesh_render_systems.get(world_id).create_mesh_render_system(render_command_handler, pipeline_manager.value());
-}
 
 void FlecsServer::set_log_level(const int level) {
 	flecs::log::set_level(level);
@@ -380,15 +422,15 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 
 
 
-std::optional<PipelineManager> FlecsServer::_get_pipeline_manager(const RID &world_id) {
-	CHECK_WORLD_VALIDITY_V(world_id, std::nullopt, _get_pipeline_manager);
+PipelineManager* FlecsServer::_get_pipeline_manager(const RID &world_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, nullptr, _get_pipeline_manager);
 	if (worlds.has(world_id)) {
 		auto it = pipeline_managers.find(world_id);
 		if (it != pipeline_managers.end()) {
-			return it->value;
+			return &it->value;
 		}
 	}
-	ERR_FAIL_V_MSG(std::nullopt, "PipelineManager not found for world_id: " + itos(world_id.get_id()));
+	ERR_FAIL_V_MSG(nullptr, "PipelineManager not found for world_id: " + itos(world_id.get_id()));
 }
 
 Ref<CommandHandler> FlecsServer::get_render_system_command_handler(const RID &world_id) {
@@ -955,11 +997,6 @@ void FlecsServer::free_world(const RID& rid) {
 			}
 		}
 		flecs_variant_owners.erase(rid);
-
-		multi_mesh_render_systems.erase(rid);
-		occlusion_systems.erase(rid);
-		mesh_render_systems.erase(rid);
-		
 
 		worlds.erase(rid);
 		flecs_world_owners.free(rid);

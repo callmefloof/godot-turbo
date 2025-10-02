@@ -77,11 +77,6 @@ public:
 	static RID create_voxel_gi_with_object(const RID &world_id, VoxelGI *voxel_gi);
 	static RID create_scenario_with_id(const RID &world_id, const RID &scenario_id, const String &name);
 	static RID create_scenario(const RID &world_id, const String &name);
-	static RID create_occluder(const RID &world_id, const String &name);
-	static RID create_occluder_with_id(const RID &world_id, const RID &occluder_id, const String &name);
-	static RID create_occluder_with_object(const RID &world_id, OccluderInstance3D* occluder_instance);
-	static bool bake_material_check(const Ref<Material> &p_material);
-	static void bake_surface(const Transform3D &p_transform, const Array& p_surface_arrays, const Ref<Material> &p_material, float p_simplification_dist, const PackedVector3Array &r_vertices, const PackedInt32Array &r_indices);
 	
 	static void _bind_methods();
 	

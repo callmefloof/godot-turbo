@@ -2,7 +2,6 @@
 #include "comp_base.h"
 #include "thirdparty/flecs/distr/flecs.h"
 #include "core/variant/variant.h"
-#include "ecs/systems/rendering/occlusion/tile.h"
 #include "core/templates/rid.h"
 #include "core/math/vector2.h"
 #include "core/math/projection.h"
@@ -1023,84 +1022,6 @@ struct CanvasItemComponent : CompBase {
 };
 REGISTER_COMPONENT(CanvasItemComponent);
 
-struct FrustumCulled : CompBase {
-
-	bool is_culled = false;
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict.set("is_culled", is_culled);
-		return dict;
-	}
-
-	void from_dict(const Dictionary &dict) override {
-		is_culled = dict["is_culled"].operator bool();
-	}
-
-	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
-		Dictionary dict;
-		if (entity.has<FrustumCulled>()) {
-			const FrustumCulled &frustum_culled = entity.get<FrustumCulled>();
-			dict.set("is_culled", frustum_culled.is_culled);
-		} else {
-			ERR_PRINT("FrustumCulled::to_dict: entity does not have FrustumCulled");
-		}
-		return dict;
-	}
-
-	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
-		if (entity.has<FrustumCulled>()) {
-			FrustumCulled &frustum_culled = entity.get_mut<FrustumCulled>();
-			frustum_culled.is_culled = dict["is_culled"].operator bool();
-		} else {
-			ERR_PRINT("FrustumCulled::from_dict: entity does not have FrustumCulled");
-		}
-	}
-
-	StringName get_type_name() const override {
-		return "FrustumCulled";
-	}
-};
-REGISTER_COMPONENT(FrustumCulled);
-
-struct Occluded : CompBase {
-
-	bool is_occluded = false;
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict.set("is_occluded", is_occluded);
-		return dict;
-	}
-
-	void from_dict(const Dictionary &dict) override {
-		is_occluded = dict["is_occluded"].operator bool();
-	}
-
-	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
-		Dictionary dict;
-		if (entity.has<Occluded>()) {
-			const Occluded &occluded = entity.get<Occluded>();
-			dict.set("is_occluded", occluded.is_occluded);
-		} else {
-			ERR_PRINT("Occluded::to_dict: entity does not have Occluded");
-		}
-		return dict;
-	}
-
-	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
-		if (entity.has<Occluded>()) {
-			Occluded &occluded = entity.get_mut<Occluded>();
-			occluded.is_occluded = dict["is_occluded"].operator bool();
-		} else {
-			ERR_PRINT("Occluded::from_dict: entity does not have Occluded");
-		}
-	}
-
-	StringName get_type_name() const override {
-		return "Occluded";
-	}
-};
-REGISTER_COMPONENT(Occluded);
-
 struct MainCamera : CompBase {
 
 	Dictionary to_dict() const override {
@@ -1124,119 +1045,7 @@ struct MainCamera : CompBase {
 };
 REGISTER_COMPONENT(MainCamera);
 
-struct Occluder : CompBase {
-	RID occluder_id;
-	Vector<ScreenTriangle> screen_triangles;
-	PackedVector3Array vertices;
-	PackedInt32Array indices;
-	Occluder() = default;
-	~Occluder() = default;
 
-	Dictionary to_dict() const {
-		Dictionary dict;
-		dict.set("occluder_id", occluder_id);
-		Array screen_triangles_array;
-		for (const auto &triangle : screen_triangles) {
-			screen_triangles_array.append(triangle.to_dict());
-		}
-		dict.set("screen_triangles", screen_triangles_array);
-		dict.set("vertices", vertices);
-		dict.set("indices", indices);
-		return dict;
-	}
-
-	void from_dict(const Dictionary &dict) {
-		occluder_id = dict["occluder_id"];
-		Array screen_triangles_array = dict["screen_triangles"];
-		screen_triangles.clear();
-		for (int i = 0; i < screen_triangles_array.size(); ++i) {
-			ScreenTriangle triangle;
-			triangle.from_dict(screen_triangles_array[i]);
-			screen_triangles.push_back(triangle);
-		}
-		vertices = dict["vertices"];
-		indices = dict["indices"];
-	}
-
-	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
-		Dictionary dict;
-		if (entity.has<Occluder>()) {
-			const Occluder &occluder_component = entity.get<Occluder>();
-			dict.set("occluder_id", occluder_component.occluder_id);
-			Array screen_triangles_array;
-			for (const auto &triangle : occluder_component.screen_triangles) {
-				screen_triangles_array.append(triangle.to_dict());
-			}
-			dict.set("screen_triangles", screen_triangles_array);
-			dict.set("vertices", occluder_component.vertices);
-			dict.set("indices", occluder_component.indices);
-		} else {
-			ERR_PRINT("Occluder::to_dict: entity does not have Occluder");
-		}
-		return dict;
-	}
-
-	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
-		if (entity.has<Occluder>()) {
-			Occluder &occluder_component = entity.get_mut<Occluder>();
-			occluder_component.occluder_id = dict["occluder_id"];
-			Array screen_triangles_array = dict["screen_triangles"];
-			occluder_component.screen_triangles.clear();
-			for (int i = 0; i < screen_triangles_array.size(); ++i) {
-				ScreenTriangle triangle;
-				triangle.from_dict(screen_triangles_array[i]);
-				occluder_component.screen_triangles.push_back(triangle);
-			}
-			occluder_component.vertices = dict["vertices"];
-			occluder_component.indices = dict["indices"];
-		} else {
-			ERR_PRINT("Occluder::from_dict: entity does not have Occluder");
-		}
-	}
-};
-REGISTER_COMPONENT(Occluder);
-
-struct Occludee : CompBase {
-	AABB worldAABB;
-	AABB aabb;
-	Occludee() = default;
-	~Occludee() = default;
-
-	Dictionary to_dict() const override {
-		Dictionary dict;
-		dict.set("worldAABB", worldAABB);
-		dict.set("aabb", aabb);
-		return dict;
-	}
-
-	void from_dict(const Dictionary &dict) override {
-		worldAABB = dict["worldAABB"];
-		aabb = dict["aabb"];
-	}
-
-	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
-		Dictionary dict;
-		if (entity.has<Occludee>()) {
-			const Occludee &occludee_component = entity.get<Occludee>();
-			dict.set("worldAABB", occludee_component.worldAABB);
-			dict.set("aabb", occludee_component.aabb);
-		} else {
-			ERR_PRINT("Occludee::to_dict: entity does not have Occludee");
-		}
-		return dict;
-	}
-
-	void from_dict_with_entity(const Dictionary &dict, flecs::entity &entity) override {
-		if (entity.has<Occludee>()) {
-			Occludee &occludee_component = entity.get_mut<Occludee>();
-			occludee_component.worldAABB = dict["worldAABB"];
-			occludee_component.aabb = dict["aabb"];
-		} else {
-			ERR_PRINT("Occludee::from_dict: entity does not have Occludee");
-		}
-	}
-};
-REGISTER_COMPONENT(Occludee);
 
 
 struct RenderingBaseComponents{
@@ -1261,11 +1070,6 @@ struct RenderingBaseComponents{
 	flecs::component<VoxelGIComponent> voxel_gi;
 	flecs::component<RenderInstanceComponent> instance;
 	flecs::component<CanvasItemComponent> canvas_item;
-	flecs::component<Occluder> occluder;
-	flecs::component<Occludee> occludee;
-	flecs::component<FrustumCulled> frustum_culled;
-	flecs::component<Occluded> occluded;
-
 	RenderingBaseComponents(flecs::world &world) :
 			mesh(world.component<MeshComponent>("MeshComponent")),
 			multi_mesh(world.component<MultiMeshComponent>("MultiMeshComponent")),
@@ -1287,11 +1091,7 @@ struct RenderingBaseComponents{
 			scenario(world.component<ScenarioComponent>("ScenarioComponent")),
 			voxel_gi(world.component<VoxelGIComponent>("VoxelGIComponent")),
 			instance(world.component<RenderInstanceComponent>("RenderInstanceComponent")),
-			canvas_item(world.component<CanvasItemComponent>("CanvasItemComponent")),
-			occluder(world.component<Occluder>("Occluder")),
-			occludee(world.component<Occludee>("Occludee")),
-			frustum_culled(world.component<FrustumCulled>("FrustumCulled")),
-			occluded(world.component<Occluded>("Occluded"))
+			canvas_item(world.component<CanvasItemComponent>("CanvasItemComponent"))
 			{
 				// Register components with the world
 
@@ -1316,9 +1116,5 @@ struct RenderingBaseComponents{
 				ComponentRegistry::bind_to_world("VoxelGIComponent", voxel_gi.id());
 				ComponentRegistry::bind_to_world("RenderInstanceComponent", instance.id());
 				ComponentRegistry::bind_to_world("CanvasItemComponent", canvas_item.id());
-				ComponentRegistry::bind_to_world("Occluder", occluder.id());
-				ComponentRegistry::bind_to_world("Occludee", occludee.id());
-				ComponentRegistry::bind_to_world("FrustumCulled", frustum_culled.id());
-				ComponentRegistry::bind_to_world("Occluded", occluded.id());
 			}
 };

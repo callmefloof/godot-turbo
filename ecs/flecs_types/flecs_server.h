@@ -17,9 +17,6 @@
 #include <cstdint>
 #include "ecs/systems/commands/command.h"
 #include "ecs/systems/pipeline_manager.h"
-#include "ecs/systems/rendering/mulitmesh_render_system.h"
-#include "ecs/systems/rendering/occlusion/occlusion_system.h"
-#include "ecs/systems/rendering/mesh_render_system.h"
 #include "core/variant/callable.h"
 #include "ecs/flecs_types/flecs_variant.h"
 #include "core/string/string_name.h"
@@ -166,15 +163,17 @@ public:
 	RID lookup(const RID& world_id, const String &entity_name);
 	flecs::world *_get_world(const RID &world_id);
 	RID get_world_of_entity(const RID &entity_id);
-	void init_render_system(const RID &world_id);
 	void set_log_level(const int level);
 	RID register_component_type(const RID& world_id, const String &type_name, const Dictionary &script_visible_component_data);
 	Ref<CommandHandler> get_render_system_command_handler(const RID &world_id);
-	std::optional<PipelineManager> _get_pipeline_manager(const RID &world_id);
+	PipelineManager* _get_pipeline_manager(const RID &world_id);
 	void remove_all_components_from_entity(const RID &entity_id);
 	bool has_component(const RID &entity_id,const String &component_type);
 	PackedStringArray get_component_types_as_name(const RID &entity_id);
 	TypedArray<RID> get_component_types_as_id(const RID &entity_id);
+
+	// Debug helpers
+	void debug_check_rid(const RID &rid);
 
 	String get_entity_name(const RID &entity_id);
 	void set_entity_name(const RID& entity_id, const String &p_name);
@@ -234,6 +233,7 @@ private:
 		RID_Owner<FlecsTypeIDVariant, true> type_id_owner;
 		RID_Owner<FlecsSystemVariant, true> system_owner;
 		RID_Owner<FlecsScriptSystem, true> script_system_owner;
+		HashMap<String, Ref<CommandHandler>> command_handlers;
 		RID_Owner_Wrapper() = default;
 		RID_Owner_Wrapper(RID world_id) : world_id(world_id),
 			entity_owner(ENTITY_OWNER_CHUNK_SIZE, MAX_ENTITY_COUNT),
@@ -270,6 +270,7 @@ private:
 					script_system_owner.make_rid(FlecsScriptSystem(FlecsServer::get_singleton()->_get_script_system(rid, world_id)));
 				}
 			}
+			command_handlers = other.command_handlers;
 		}
 		RID_Owner_Wrapper operator=(const RID_Owner_Wrapper& other) {
 			if (this != &other) {
@@ -321,6 +322,7 @@ private:
 					}
 				}
 			}
+			command_handlers = other.command_handlers;
 			return *this;
 		}
 	};
@@ -329,9 +331,6 @@ private:
 	Vector<RID> worlds;
 	AHashMap<RID,RID_Owner_Wrapper> flecs_variant_owners = AHashMap<RID,RID_Owner_Wrapper>(MAX_WORLD_COUNT);
 	Ref<CommandHandler> render_system_command_handler;
-	AHashMap<RID, MultiMeshRenderSystem> multi_mesh_render_systems = AHashMap<RID, MultiMeshRenderSystem>(MAX_WORLD_COUNT);
-	AHashMap<RID, MeshRenderSystem> mesh_render_systems = AHashMap<RID, MeshRenderSystem>(MAX_WORLD_COUNT);
-	AHashMap<RID, OcclusionSystem> occlusion_systems = AHashMap<RID, OcclusionSystem>(MAX_WORLD_COUNT);
 	AHashMap<RID, PipelineManager> pipeline_managers = AHashMap<RID, PipelineManager>(MAX_WORLD_COUNT);
 	Callable command_handler_callback;
 	AHashMap<RID, NodeStorage> node_storages = AHashMap<RID, NodeStorage>(MAX_WORLD_COUNT);

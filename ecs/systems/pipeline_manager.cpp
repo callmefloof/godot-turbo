@@ -1,14 +1,21 @@
 #include "pipeline_manager.h"
 #include "core/string/ustring.h"
 #include "core/string/print_string.h"
+#include "ecs/flecs_types/flecs_server.h"
 
-PipelineManager::PipelineManager(flecs::world *p_world) {
-	world = p_world;
-	pipeline = world->get_pipeline();
+PipelineManager::PipelineManager(const RID& p_world_rid) {
+	world_rid = p_world_rid;
+    flecs::world* world = FlecsServer::get_singleton()->_get_world(world_rid);
+    if (!world) {
+        ERR_PRINT("PipelineManager::PipelineManager: world not found for rid=" + itos(world_rid.get_id()));
+        pipeline = flecs::entity();
+        return;
+    }
+    pipeline = world->get_pipeline();
 }
 
 PipelineManager::PipelineManager(const PipelineManager &rhs) :
-		world(rhs.world) {
+		world_rid(rhs.world_rid) {
 	this->pipeline = rhs.pipeline;
 	this->systems = rhs.systems;
 }
@@ -17,13 +24,13 @@ PipelineManager &PipelineManager::operator=(const PipelineManager &rhs) {
 	if (this == &rhs) {
 		return *this;
 	}
-	this->world = rhs.world;
+	this->world_rid = rhs.world_rid;
 	this->pipeline = rhs.pipeline;
 	this->systems = rhs.systems;
 	return *this;
 }
 
-PipelineManager::PipelineManager(PipelineManager &&rhs) noexcept : world(std::move(rhs.world)) {
+PipelineManager::PipelineManager(PipelineManager &&rhs) noexcept : world_rid(std::move(rhs.world_rid)) {
 	this->pipeline = std::move(rhs.pipeline);
 	this->systems = std::move(rhs.systems);
 }
@@ -32,7 +39,7 @@ PipelineManager &PipelineManager::operator=(PipelineManager &&rhs) noexcept {
 	if (this == &rhs) {
 		return *this;
 	}
-	this->world = std::move(rhs.world);
+	this->world_rid = std::move(rhs.world_rid);
 	this->pipeline = std::move(rhs.pipeline);
 	this->systems = std::move(rhs.systems);
 	return *this;
@@ -63,10 +70,10 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
 
     // Assign the system to the specified phase
     system.add(phase);
-
+    flecs::world* world = FlecsServer::get_singleton()->_get_world(world_rid);
     // Debug: Check if the world object is initialized
     if (!world) {
-        ERR_PRINT("World object is not initialized.");
+        ERR_PRINT("PipelineManager::add_to_pipeline: world not initialized for rid=" + itos(world_rid.get_id()));
         return;
     }
 
@@ -81,6 +88,10 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
     }
 
     // Add the system to the pipeline
+    if (!pipeline.is_valid()) {
+        ERR_PRINT("PipelineManager::add_to_pipeline: pipeline is not valid for world rid=" + itos(world_rid.get_id()));
+        return;
+    }
     pipeline.add(system);
 
     // Store the system in the systems vector for future reference
@@ -92,6 +103,12 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
 
 flecs::entity PipelineManager::create_custom_phase(const String &phase_name, const String &depends_on) {
     // Create a custom phase entity
+    flecs::world* world = FlecsServer::get_singleton()->_get_world(world_rid);
+    if (!world) {
+        ERR_PRINT("PipelineManager::create_custom_phase: world not initialized for rid=" + itos(world_rid.get_id()));
+        return flecs::entity();
+    }
+
     flecs::entity custom_phase = world->entity(phase_name.ascii().get_data());
 
     // If a dependency is provided, set the phase to depend on it
@@ -109,11 +126,18 @@ flecs::entity PipelineManager::create_custom_phase(const String &phase_name, con
     return custom_phase;
 }
 
-void PipelineManager::set_world(flecs::world *p_world) {
-    world = p_world;
+void PipelineManager::set_world(const RID& p_world_rid) {
+    world_rid = p_world_rid;
+    flecs::world* world = FlecsServer::get_singleton()->_get_world(world_rid);
+    if (!world) {
+        ERR_PRINT("PipelineManager::set_world: world not initialized for rid=" + itos(world_rid.get_id()));
+        pipeline = flecs::entity();
+        return;
+    }
     pipeline = world->get_pipeline();
+
 }
 
-flecs::world *PipelineManager::get_world() {
-    return world;
+RID PipelineManager::get_world() {
+    return world_rid;
 }

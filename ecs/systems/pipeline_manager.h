@@ -2,6 +2,8 @@
 #include "thirdparty/flecs/distr/flecs.h"
 #include "core/templates/vector.h"
 #include "core/string/ustring.h"
+#include "core/templates/rid.h"
+#include <optional>
 
 class PipelineManager {
     private:
@@ -10,11 +12,11 @@ class PipelineManager {
             flecs::entity_t relationship = 0ULL;
         };
         flecs::entity pipeline;
-        flecs::world* world = nullptr;
+        RID world_rid;
         Vector<FlecsSystemContainer> systems;
     public:
         PipelineManager() = default;
-        PipelineManager(flecs::world* p_world);
+        PipelineManager(const RID& p_world_rid);
         virtual ~PipelineManager() = default;
         PipelineManager(const PipelineManager& rhs);
         PipelineManager& operator=(const PipelineManager& rhs);
@@ -24,6 +26,6 @@ class PipelineManager {
         void add_to_pipeline(flecs::system system);
         void add_to_pipeline(flecs::system system, flecs::entity_t phase);
         flecs::entity create_custom_phase(const String &phase_name, const String &depends_on = "");
-        void set_world(flecs::world* p_world);
-        flecs::world* get_world();
+        void set_world(const RID& p_world_rid);
+        RID get_world();
 };

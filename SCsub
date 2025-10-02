@@ -7,11 +7,7 @@ module_env.add_source_files(env.modules_sources, [
     "register_types.cpp",
     "thirdparty/flecs/distr/flecs.c",
     "ecs/flecs_types/flecs_script_system.cpp",
-    "ecs/systems/rendering/multimesh_render_system.cpp",
-    "ecs/systems/rendering/occlusion/tile_occlusion_manager.cpp",
-    "ecs/systems/rendering/occlusion/occlusion_system.cpp",
     "ecs/systems/pipeline_manager.cpp",
-    "ecs/systems/rendering/render_system.cpp",
     "ecs/utility/navigation/2d/navigation2d_utility.cpp",
     "ecs/utility/navigation/3d/navigation3d_utility.cpp",
     "ecs/utility/physics/2d/physics2d_utility.cpp",
@@ -41,21 +37,6 @@ module_env.Append(CPPPATH=[
     env.Dir('ecs/flecs_types'),
     env.Dir('ecs/components'),
     env.Dir('ecs/utility'),
-
-    # Specific sub-subdirectories (if your #includes are like #include "2d_physics_components.h")
-    # env.Dir('ecs/components/rendering'),
-    # env.Dir('ecs/components/physics/2d'),
-    # env.Dir('ecs/components/physics/3d'),
-    # env.Dir('ecs/components/navigation/2d'),
-    # env.Dir('ecs/components/navigation/3d'),
-    # env.Dir('ecs/utility/rendering'),
-    # env.Dir('ecs/utility/physics/2d'),
-    # env.Dir('ecs/utility/physics/3d'),
-    # env.Dir('ecs/utility/navigation/2d'),
-    # env.Dir('ecs/system/commands/'),
-    # env.Dir('ecs/utility/navigation/3d'),
-    # env.Dir('ecs/utility/navigation/3d'),
-    # env.Dir('ecs/utility/navigation/3d'),
 
 ])
 

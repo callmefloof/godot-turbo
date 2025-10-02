@@ -251,18 +251,10 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
         TypedArray<RID> multi_mesh_instance_3d_entities = RenderUtility3D::create_multi_mesh_with_object(world_id, multi_mesh_instance_3d);
         if(multi_mesh_instance_3d_entities.size() == 0){
             ERR_FAIL_COND_V(multi_mesh_instance_3d_entities.size() == 0 ,result);
-        RID multi_mesh_instance_3d_entity = multi_mesh_instance_3d_entities[0];
-        const uint32_t instance_count = FlecsServer::get_singleton()->_get_entity(multi_mesh_instance_3d_entity,world_id).get<MultiMeshComponent>().instance_count;
-        TypedArray<RID> multi_mesh_instances;
-        for(uint32_t i = 0; i < instance_count; i++) {
-            if(i == 0){
-                //skip the first entity as it is the MultiMeshInstance2D itself
-                continue;
-            }
-            multi_mesh_instances.append(multi_mesh_instance_3d_entities[i]);
         }
+        //RID multi_mesh_instance_3d_entity = multi_mesh_instance_3d_entities[0];
         result.append_array(multi_mesh_instance_3d_entities);
-        result.append(get_node_script(world_id, node, multi_mesh_instance_3d_entity));
+        //result.append(get_node_script(world_id, node, multi_mesh_instance_3d_entity));
         return result;
     }
     GPUParticles3D *particles_3d = Object::cast_to<GPUParticles3D>(node);
@@ -331,14 +323,6 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     VoxelGI* voxel_gi = Object::cast_to<VoxelGI>(node);
     if ( voxel_gi != nullptr) {
         const RID entity = RenderUtility3D::create_voxel_gi_with_object(world_id, voxel_gi);
-        result.append(entity);
-        result.append(get_node_script(world_id, node, entity));
-        return result;
-    }
-
-    OccluderInstance3D* occluder_component = Object::cast_to<OccluderInstance3D>(node);
-    if (occluder_component != nullptr) {
-        const RID entity = RenderUtility3D::create_occluder_with_object(world_id, occluder_component);
         result.append(entity);
         result.append(get_node_script(world_id, node, entity));
         return result;
@@ -444,7 +428,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     }
     result.append(entity);
     
-    }
+    
     return result;
 }
 
