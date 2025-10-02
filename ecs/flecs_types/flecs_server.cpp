@@ -36,6 +36,7 @@
 #include "core/string/ustring.h"
 #include "flecs_variant.h"
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 #include <optional>
 #include "ecs/components/rendering/rendering_components.h"
@@ -222,7 +223,7 @@ RID FlecsServer::create_world() {
 	uint64_t created_id_u64 = flecs_world.get_id();
 	char hexbuf[32];
 	snprintf(hexbuf, sizeof(hexbuf), "%llx", (unsigned long long)created_id_u64);
-	ERR_PRINT("FlecsServer::create_world: created world_id=" + itos(created_id_u64) + " (hex=0x" + String(hexbuf) + ", local_index=" + itos(flecs_world.get_local_index()) + ")");
+	print_line("FlecsServer::create_world: created world_id=" + itos(created_id_u64) + " (hex=0x" + String(hexbuf) + ", local_index=" + itos(flecs_world.get_local_index()) + ")");
 
 	unlock();
 
@@ -235,14 +236,14 @@ void FlecsServer::debug_check_rid(const RID &rid) {
 	uint64_t id_u64 = rid.get_id();
 	char hexbuf2[32];
 	snprintf(hexbuf2, sizeof(hexbuf2), "%llx", (unsigned long long)id_u64);
-	ERR_PRINT("debug_check_rid: rid=" + itos(id_u64) + " (hex=0x" + String(hexbuf2) + ", local_index=" + itos(rid.get_local_index()) + "), owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
-	ERR_PRINT("debug_check_rid: worlds vector size=" + itos(worlds.size()));
+	print_line("debug_check_rid: rid=" + itos(id_u64) + " (hex=0x" + String(hexbuf2) + ", local_index=" + itos(rid.get_local_index()) + "), owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
+	print_line("debug_check_rid: worlds vector size=" + itos(worlds.size()));
 	const int max_print = 64;
 	int printed = 0;
 	for (int i = 0; i < worlds.size() && printed < max_print; ++i) {
 		const RID &r = worlds[i];
 		if (r != RID()) {
-			ERR_PRINT("debug_check_rid: worlds[" + itos(i) + "] -> rid_id=" + itos(r.get_id()));
+			print_line("debug_check_rid: worlds[" + itos(i) + "] -> rid_id=" + itos(r.get_id()));
 			++printed;
 		}
 	}
