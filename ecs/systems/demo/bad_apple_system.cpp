@@ -39,8 +39,7 @@ void BadAppleSystem::start() {
 		return;
 	}
 
-    auto bas_get_image_data = world->system().rate(50) // limit to 25 FPS
-    .run([&](flecs::iter it){
+    auto bas_get_image_data = world->system().interval(1.0 / 30.0).run([&](flecs::iter it){
         if (!video_player) {
             ERR_PRINT_ONCE("Video player is not set for BadAppleSystem.");
             return;
@@ -82,9 +81,17 @@ void BadAppleSystem::start() {
 
 			// Luminance -> black/white
 			float luminance = 0.2126f * pixel.r + 0.7152f * pixel.g + 0.0722f * pixel.b;
-			s_frame_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-// 			Color test = ((x / 8 + y / 8) % 2 == 0) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-// s_frame_colors[idx] = test;
+			switch(mode) {
+				case BASMode::REGULAR:
+					s_frame_colors[idx] = (luminance > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
+					break;
+				case BASMode::INVERTED:
+					s_frame_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
+					break;
+				case BASMode::RANDOM:
+					s_frame_colors[idx] = luminance > 0.5f ? Color(Math::randf(), Math::randf(), Math::randf(), 1) : Color(0, 0, 0, 1);
+					break;
+			}
 		}
 
 		// Flush once per frame
@@ -246,6 +253,7 @@ Color BadAppleSystem::get_pixel(const ImageData& image_data, const int x, const 
     return color;
 }
 
+
 void BadAppleSystem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("start"), &BadAppleSystem::start);
 	ClassDB::bind_method(D_METHOD("set_mm_entity", "mm_entity"), &BadAppleSystem::set_mm_entity);
@@ -254,4 +262,9 @@ void BadAppleSystem::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_video_player"), &BadAppleSystem::get_video_player);
 	ClassDB::bind_method(D_METHOD("set_world_id", "world_id"), &BadAppleSystem::set_world_id);
 	ClassDB::bind_method(D_METHOD("get_world_id"), &BadAppleSystem::get_world_id);
+	ClassDB::bind_method(D_METHOD("get_mode"), &BadAppleSystem::get_mode);
+	ClassDB::bind_method(D_METHOD("set_mode", "mode"), &BadAppleSystem::set_mode);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_ENUM, "Regular,Inverted,Random"), "set_mode", "get_mode");
+
 }
