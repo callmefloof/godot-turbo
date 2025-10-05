@@ -1,6 +1,7 @@
 #pragma once
 #include "core/object/object_id.h"
 #include "core/templates/a_hash_map.h"
+#include "core/templates/local_vector.h"
 #include "core/templates/vector.h"
 #include "core/variant/dictionary.h"
 #include "core/variant/typed_array.h"
@@ -245,82 +246,57 @@ private:
 		RID_Owner_Wrapper(const RID_Owner_Wrapper& other) {
 			// Initialize world_id first to ensure lookups use the correct world
 			world_id = other.world_id;
-			List<RID> *p_owned = nullptr;
-			other.entity_owner.get_owned_list(p_owned);
-			if(p_owned){
-				for (RID rid : *p_owned) {
+			for (RID rid : other.entity_owner.get_owned_list()) {
 					entity_owner.make_rid(FlecsEntityVariant(FlecsServer::get_singleton()->_get_entity(rid, world_id)));
-				}
 			}
-			other.type_id_owner.get_owned_list(p_owned);
-			if(p_owned) {
-				for (RID rid : *p_owned) {
-					type_id_owner.make_rid(FlecsTypeIDVariant(FlecsServer::get_singleton()->_get_type_id(rid, world_id)));
-				}
+			LocalVector<RID> other_type_ids = other.type_id_owner.get_owned_list();
+			
+			for (RID rid : other_type_ids) {
+				type_id_owner.make_rid(FlecsTypeIDVariant(FlecsServer::get_singleton()->_get_type_id(rid, world_id)));
 			}
-			other.system_owner.get_owned_list(p_owned);
-			if(p_owned) {
-				for (RID rid : *p_owned) {
-					system_owner.make_rid(FlecsSystemVariant(FlecsServer::get_singleton()->_get_system(rid, world_id)));
-				}
+
+			LocalVector<RID> other_system_ids = other.system_owner.get_owned_list();
+
+			for (RID rid : other_system_ids) {
+				system_owner.make_rid(FlecsSystemVariant(FlecsServer::get_singleton()->_get_system(rid, world_id)));
 			}
-			other.script_system_owner.get_owned_list(p_owned);
-			if(p_owned) {
-				for (RID rid : *p_owned) {
-					script_system_owner.make_rid(FlecsScriptSystem(FlecsServer::get_singleton()->_get_script_system(rid, world_id)));
-				}
+
+			LocalVector<RID> other_script_ids = other.script_system_owner.get_owned_list();
+			for (RID rid : other_script_ids) {
+				script_system_owner.make_rid(FlecsScriptSystem(FlecsServer::get_singleton()->_get_script_system(rid, world_id)));
 			}
+
 			command_handlers = other.command_handlers;
 		}
 		RID_Owner_Wrapper operator=(const RID_Owner_Wrapper& other) {
 			if (this != &other) {
 				world_id = other.world_id;
-
-				List<RID> *p_owned = nullptr;
-
-				type_id_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for(RID rid : *p_owned) {
-						FlecsServer::get_singleton()->free_type_id(world_id, rid);
-					}
+				for(RID rid : other.type_id_owner.get_owned_list()) {
+					FlecsServer::get_singleton()->free_type_id(world_id, rid);
 				}
-				system_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for (RID rid : *p_owned) {
-						FlecsServer::get_singleton()->free_system(world_id, rid, true);
-					}
+				for (RID rid : other.system_owner.get_owned_list()) {
+					FlecsServer::get_singleton()->free_system(world_id, rid, true);
 				}
-				script_system_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for (RID rid : *p_owned) {
-						FlecsServer::get_singleton()->free_script_system(world_id, rid);
-					}
+				for (RID rid : other.script_system_owner.get_owned_list()) {
+					FlecsServer::get_singleton()->free_script_system(world_id, rid);
 				}
 
-				other.entity_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for (RID rid : *p_owned) {
-						entity_owner.make_rid(FlecsEntityVariant(get_singleton()->_get_entity(rid, world_id)));
-					}
+				for (RID rid : other.entity_owner.get_owned_list()) {
+					entity_owner.make_rid(FlecsEntityVariant(get_singleton()->_get_entity(rid, world_id)));
 				}
-				other.type_id_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for (RID rid : *p_owned) {
-						type_id_owner.make_rid(FlecsTypeIDVariant(get_singleton()->_get_type_id(rid, world_id)));
-					}
+			
+				for (RID rid : other.type_id_owner.get_owned_list()) {
+					type_id_owner.make_rid(FlecsTypeIDVariant(get_singleton()->_get_type_id(rid, world_id)));
 				}
-				other.system_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for (RID rid : *p_owned) {
-						system_owner.make_rid(FlecsSystemVariant(get_singleton()->_get_system(rid, world_id)));
-					}
+			
+				for (RID rid : other.system_owner.get_owned_list()) {
+					system_owner.make_rid(FlecsSystemVariant(get_singleton()->_get_system(rid, world_id)));
 				}
-				other.script_system_owner.get_owned_list(p_owned);
-				if(p_owned) {
-					for (RID rid : *p_owned) {
-						script_system_owner.make_rid(FlecsScriptSystem(get_singleton()->_get_script_system(rid, world_id)));
-					}
+
+				for (RID rid : other.script_system_owner.get_owned_list()) {
+					script_system_owner.make_rid(FlecsScriptSystem(get_singleton()->_get_script_system(rid, world_id)));
 				}
+				
 			}
 			command_handlers = other.command_handlers;
 			return *this;

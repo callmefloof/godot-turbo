@@ -273,13 +273,10 @@ bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 		ERR_PRINT("FlecsServer::progress_world: world not found");
 		return false;
 	}
-	std::unique_ptr<List<RID>> p_owned = std::make_unique<List<RID>>();
-	flecs_variant_owners.get(world_id).script_system_owner.get_owned_list(p_owned.get());
-	if(p_owned){
-		for (auto &sys_id :* p_owned) {
-			run_script_system(world_id, sys_id);
-		}
+	for (auto &sys_id : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		run_script_system(world_id, sys_id);
 	}
+	
 
 	const bool progress = world->progress(delta);
 
@@ -905,10 +902,7 @@ TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
 	flecs::entity entity = entity_variant->get_entity();
 	TypedArray<RID> relationships;
 	Vector<flecs::entity_t> relationship_ids;
-	List<RID> *p_owned = nullptr;
-	flecs_variant_owners.get(world_id).type_id_owner.get_owned_list(p_owned);
-	if(p_owned) {
-		for (const RID& rid : *p_owned) {
+	for (const RID& rid : flecs_variant_owners.get(world_id).type_id_owner.get_owned_list()) {
 			FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(rid);
 			if(!type_variant) {
 				continue;
@@ -922,7 +916,6 @@ TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
 				relationship_ids.push_back(type_id);
 			}
 		}
-	}
 
 	entity.children([&](flecs::entity child) {
 		if(!child.is_pair()){
@@ -969,33 +962,21 @@ RID FlecsServer::_create_rid_for_script_system(const RID& world_id, const FlecsS
 
 void FlecsServer::free_world(const RID& rid) {
 	if (flecs_world_owners.owns(rid)) {
-		std::unique_ptr<List<RID>> p_owned = std::make_unique<List<RID>>();
-		flecs_variant_owners.get(rid).entity_owner.get_owned_list(p_owned.get());
-		if (p_owned) {
-			for (const RID& owned : *p_owned) {
+			for (const RID& owned : flecs_variant_owners.get(rid).entity_owner.get_owned_list()) {
 				flecs_variant_owners.get(rid).entity_owner.free(owned);
 			}
-		}
 
-		flecs_variant_owners.get(rid).type_id_owner.get_owned_list(p_owned.get());
-		if (p_owned) {
-			for (const RID& owned : *p_owned) {
+			for (const RID& owned : flecs_variant_owners.get(rid).type_id_owner.get_owned_list()) {
 				flecs_variant_owners.get(rid).type_id_owner.free(owned);
 			}
+			
+		flecs_variant_owners.get(rid).system_owner.get_owned_list();
+		for (const RID& owned : flecs_variant_owners.get(rid).system_owner.get_owned_list()) {
+			flecs_variant_owners.get(rid).system_owner.free(owned);
 		}
 
-		flecs_variant_owners.get(rid).system_owner.get_owned_list(p_owned.get());
-		if (p_owned) {
-			for (const RID& owned : *p_owned) {
-				flecs_variant_owners.get(rid).system_owner.free(owned);
-			}
-		}
-
-		flecs_variant_owners.get(rid).script_system_owner.get_owned_list(p_owned.get());
-		if (p_owned) {
-			for (const RID& owned : *p_owned) {
-				flecs_variant_owners.get(rid).script_system_owner.free(owned);
-			}
+		for (const RID& owned : flecs_variant_owners.get(rid).script_system_owner.get_owned_list()) {
+			flecs_variant_owners.get(rid).script_system_owner.free(owned);
 		}
 		flecs_variant_owners.erase(rid);
 
@@ -1119,16 +1100,13 @@ Node* FlecsServer::get_node_from_node_storage(const int64_t node_id, const RID &
 
 RID FlecsServer::_get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity) {
 	if (flecs_variant_owners.has(world_id)) {
-		std::unique_ptr<List<RID>> p_owned = std::make_unique<List<RID>>();
-		flecs_variant_owners.get(world_id).entity_owner.get_owned_list(p_owned.get());
-		if (p_owned) {
-			for (const RID& owned : *p_owned) {
+		flecs_variant_owners.get(world_id).entity_owner.get_owned_list();
+			for (const RID& owned : flecs_variant_owners.get(world_id).entity_owner.get_owned_list()) {
 				FlecsEntityVariant* owned_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(owned);
 				if (owned_entity && owned_entity->get_entity().id() == entity.id()) {
 					return owned;
 				}
 			}
-		}
 		if(entity.is_valid()) {
 			return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
 		}

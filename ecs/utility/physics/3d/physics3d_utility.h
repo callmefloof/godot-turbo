@@ -6,7 +6,7 @@
 #include "scene/3d/physics/rigid_body_3d.h"
 #include "scene/3d/physics/joints/joint_3d.h"
 #include "scene/3d/physics/physics_body_3d.h"
-#include "scene/3d/soft_body_3d.h"
+#include "scene/3d/physics/soft_body_3d.h"
 #include "core/templates/rid.h"
 #include "core/string/ustring.h"
 #include "ecs/utility/ref_storage.h"
