@@ -244,7 +244,7 @@ TypedArray<RID> RenderUtility2D::create_multi_mesh_with_object(const RID &world_
     TypedArray<RID> entities;
     TypedArray<Transform2D> transforms;
     transforms.resize(multi_mesh_ref->get_instance_count());
-    for (uint32_t i = 0; i < multi_mesh_ref->get_instance_count(); ++i) {
+    for (int i = 0; i < multi_mesh_ref->get_instance_count(); ++i) {
         transforms[i] = multi_mesh_ref->get_instance_transform(i);
     }
     entities.append(FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e));

@@ -365,7 +365,7 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 	if(mm_use_colors || mm_use_data) {
 		data.push_back(mm_data_components.data());
 
-		if(instance_count > std::numeric_limits<int32_t>::max()) {
+		if(instance_count > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
 			ERR_PRINT("Instance count exceeds maximum limit of uint32_t.");
 			return entities;
 		}
@@ -385,7 +385,7 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 		auto flecs_entities = ecs_bulk_init(world->c_ptr(), &bulk_desc);
 		
 		entities.resize(instance_count);
-		for (int i = 0; i < instance_count; i++) {
+		for (uint32_t i = 0; i < instance_count; i++) {
 			const flecs::entity entity = world->get_alive(flecs_entities[i]);
 			//entity.child_of(mm_entity);
 			entities[i] = FlecsServer::get_singleton()->_create_rid_for_entity(world_id, entity);
@@ -393,7 +393,7 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 		return entities;
 
 	}else{
-		if(instance_count > std::numeric_limits<int32_t>::max()) {
+		if(instance_count > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
 		ERR_PRINT("Instance count exceeds maximum limit of uint32_t.");
 		return entities;
 		}
@@ -411,7 +411,7 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 		auto flecs_entities = ecs_bulk_init(world->c_ptr(), &bulk_desc);
 		
 		entities.resize(instance_count);
-		for (int i = 0; i < instance_count; i++) {
+		for (uint32_t i = 0; i < instance_count; i++) {
 			const flecs::entity entity = world->get_alive(flecs_entities[i]);
 			//entity.child_of(mm_entity);
 			entities[i] = FlecsServer::get_singleton()->_create_rid_for_entity(world_id, entity);

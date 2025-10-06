@@ -119,9 +119,9 @@ RID BadAppleSystem::get_mm_entity() const {
     return gd_mm_entity;
 }
 
-void BadAppleSystem::set_mm_entity(const RID& mm_entity) {
-    gd_mm_entity = mm_entity;
-	this->mm_entity = FlecsServer::get_singleton()->_get_entity(mm_entity, world_id);
+void BadAppleSystem::set_mm_entity(const RID& rid_mm_entity) {
+    gd_mm_entity = rid_mm_entity;
+	this->mm_entity = FlecsServer::get_singleton()->_get_entity(rid_mm_entity, world_id);
 }
 
 void BadAppleSystem::set_video_player(VideoStreamPlayer *p_video_player) {
@@ -247,9 +247,9 @@ Color BadAppleSystem::_get_color_at_ofs(const Image::Format format, const uint8_
 	}
 }
 
-Color BadAppleSystem::get_pixel(const ImageData& image_data, const int x, const int y) const {
+Color BadAppleSystem::get_pixel(const ImageData& p_image_data, const int x, const int y) const {
 
-    Color color = _get_color_at_ofs(image_data.format, image_data.data.ptr(), y * image_data.width + x);
+    Color color = _get_color_at_ofs(p_image_data.format, p_image_data.data.ptr(), y * p_image_data.width + x);
     return color;
 }
 

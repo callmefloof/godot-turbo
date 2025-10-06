@@ -90,6 +90,7 @@ struct MultiMeshComponent : CompBase {
 		has_data = dict["has_data"];
 		has_color = dict["has_color"];
 		is_instanced = dict["is_instanced"];
+		transform_format = static_cast<RS::MultimeshTransformFormat>(dict["transform_format"]);
 	}
 
 	Dictionary to_dict_with_entity(flecs::entity &entity) const override {
@@ -122,8 +123,8 @@ struct MultiMeshComponent : CompBase {
 			multi_mesh_component.has_data = dict["has_data"];
 			multi_mesh_component.has_color = dict["has_color"];
 			multi_mesh_component.is_instanced = dict["is_instanced"];
-			int transform_format = dict["transform_format"];
-			multi_mesh_component.transform_format = static_cast<RS::MultimeshTransformFormat>(transform_format);
+			int raw_transform_format = dict["transform_format"];
+			multi_mesh_component.transform_format = static_cast<RS::MultimeshTransformFormat>(raw_transform_format);
 		} else {
 			ERR_PRINT("MultiMeshComponent::from_dict: entity does not have MultiMeshComponent");
 		}
