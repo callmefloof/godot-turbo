@@ -1,7 +1,4 @@
 #pragma once
-#include "servers/physics_server_3d.h"
-#include "components/physics/3d/3d_physics_components.h"
-#include "thirdparty/flecs/distr/flecs.h"
 #include "scene/3d/physics/area_3d.h"
 #include "scene/3d/physics/rigid_body_3d.h"
 #include "scene/3d/physics/joints/joint_3d.h"
@@ -9,10 +6,6 @@
 #include "scene/3d/physics/soft_body_3d.h"
 #include "core/templates/rid.h"
 #include "core/string/ustring.h"
-#include "ecs/utility/ref_storage.h"
-#include "ecs/utility/node_storage.h"
-#include "ecs/components/object_instance_component.h"
-#include "ecs/flecs_types/flecs_server.h"
 
 class Physics3DUtility : public Object {
 	GDCLASS(Physics3DUtility, Object)

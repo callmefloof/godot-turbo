@@ -1,12 +1,10 @@
 #pragma once
 
-#include "core/object/ref_counted.h"
 #include "core/templates/vector.h"
 #include "core/string/ustring.h"
 #include "scene/main/node.h"
 #include "scene/2d/node_2d.h"
 #include "scene/3d/node_3d.h"
-#include "servers/rendering_server.h"
 #include "scene/3d/physics/rigid_body_3d.h"
 #include "scene/2d/physics/rigid_body_2d.h"
 #include "scene/main/window.h"

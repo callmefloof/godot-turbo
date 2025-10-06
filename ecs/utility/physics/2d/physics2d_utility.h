@@ -1,17 +1,10 @@
 #pragma once
-#include "ecs/utility/ref_storage.h"
-#include "ecs/components/object_instance_component.h"
-#include "ecs/utility/node_storage.h"
 #include "core/string/ustring.h"
 #include "core/templates/rid.h"
-#include "ecs/components/physics/2d/2d_physics_components.h"
-#include "thirdparty/flecs/distr/flecs.h"
 #include "scene/2d/physics/area_2d.h"
 #include "scene/2d/physics/joints/joint_2d.h"
 #include "scene/2d/physics/rigid_body_2d.h"
-#include "servers/physics_server_2d.h"
 #include "scene/2d/physics/physics_body_2d.h"
-#include "scene/2d/physics/collision_object_2d.h"
 
 
 class Physics2DUtility : public Object {

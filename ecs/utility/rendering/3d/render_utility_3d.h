@@ -1,10 +1,9 @@
 #pragma once
 #include "core/math/transform_3d.h"
-#include "core/templates/vector.h"
 #include "core/variant/variant.h"
 #include "core/object/object.h"
 #include "core/templates/rid.h"
-#include "core/object/class_db.h"
+
 
 class VoxelGI;
 class OccluderInstance3D;
@@ -31,6 +30,11 @@ class Material;
 class RenderUtility3D : Object {
 	GDCLASS(RenderUtility3D, Object);
 public:
+	// This class is a utility for creating rendering entities in the ECS world.
+	// It should not be instantiated directly, but rather used through its static methods.
+	// It provides a way to create entities that represent rendering components in the ECS world,
+	// ensuring that the necessary properties are set correctly.
+
 	RenderUtility3D() = default;
 	~RenderUtility3D();
 	static RID create_mesh_instance_with_id(const RID &world_id, const RID& mesh_id, const Transform3D& transform, const String& name, const RID& scenario_id);

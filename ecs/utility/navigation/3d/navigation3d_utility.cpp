@@ -1,5 +1,8 @@
 #include "navigation3d_utility.h"
 #include "core/object/class_db.h"
+#include "ecs/components/navigation/3d/3d_navigation_components.h"
+#include "ecs/components/object_instance_component.h"
+#include "servers/navigation_server_3d.h"
 #include "ecs/flecs_types/flecs_server.h"
 
 RID Navigation3DUtility::create_nav_agent_with_id(const RID &world_id, const RID &agent, const String &name)  {

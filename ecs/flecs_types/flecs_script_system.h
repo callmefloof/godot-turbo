@@ -4,7 +4,6 @@
 
 #ifndef FLECS_SCRIPT_SYSTEM_H
 #define FLECS_SCRIPT_SYSTEM_H
-#include "core/string/ustring.h"
 #include "core/templates/rid.h"
 #include "core/typedefs.h"
 #include "core/variant/callable.h"

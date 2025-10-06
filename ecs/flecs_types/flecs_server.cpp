@@ -23,7 +23,7 @@
 #include "ecs/components/physics/3d/3d_physics_components.h"
 #include "ecs/components/navigation/2d/2d_navigation_components.h"
 #include "ecs/components/navigation/3d/3d_navigation_components.h"
-#include "ecs/components/worldcomponents.h"
+#include "ecs/components/world_components.h"
 #include "ecs/components/transform_3d_component.h"
 #include "ecs/components/transform_2d_component.h"
 #include "ecs/components/visibility_component.h"
@@ -32,13 +32,10 @@
 #include "ecs/components/dirty_transform.h"
 #include "ecs/components/resource_component.h"
 #include "ecs/components/scene_node_component.h"
-
 #include "core/string/ustring.h"
 #include "flecs_variant.h"
 #include <cstdint>
 #include <cstdio>
-#include <memory>
-#include <optional>
 #include "ecs/components/rendering/rendering_components.h"
 
 void FlecsServer::run_script_system(const RID& world_id, const RID& script_system_id) {

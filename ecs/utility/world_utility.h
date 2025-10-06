@@ -14,7 +14,7 @@
 #include "servers/physics_server_3d.h"
 #include "servers/rendering_server.h"
 #include "thirdparty/flecs/distr/flecs.h"
-#include "components/worldcomponents.h"
+#include "components/world_components.h"
 #include "scene/resources/camera_attributes.h"
 #include "ecs/flecs_types/flecs_server.h"
 

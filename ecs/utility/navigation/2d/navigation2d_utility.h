@@ -1,12 +1,6 @@
 #pragma once
-#include "thirdparty/flecs/distr/flecs.h"
-#include "ecs/components/navigation/2d/2d_navigation_components.h"
-#include "ecs/utility/ref_storage.h"
-#include "ecs/utility/node_storage.h"
-#include "ecs/components/object_instance_component.h"
 #include "core/string/ustring.h"
 #include "core/templates/rid.h"
-#include "servers/navigation_server_2d.h"
 #include <scene/2d/navigation/navigation_agent_2d.h>
 #include <scene/2d/navigation/navigation_link_2d.h>
 #include <scene/2d/navigation/navigation_obstacle_2d.h>

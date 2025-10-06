@@ -5,9 +5,7 @@
 #include "render_utility_3d.h"
 
 #include "core/error/error_macros.h"
-#include "core/io/marshalls.h"
 #include "core/math/aabb.h"
-#include "core/math/math_funcs.h"
 #include "core/math/rect2i.h"
 #include "core/math/transform_3d.h"
 #include "core/math/vector3.h"
@@ -28,16 +26,14 @@
 #include "scene/resources/material.h"
 #include "scene/resources/mesh.h"
 #include "scene/resources/multimesh.h"
-#include "scene/resources/surface_tool.h"
 #include "core/object/class_db.h"
 #include "ecs/components/transform_3d_component.h"
 #include "ecs/components/rendering/rendering_components.h"
 #include "ecs/components/object_instance_component.h"
-#include "ecs/components/worldcomponents.h"
+#include "ecs/components/world_components.h"
 #include "ecs/components/visibility_component.h"
 #include "ecs/components/dirty_transform.h"
 #include "thirdparty/flecs/distr/flecs.h"
-#include "scene/3d/occluder_instance_3d.h"
 #include "ecs/flecs_types/flecs_server.h"
 #include "core/templates/rid.h"
 #include "scene/main/viewport.h"
@@ -51,7 +47,6 @@
 #include <vector>
 #include "ecs/components/dirty_transform.h"
 #include "ecs/flecs_types/flecs_server.h"
-#include "worldcomponents.h"
 
 RenderUtility3D::~RenderUtility3D() {
 }

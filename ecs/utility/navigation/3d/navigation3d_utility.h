@@ -5,12 +5,6 @@
 #include "scene/3d/navigation/navigation_link_3d.h"
 #include "scene/3d/navigation/navigation_obstacle_3d.h"
 #include "scene/3d/navigation/navigation_region_3d.h"
-#include "servers/navigation_server_3d.h"
-#include "thirdparty/flecs/distr/flecs.h"
-#include "components/navigation/3d/3d_navigation_components.h"
-#include "ecs/utility/ref_storage.h"
-#include "ecs/utility/node_storage.h"
-#include "ecs/components/object_instance_component.h"
 
 class Callable;
 class Navigation3DUtility : public Object {

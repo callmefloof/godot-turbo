@@ -7,6 +7,8 @@
 #include "ecs/flecs_types/flecs_server.h"
 #include "ecs/components/transform_2d_component.h"
 #include "ecs/components/rendering/rendering_components.h"
+#include "ecs/components/dirty_transform.h"
+#include "ecs/components/world_components.h"
 #include "flecs.h"
 
 RID RenderUtility2D::create_mesh_instance_with_id(const RID &world_id, const RID &mesh_id, const Transform2D &transform, const String &name, const RID &canvas_id)  {

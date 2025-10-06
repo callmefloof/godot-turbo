@@ -1,25 +1,15 @@
 #pragma once
 #include "core/variant/typed_array.h"
-#include "ecs/components/rendering/rendering_components.h"
-#include "ecs/components/transform_2d_component.h"
-#include "modules/godot_turbo/ecs/components/worldcomponents.h"
 #include "scene/2d/camera_2d.h"
 #include "scene/2d/gpu_particles_2d.h"
 #include "scene/2d/multimesh_instance_2d.h"
 #include "scene/2d/skeleton_2d.h"
 #include "scene/main/canvas_item.h"
 #include "scene/resources/mesh.h"
-#include "servers/rendering_server.h"
 #include <scene/2d/light_2d.h>
 #include <scene/2d/light_occluder_2d.h>
 #include <scene/2d/mesh_instance_2d.h>
 
-
-
-#include "ecs/utility/ref_storage.h"
-#include "ecs/utility/node_storage.h"
-#include "ecs/components/dirty_transform.h"
-#include "ecs/flecs_types/flecs_server.h"
 
 class RenderUtility2D : public Object{
 	GDCLASS(RenderUtility2D, Object)

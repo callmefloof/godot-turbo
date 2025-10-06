@@ -1,4 +1,6 @@
 #include "physics3d_utility.h"
+#include "ecs/components/physics/3d/3d_physics_components.h"
+#include "ecs/components/object_instance_component.h"
 #include "ecs/flecs_types/flecs_server.h"
 
 RID Physics3DUtility::create_area(const RID &world_id, const String &name, const RID &space_id) {

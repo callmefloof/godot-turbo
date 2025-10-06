@@ -1,5 +1,4 @@
 #pragma once
-#include "core/object/object_id.h"
 #include "core/templates/a_hash_map.h"
 #include "core/templates/local_vector.h"
 #include "core/templates/vector.h"
@@ -11,7 +10,6 @@
 #include "core/os/mutex.h"
 #include "core/templates/rid.h"
 #include "core/templates/rid_owner.h"
-#include "core/templates/vset.h"
 #include "core/variant/variant.h"
 #include "core/object/ref_counted.h"
 #include "flecs_script_system.h"
@@ -20,12 +18,9 @@
 #include "ecs/systems/pipeline_manager.h"
 #include "core/variant/callable.h"
 #include "ecs/flecs_types/flecs_variant.h"
-#include "core/string/string_name.h"
-#include "ecs/components/component_registry.h"
 #include "ecs/utility/node_storage.h"
 #include "ecs/utility/ref_storage.h"
 #include <limits>
-#include <optional>
 #include <atomic>
 
 
