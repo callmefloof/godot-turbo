@@ -812,13 +812,13 @@ RID RenderUtility2D::create_gpu_particles_with_object(const RID &world_id, GPUPa
                                 : Vector2();
 
         const int total_segments = trail_sections * trail_section_subdivisions;
-        real_t depth = size.height * trail_sections;
+        //real_t depth = size.height * trail_sections;
 
         for (int j = 0; j <= total_segments; j++) {
             real_t v = j;
             v /= total_segments;
 
-            real_t y = depth * v;
+            // real_t y = depth * v;
             //y = (depth * 0.5) - y;
 
             int bone = j / trail_section_subdivisions;

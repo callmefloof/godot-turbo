@@ -31,7 +31,9 @@ public:
 		release_all();
 	}
 	 void make_inert(Node *p_node) {
-		if (!p_node) return;
+		if (!p_node) {
+			return;
+		}
 
 		p_node->set_process(false);
 		p_node->set_physics_process(false);

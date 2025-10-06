@@ -1,5 +1,4 @@
 #pragma once
-#include "core/error/error_list.h"
 #include "core/error/error_macros.h"
 #include "core/variant/variant.h"
 #include "ecs/systems/commands/command.h"

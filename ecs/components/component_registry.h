@@ -1,9 +1,6 @@
 #pragma once
 
-#include "core/templates/a_hash_map.h"
 #include "core/variant/dictionary.h"
-#include "core/string/string_name.h"
-#include "core/variant/variant.h"
 #include "flecs.h"
 #include "ecs/components/comp_base.h"
 #include "core/error/error_macros.h"

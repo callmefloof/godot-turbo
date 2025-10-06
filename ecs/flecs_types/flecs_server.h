@@ -38,7 +38,6 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
 	} \
-	flecs::world *world = &world_variant->get_world();
 
 #define CHECK_ENTITY_VALIDITY(entity_id, world_id, func_name) \
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id); \
@@ -46,7 +45,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": entity_id is not a valid entity"); \
 		return; \
 	} \
-	flecs::entity entity = entity_variant->get_entity();
+
 
 #define CHECK_WORLD_VALIDITY(world_id, func_name) \
 	FlecsWorldVariant* world_variant = flecs_world_owners.get_or_null(world_id); \
@@ -54,7 +53,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	flecs::world &world = world_variant->get_world();
+
 
 #define CHECK_SYSTEM_VALIDITY_V(system_id, world_id, default_value, func_name) \
 	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
@@ -62,7 +61,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": system_id is not a valid system"); \
 		return default_value; \
 	} \
-	flecs::system system = system_variant->get_system();
+
 
 #define CHECK_SYSTEM_VALIDITY(system_id, world_id, func_name) \
 	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
@@ -70,7 +69,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": system_id is not a valid system"); \
 		return; \
 	} \
-	flecs::system system = system_variant->get_system();
+
 
 #define CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, default_value, func_name) \
 	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(script_system_id); \
@@ -92,8 +91,8 @@
 		ERR_PRINT("FlecsServer::" #func_name ": type_id is not a valid type ID"); \
 		return default_value; \
 	} \
-	flecs::entity_t type_id = type_id_variant->get_type();
 
+	
 #define CHECK_TYPE_ID_VALIDITY(type_id, world_id, func_name) \
 	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(type_id); \
 	if (!type_id_variant) { \

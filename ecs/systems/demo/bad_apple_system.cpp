@@ -6,7 +6,6 @@
 #include "servers/rendering_server.h"
 #include "core/math/vector2i.h"
 #include "systems/pipeline_manager.h"
-#include <optional>
 
 
 void BadAppleSystem::start() {

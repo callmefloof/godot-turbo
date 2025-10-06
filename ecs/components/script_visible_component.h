@@ -8,8 +8,9 @@
 #include "core/templates/a_hash_map.h"
 #include "core/typedefs.h"
 #include "core/variant/variant.h"
-#include "ecs/components/component_registry.h"
 #include "core/variant/dictionary.h"
+#include "ecs/components/comp_base.h"
+
 
 struct ScriptVisibleComponent : CompBase {
 	StringName name;

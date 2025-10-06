@@ -91,7 +91,9 @@ template<typename F>
 static ICommand* make_command(F&& func) {
 	using CmdT = Command<F>;
 	void* mem = CmdT::pool().allocate();
-	if (!mem) return nullptr;
+	if (!mem) { 
+		return nullptr;
+	}
 	return new (mem) CmdT(std::forward<F>(func));
 }
 

@@ -93,10 +93,10 @@ RID FlecsScriptSystem::get_world() {
 	return world_id;
 }
 
-void FlecsScriptSystem::set_world(const RID &world_id) {
-		this->world_id = world_id;
-		world = FlecsServer::get_singleton()->_get_world(world_id);
+void FlecsScriptSystem::set_world(const RID &world_rid) {
+		this->world_id = world_rid;
+		world = FlecsServer::get_singleton()->_get_world(world_rid);
 		if (!world) {
 			ERR_PRINT("FlecsScriptSystem::set_world: world_id is not a valid world");
 		}
-	}
+}
