@@ -1,7 +1,7 @@
 #include "pipeline_manager.h"
 #include "core/string/ustring.h"
 #include "core/string/print_string.h"
-#include "ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 
 PipelineManager::PipelineManager(const RID& p_world_rid) {
 	world_rid = p_world_rid;
