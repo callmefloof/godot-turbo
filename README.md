@@ -30,7 +30,7 @@ A high-performance Entity Component System (ECS) module for Godot 4.4+, powered 
 
 ### Prerequisites
 
-- **Godot 4.4+** (4.5 beta untested)
+- **Godot 4.5+**
 - **SCons** build system
 - **C++17** compatible compiler
 
