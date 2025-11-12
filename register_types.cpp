@@ -2,20 +2,22 @@
 
 #include "../../core/object/class_db.h"
 #include "core/os/memory.h"
-#include "ecs/utility/world_utility.h"
-#include "ecs/utility/scene_object_utility.h"
-#include "ecs/utility/resource_object_utility.h"
+#include "modules/godot_turbo/ecs/utility/world_utility.h"
+#include "modules/godot_turbo/ecs/utility/scene_object_utility.h"
+#include "modules/godot_turbo/ecs/utility/resource_object_utility.h"
 
-#include "ecs/utility/navigation/2d/navigation2d_utility.h"
-#include "ecs/utility/navigation/3d/navigation3d_utility.h"
-#include "ecs/utility/physics/2d/physics2d_utility.h"
-#include "ecs/utility/physics/3d/physics3d_utility.h"
+#include "modules/godot_turbo/ecs/utility/navigation2d_utility.h"
+#include "modules/godot_turbo/ecs/utility/navigation3d_utility.h"
+#include "modules/godot_turbo/ecs/utility/physics2d_utility.h"
+#include "modules/godot_turbo/ecs/utility/physics3d_utility.h"
 
-#include "ecs/utility/rendering/2d/render_utility_2d.h"
-#include "ecs/utility/rendering/3d/render_utility_3d.h"
-#include "ecs/systems/commands/command.h"
-#include "ecs/flecs_types/flecs_server.h"
-#include "ecs/systems/demo/bad_apple_system.h"
+#include "modules/godot_turbo/ecs/utility/render_utility_2d.h"
+#include "modules/godot_turbo/ecs/utility/render_utility_3d.h"
+#include "modules/godot_turbo/ecs/systems/command.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+
+#include "modules/godot_turbo/ecs/systems/demo/bad_apple_system.h"
+#include "modules/register_module_types.h"
 
 
 
@@ -24,7 +26,7 @@ void initialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 	ClassDB::register_class<FlecsServer>();
-	FlecsServer* p_fs = memnew(FlecsServer);
+	p_fs = memnew(FlecsServer);
 	Engine::get_singleton()->add_singleton(Engine::Singleton("FlecsServer", p_fs));
 	ClassDB::register_runtime_class<RenderUtility2D>();
 	ClassDB::register_runtime_class<RenderUtility3D>();
@@ -45,7 +47,8 @@ void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	memdelete(p_fs);
+
+
    // Nothing to do here in this example.
 }
-
-

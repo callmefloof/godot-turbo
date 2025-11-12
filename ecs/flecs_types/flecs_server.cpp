@@ -1,9 +1,11 @@
-#include "flecs_server.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 
-#include "component_registry.h"
+#include "core/math/quaternion.h"
+#include "core/math/vector4.h"
 #include "core/object/class_db.h"
 #include "core/object/object.h"
 #include "core/object/ref_counted.h"
+#include "core/string/node_path.h"
 #include "core/string/print_string.h"
 #include "core/string/string_name.h"
 #include "core/error/error_macros.h"
@@ -13,40 +15,459 @@
 #include "core/templates/vector.h"
 #include "core/variant/dictionary.h"
 #include "core/variant/typed_array.h"
-#include "flecs.h"
+#include "core/variant/variant.h"
+#include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
 #include "flecs_script_system.h"
-#include "ecs/components/rendering/rendering_components.h"
-#include "ecs/components/script_visible_component.h"
 #include "node_storage.h"
 #include "ref_storage.h"
-#include "ecs/components/physics/2d/2d_physics_components.h"
-#include "ecs/components/physics/3d/3d_physics_components.h"
-#include "ecs/components/navigation/2d/2d_navigation_components.h"
-#include "ecs/components/navigation/3d/3d_navigation_components.h"
-#include "ecs/components/world_components.h"
-#include "ecs/components/transform_3d_component.h"
-#include "ecs/components/transform_2d_component.h"
-#include "ecs/components/visibility_component.h"
-#include "ecs/components/object_instance_component.h"
-#include "object_instance_component.h"
-#include "ecs/components/dirty_transform.h"
-#include "ecs/components/resource_component.h"
-#include "ecs/components/scene_node_component.h"
 #include "core/string/ustring.h"
 #include "flecs_variant.h"
+#include "modules/godot_turbo/ecs/components/all_components.h"
 #include <cstdint>
 #include <cstdio>
-#include "ecs/components/rendering/rendering_components.h"
 
-void FlecsServer::run_script_system(const RID& world_id, const RID& script_system_id) {
-	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(script_system_id);
-	if (!script_system) {
-		ERR_PRINT("FlecsServer::run_script_system: script system not found");
-		return;
+// Helper function to recursively convert flecs cursor data to Godot Variant
+static Variant cursor_to_variant(flecs::cursor& cur) {
+	flecs::entity type = cur.get_type();
+	
+	// Check if type entity is valid (non-zero ID)
+	if (!type.is_valid()) {
+		ERR_PRINT("cursor_to_variant: Type entity is invalid (ID is 0)");
+		return Variant();
 	}
-	script_system->run();
+	
+	const char* type_name = type.name().c_str();
+	
+	// Check if type name is valid
+	if (!type_name || strlen(type_name) == 0) {
+		ERR_PRINT("cursor_to_variant: Type has no name");
+		return Variant();
+	}
+	
+	// Handle opaque Godot types by getting the raw pointer and dereferencing
+	if (strcmp(type_name, "Variant") == 0) {
+		Variant* ptr = static_cast<Variant*>(cur.get_ptr());
+		return ptr ? *ptr : Variant();
+	}
+	if (strcmp(type_name, "Dictionary") == 0) {
+		Dictionary* ptr = static_cast<Dictionary*>(cur.get_ptr());
+		return ptr ? *ptr : Dictionary();
+	}
+	if (strcmp(type_name, "Array") == 0) {
+		Array* ptr = static_cast<Array*>(cur.get_ptr());
+		return ptr ? *ptr : Array();
+	}
+	if (strcmp(type_name, "String") == 0) {
+		String* ptr = static_cast<String*>(cur.get_ptr());
+		return ptr ? *ptr : String();
+	}
+	if (strcmp(type_name, "StringName") == 0) {
+		StringName* ptr = static_cast<StringName*>(cur.get_ptr());
+		return ptr ? *ptr : StringName();
+	}
+	if (strcmp(type_name, "NodePath") == 0) {
+		NodePath* ptr = static_cast<NodePath*>(cur.get_ptr());
+		return ptr ? *ptr : NodePath();
+	}
+	if (strcmp(type_name, "Callable") == 0) {
+		Callable* ptr = static_cast<Callable*>(cur.get_ptr());
+		return ptr ? *ptr : Callable();
+	}
+	if (strcmp(type_name, "Signal") == 0) {
+		Signal* ptr = static_cast<Signal*>(cur.get_ptr());
+		return ptr ? *ptr : Signal();
+	}
+	if (strcmp(type_name, "RID") == 0) {
+		RID* ptr = static_cast<RID*>(cur.get_ptr());
+		if (!ptr) {
+			WARN_PRINT("cursor_to_variant: RID type found but pointer is null");
+			return RID();
+		}
+		return *ptr;
+	}
+	
+	// Handle packed arrays
+	if (strcmp(type_name, "PackedByteArray") == 0) {
+		PackedByteArray* ptr = static_cast<PackedByteArray*>(cur.get_ptr());
+		return ptr ? *ptr : PackedByteArray();
+	}
+	if (strcmp(type_name, "PackedInt32Array") == 0) {
+		PackedInt32Array* ptr = static_cast<PackedInt32Array*>(cur.get_ptr());
+		return ptr ? *ptr : PackedInt32Array();
+	}
+	if (strcmp(type_name, "PackedInt64Array") == 0) {
+		PackedInt64Array* ptr = static_cast<PackedInt64Array*>(cur.get_ptr());
+		return ptr ? *ptr : PackedInt64Array();
+	}
+	if (strcmp(type_name, "PackedFloat32Array") == 0) {
+		PackedFloat32Array* ptr = static_cast<PackedFloat32Array*>(cur.get_ptr());
+		return ptr ? *ptr : PackedFloat32Array();
+	}
+	if (strcmp(type_name, "PackedFloat64Array") == 0) {
+		PackedFloat64Array* ptr = static_cast<PackedFloat64Array*>(cur.get_ptr());
+		return ptr ? *ptr : PackedFloat64Array();
+	}
+	if (strcmp(type_name, "PackedStringArray") == 0) {
+		PackedStringArray* ptr = static_cast<PackedStringArray*>(cur.get_ptr());
+		return ptr ? *ptr : PackedStringArray();
+	}
+	if (strcmp(type_name, "PackedVector2Array") == 0) {
+		PackedVector2Array* ptr = static_cast<PackedVector2Array*>(cur.get_ptr());
+		return ptr ? *ptr : PackedVector2Array();
+	}
+	if (strcmp(type_name, "PackedVector3Array") == 0) {
+		PackedVector3Array* ptr = static_cast<PackedVector3Array*>(cur.get_ptr());
+		return ptr ? *ptr : PackedVector3Array();
+	}
+	if (strcmp(type_name, "PackedColorArray") == 0) {
+		PackedColorArray* ptr = static_cast<PackedColorArray*>(cur.get_ptr());
+		return ptr ? *ptr : PackedColorArray();
+	}
+	
+	// Handle Godot math types
+	if (strcmp(type_name, "Vector2") == 0) {
+		Vector2* ptr = static_cast<Vector2*>(cur.get_ptr());
+		return ptr ? *ptr : Vector2();
+	}
+	if (strcmp(type_name, "Vector2i") == 0) {
+		Vector2i* ptr = static_cast<Vector2i*>(cur.get_ptr());
+		return ptr ? *ptr : Vector2i();
+	}
+	if (strcmp(type_name, "Vector3") == 0) {
+		Vector3* ptr = static_cast<Vector3*>(cur.get_ptr());
+		return ptr ? *ptr : Vector3();
+	}
+	if (strcmp(type_name, "Vector3i") == 0) {
+		Vector3i* ptr = static_cast<Vector3i*>(cur.get_ptr());
+		return ptr ? *ptr : Vector3i();
+	}
+	if (strcmp(type_name, "Vector4") == 0) {
+		Vector4* ptr = static_cast<Vector4*>(cur.get_ptr());
+		return ptr ? *ptr : Vector4();
+	}
+	if (strcmp(type_name, "Vector4i") == 0) {
+		Vector4i* ptr = static_cast<Vector4i*>(cur.get_ptr());
+		return ptr ? *ptr : Vector4i();
+	}
+	if (strcmp(type_name, "Quaternion") == 0) {
+		Quaternion* ptr = static_cast<Quaternion*>(cur.get_ptr());
+		return ptr ? *ptr : Quaternion();
+	}
+	if (strcmp(type_name, "Transform2D") == 0) {
+		Transform2D* ptr = static_cast<Transform2D*>(cur.get_ptr());
+		return ptr ? *ptr : Transform2D();
+	}
+	if (strcmp(type_name, "Transform3D") == 0) {
+		Transform3D* ptr = static_cast<Transform3D*>(cur.get_ptr());
+		return ptr ? *ptr : Transform3D();
+	}
+	if (strcmp(type_name, "Rect2") == 0) {
+		Rect2* ptr = static_cast<Rect2*>(cur.get_ptr());
+		return ptr ? *ptr : Rect2();
+	}
+	if (strcmp(type_name, "Rect2i") == 0) {
+		Rect2i* ptr = static_cast<Rect2i*>(cur.get_ptr());
+		return ptr ? *ptr : Rect2i();
+	}
+	if (strcmp(type_name, "AABB") == 0) {
+		AABB* ptr = static_cast<AABB*>(cur.get_ptr());
+		return ptr ? *ptr : AABB();
+	}
+	if (strcmp(type_name, "Plane") == 0) {
+		Plane* ptr = static_cast<Plane*>(cur.get_ptr());
+		return ptr ? *ptr : Plane();
+	}
+	if (strcmp(type_name, "Basis") == 0) {
+		Basis* ptr = static_cast<Basis*>(cur.get_ptr());
+		return ptr ? *ptr : Basis();
+	}
+	if (strcmp(type_name, "Color") == 0) {
+		Color* ptr = static_cast<Color*>(cur.get_ptr());
+		return ptr ? *ptr : Color();
+	}
+	if (strcmp(type_name, "Projection") == 0) {
+		Projection* ptr = static_cast<Projection*>(cur.get_ptr());
+		return ptr ? *ptr : Projection();
+	}
+	
+	// Try to get type kind from EcsType component
+	if (type.has<EcsType>()) {
+		const EcsType& ecs_type = type.get<EcsType>();
+		if (ecs_type.kind == EcsPrimitiveType && type.has<EcsPrimitive>()) {
+			const EcsPrimitive& prim = type.get<EcsPrimitive>();
+			switch (prim.kind) {
+				case EcsBool: return cur.get_bool();
+				case EcsChar: return (int64_t)cur.get_char();
+				case EcsU8: return (int64_t)cur.get_uint();
+				case EcsU16: return (int64_t)cur.get_uint();
+				case EcsU32: return (int64_t)cur.get_uint();
+				case EcsU64: return (int64_t)cur.get_uint();
+				case EcsI8: return cur.get_int();
+				case EcsI16: return cur.get_int();
+				case EcsI32: return cur.get_int();
+				case EcsI64: return cur.get_int();
+				case EcsF32: return (double)cur.get_float();
+				case EcsF64: return cur.get_float();
+				case EcsUPtr: return (int64_t)cur.get_uint();
+				case EcsIPtr: return cur.get_int();
+				case EcsString: {
+					const char* str = cur.get_string();
+					return str ? String(str) : String();
+				}
+				case EcsEntity: return (int64_t)cur.get_entity().id();
+				default: break;
+			}
+		}
+		
+		// Handle structs/nested types
+		if (ecs_type.kind == EcsStructType) {
+			Dictionary dict;
+			if (cur.push() == 0) {
+				do {
+					const char* member_name = cur.get_member();
+					if (member_name && strlen(member_name) > 0) {
+						Variant value = cursor_to_variant(cur);
+						dict[String(member_name)] = value;
+					}
+				} while (cur.next() == 0);
+				cur.pop();
+			}
+			return dict;
+		}
+	}
+	
+	// If we reach here, the type wasn't handled - print warning for debugging
+	// Check if it's an opaque type without reflection metadata
+	if (!type.has<EcsType>()) {
+		WARN_PRINT(vformat("cursor_to_variant: Type '%s' has no EcsType metadata (opaque type not in type name checks)", type_name));
+	} else {
+		const EcsType& ecs_type = type.get<EcsType>();
+		WARN_PRINT(vformat("cursor_to_variant: Type '%s' has EcsType with kind=%d but wasn't handled", type_name, (int)ecs_type.kind));
+	}
+	return Variant();
 }
 
+// Helper function to convert component data to Dictionary using flecs cursor
+static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t comp_type_id) {
+	if (!entity.has(comp_type_id)) {
+		return Dictionary();
+	}
+	
+	const void* comp_ptr = entity.get(comp_type_id);
+	if (!comp_ptr) {
+		return Dictionary();
+	}
+	
+	flecs::cursor cur = entity.world().cursor(comp_type_id, const_cast<void*>(comp_ptr));
+	
+	// Get the type to check if it's a struct
+	flecs::entity type = cur.get_type();
+	
+	// Check if type is valid (non-zero entity ID)
+	if (type.is_valid() && type.has<EcsType>()) {
+		const EcsType& ecs_type = type.get<EcsType>();
+		if (ecs_type.kind == EcsStructType) {
+			// It's a struct, convert members to dictionary
+			Dictionary dict;
+			if (cur.push() == 0) {
+				do {
+					const char* member_name = cur.get_member();
+					if (member_name && strlen(member_name) > 0) {
+						Variant value = cursor_to_variant(cur);
+						dict[String(member_name)] = value;
+					}
+				} while (cur.next() == 0);
+				cur.pop();
+			}
+			return dict;
+		}
+	}
+	
+	// Not a struct (opaque type or primitive), wrap in dictionary with "value" key
+	Dictionary result;
+	Variant value = cursor_to_variant(cur);
+	result["value"] = value;
+	return result;
+}
+
+// Helper function to set component data from Dictionary using flecs cursor
+static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t comp_type_id, const Dictionary& dict) {
+	// Use ensure to get or create the component
+	void* comp_ptr = entity.ensure(comp_type_id);
+	if (!comp_ptr) {
+		ERR_PRINT("Failed to get mutable component pointer");
+		return;
+	}
+	
+	// For opaque types, get the type name directly from the component entity
+	// instead of relying on cursor (which may not have type info for opaque types)
+	flecs::entity comp_entity(entity.world().c_ptr(), comp_type_id);
+	const char* type_name = comp_entity.name().c_str();
+	
+	if (!type_name || strlen(type_name) == 0) {
+		ERR_PRINT("component_from_dict_cursor: Component type has no name");
+		return;
+	}
+	
+	// Handle opaque Godot types directly
+	// Check if the dictionary has a single "value" key (opaque type wrapped)
+	bool is_wrapped_opaque = dict.size() == 1 && dict.has("value");
+	
+	if (strcmp(type_name, "Variant") == 0) {
+		Variant* ptr = static_cast<Variant*>(comp_ptr);
+		if (ptr) {
+			if (is_wrapped_opaque) {
+				*ptr = dict["value"];
+			} else if (dict.size() > 0) {
+				*ptr = dict.values()[0];
+			}
+		}
+		entity.modified(comp_type_id);
+		return;
+	}
+	if (strcmp(type_name, "Dictionary") == 0) {
+		Dictionary* ptr = static_cast<Dictionary*>(comp_ptr);
+		if (ptr) {
+			*ptr = dict;
+		}
+		entity.modified(comp_type_id);
+		return;
+	}
+	if (strcmp(type_name, "RID") == 0) {
+		RID* ptr = static_cast<RID*>(comp_ptr);
+		if (ptr) {
+			if (is_wrapped_opaque) {
+				*ptr = dict["value"];
+			}
+		}
+		entity.modified(comp_type_id);
+		return;
+	}
+	if (strcmp(type_name, "String") == 0) {
+		String* ptr = static_cast<String*>(comp_ptr);
+		if (ptr) {
+			if (is_wrapped_opaque) {
+				*ptr = dict["value"];
+			}
+		}
+		entity.modified(comp_type_id);
+		return;
+	}
+	if (strcmp(type_name, "StringName") == 0) {
+		StringName* ptr = static_cast<StringName*>(comp_ptr);
+		if (ptr) {
+			if (is_wrapped_opaque) {
+				*ptr = dict["value"];
+			}
+		}
+		entity.modified(comp_type_id);
+		return;
+	}
+	if (strcmp(type_name, "Array") == 0) {
+		Array* ptr = static_cast<Array*>(comp_ptr);
+		if (ptr) {
+			if (is_wrapped_opaque) {
+				*ptr = dict["value"];
+			}
+		}
+		entity.modified(comp_type_id);
+		return;
+	}
+	
+	// For structs, iterate through dictionary keys and set members
+	// Create cursor after handling opaque types
+	flecs::cursor cur = entity.world().cursor(comp_type_id, comp_ptr);
+	flecs::entity type = cur.get_type();
+	
+	if (type.is_valid() && type.has<EcsType>()) {
+		const EcsType& ecs_type = type.get<EcsType>();
+		if (ecs_type.kind == EcsStructType && cur.push() == 0) {
+			Array keys = dict.keys();
+		for (int i = 0; i < keys.size(); i++) {
+			String key = keys[i];
+			Variant value = dict[key];
+			
+			if (cur.member(key.utf8().get_data()) == 0) {
+				flecs::entity member_type = cur.get_type();
+				const char* member_type_name = member_type.name().c_str();
+				
+				// Set value based on type
+				if (strcmp(member_type_name, "Variant") == 0) {
+					Variant* ptr = static_cast<Variant*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "String") == 0) {
+					String* ptr = static_cast<String*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "StringName") == 0) {
+					StringName* ptr = static_cast<StringName*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "Dictionary") == 0) {
+					Dictionary* ptr = static_cast<Dictionary*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "Array") == 0) {
+					Array* ptr = static_cast<Array*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "RID") == 0) {
+					RID* ptr = static_cast<RID*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "Vector2") == 0) {
+					Vector2* ptr = static_cast<Vector2*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "Vector3") == 0) {
+					Vector3* ptr = static_cast<Vector3*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else if (strcmp(member_type_name, "Quaternion") == 0) {
+					Quaternion* ptr = static_cast<Quaternion*>(cur.get_ptr());
+					if (ptr) {
+						*ptr = value;
+					}
+				} else {
+					// Try primitive types
+					switch (value.get_type()) {
+						case Variant::BOOL: {
+							cur.set_bool(value);
+							break;
+						}
+						case Variant::INT: {
+							cur.set_int(value);
+							break;
+						}
+						case Variant::FLOAT: {
+							cur.set_float(value);
+							break;
+						}
+						case Variant::STRING: {
+							cur.set_string(String(value).utf8().get_data());
+							break;
+						}
+						default:
+							break;
+					}
+				}
+			}
+			}
+			cur.pop();
+		}
+	}
+	
+	entity.modified(comp_type_id);
+}
 
 void FlecsServer::thread_func(void *p_udata) {
 
@@ -82,6 +503,125 @@ void FlecsServer::finish() {
 	thread.wait_to_finish();
 }
 
+// ===== Query API Implementation =====
+
+RID FlecsServer::create_query(const RID &world_id, const PackedStringArray &required_components) {
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_query);
+	FlecsQuery query;
+	query.init(world_id, required_components);
+	return flecs_variant_owners.get(world_id).query_owner.make_rid(query);
+}
+
+Array FlecsServer::query_get_entities(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, Array(), query_get_entities);
+	return query->get_entities();
+}
+
+Array FlecsServer::query_get_entities_with_components(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, Array(), query_get_entities_with_components);
+	return query->get_entities_with_components();
+}
+
+int FlecsServer::query_get_entity_count(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, 0, query_get_entity_count);
+	return query->get_entity_count();
+}
+
+Array FlecsServer::query_get_entities_limited(const RID &world_id, const RID &query_id, int max_count, int offset) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, Array(), query_get_entities_limited);
+	return query->get_entities_limited(max_count, offset);
+}
+
+Array FlecsServer::query_get_entities_with_components_limited(const RID &world_id, const RID &query_id, int max_count, int offset) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, Array(), query_get_entities_with_components_limited);
+	return query->get_entities_with_components_limited(max_count, offset);
+}
+
+bool FlecsServer::query_matches_entity(const RID &world_id, const RID &query_id, const RID &entity_rid) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, false, query_matches_entity);
+	return query->matches_entity(entity_rid);
+}
+
+void FlecsServer::query_set_required_components(const RID &world_id, const RID &query_id, const PackedStringArray &components) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_set_required_components);
+	query->set_required_components(components);
+}
+
+PackedStringArray FlecsServer::query_get_required_components(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, PackedStringArray(), query_get_required_components);
+	return query->get_required_components();
+}
+
+void FlecsServer::query_set_caching_strategy(const RID &world_id, const RID &query_id, int strategy) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_set_caching_strategy);
+	query->set_caching_strategy(static_cast<FlecsQuery::CachingStrategy>(strategy));
+}
+
+int FlecsServer::query_get_caching_strategy(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, 0, query_get_caching_strategy);
+	return static_cast<int>(query->get_caching_strategy());
+}
+
+void FlecsServer::query_set_filter_name_pattern(const RID &world_id, const RID &query_id, const String &pattern) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_set_filter_name_pattern);
+	query->set_filter_name_pattern(pattern);
+}
+
+String FlecsServer::query_get_filter_name_pattern(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, String(), query_get_filter_name_pattern);
+	return query->get_filter_name_pattern();
+}
+
+void FlecsServer::query_clear_filter(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_clear_filter);
+	query->clear_filter();
+}
+
+void FlecsServer::query_force_cache_refresh(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_force_cache_refresh);
+	query->force_cache_refresh();
+}
+
+bool FlecsServer::query_is_cache_dirty(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, true, query_is_cache_dirty);
+	return query->is_cache_dirty();
+}
+
+void FlecsServer::query_set_instrumentation_enabled(const RID &world_id, const RID &query_id, bool enabled) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_set_instrumentation_enabled);
+	query->set_instrumentation_enabled(enabled);
+}
+
+bool FlecsServer::query_get_instrumentation_enabled(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, false, query_get_instrumentation_enabled);
+	return query->get_instrumentation_enabled();
+}
+
+Dictionary FlecsServer::query_get_instrumentation_data(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, Dictionary(), query_get_instrumentation_data);
+	return query->get_instrumentation_data();
+}
+
+void FlecsServer::query_reset_instrumentation(const RID &world_id, const RID &query_id) {
+	CHECK_QUERY_VALIDITY(query_id, world_id, query_reset_instrumentation);
+	query->reset_instrumentation();
+}
+
+void FlecsServer::free_query(const RID &world_id, const RID &query_id) {
+	CHECK_WORLD_VALIDITY(world_id, free_query);
+	flecs_variant_owners.get(world_id).query_owner.free(query_id);
+}
+
+FlecsQuery FlecsServer::_get_query(const RID &query_id, const RID &world_id) {
+	CHECK_QUERY_VALIDITY_V(query_id, world_id, FlecsQuery(), _get_query);
+	return *query;
+}
+
+RID FlecsServer::_create_rid_for_query(const RID &world_id, const FlecsQuery &query) {
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), _create_rid_for_query);
+	return flecs_variant_owners.get(world_id).query_owner.make_rid(query);
+}
+
 void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("create_world"), &FlecsServer::create_world);
 	ClassDB::bind_method(D_METHOD("init_world", "world_id"), &FlecsServer::init_world);
@@ -114,6 +654,92 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_children", "parent_id"), &FlecsServer::get_children);
 	ClassDB::bind_method(D_METHOD("get_child", "parent_id", "index"), &FlecsServer::get_child);
 	ClassDB::bind_method(D_METHOD("add_script_system", "world_id", "component_types", "callable"), &FlecsServer::add_script_system);
+	ClassDB::bind_method(D_METHOD("set_script_system_dispatch_mode", "world_id", "script_system_id", "mode"), &FlecsServer::set_script_system_dispatch_mode);
+	ClassDB::bind_method(D_METHOD("get_script_system_dispatch_mode", "world_id", "script_system_id"), &FlecsServer::get_script_system_dispatch_mode);
+	ClassDB::bind_method(D_METHOD("set_script_system_change_only", "world_id", "script_system_id", "change_only"), &FlecsServer::set_script_system_change_only);
+	ClassDB::bind_method(D_METHOD("is_script_system_change_only", "world_id", "script_system_id"), &FlecsServer::is_script_system_change_only);
+	ClassDB::bind_method(D_METHOD("set_script_system_instrumentation", "world_id", "script_system_id", "enabled"), &FlecsServer::set_script_system_instrumentation);
+	ClassDB::bind_method(D_METHOD("get_script_system_instrumentation", "world_id", "script_system_id"), &FlecsServer::get_script_system_instrumentation);
+	ClassDB::bind_method(D_METHOD("reset_script_system_instrumentation", "world_id", "script_system_id"), &FlecsServer::reset_script_system_instrumentation);
+	ClassDB::bind_method(D_METHOD("set_script_system_paused", "world_id", "script_system_id", "paused"), &FlecsServer::set_script_system_paused);
+	ClassDB::bind_method(D_METHOD("is_script_system_paused", "world_id", "script_system_id"), &FlecsServer::is_script_system_paused);
+	ClassDB::bind_method(D_METHOD("set_script_system_dependency", "world_id", "script_system_id", "depends_on"), &FlecsServer::set_script_system_dependency);
+	ClassDB::bind_method(D_METHOD("get_all_systems", "world_id"), &FlecsServer::get_all_systems);
+	ClassDB::bind_method(D_METHOD("set_script_system_change_observe_add_and_set", "world_id", "script_system_id", "both"), &FlecsServer::set_script_system_change_observe_add_and_set);
+	ClassDB::bind_method(D_METHOD("get_script_system_change_observe_add_and_set", "world_id", "script_system_id"), &FlecsServer::get_script_system_change_observe_add_and_set);
+	ClassDB::bind_method(D_METHOD("set_script_system_change_observe_remove", "world_id", "script_system_id", "enable"), &FlecsServer::set_script_system_change_observe_remove);
+	ClassDB::bind_method(D_METHOD("get_script_system_change_observe_remove", "world_id", "script_system_id"), &FlecsServer::get_script_system_change_observe_remove);
+	ClassDB::bind_method(D_METHOD("pause_systems", "world_id", "system_ids"), &FlecsServer::pause_systems);
+	ClassDB::bind_method(D_METHOD("resume_systems", "world_id", "system_ids"), &FlecsServer::resume_systems);
+	ClassDB::bind_method(D_METHOD("pause_all_systems", "world_id"), &FlecsServer::pause_all_systems);
+	ClassDB::bind_method(D_METHOD("resume_all_systems", "world_id"), &FlecsServer::resume_all_systems);
+	ClassDB::bind_method(D_METHOD("reset_script_system_instrumentation_action", "world_id", "script_system_id"), &FlecsServer::reset_script_system_instrumentation_action);
+	ClassDB::bind_method(D_METHOD("get_world_distribution_summary", "world_id"), &FlecsServer::get_world_distribution_summary);
+	ClassDB::bind_method(D_METHOD("set_script_system_auto_reset", "world_id", "script_system_id", "auto_reset"), &FlecsServer::set_script_system_auto_reset);
+	ClassDB::bind_method(D_METHOD("get_script_system_auto_reset", "world_id", "script_system_id"), &FlecsServer::get_script_system_auto_reset);
+	ClassDB::bind_method(D_METHOD("get_world_frame_summary", "world_id"), &FlecsServer::get_world_frame_summary);
+	ClassDB::bind_method(D_METHOD("reset_world_frame_summary", "world_id"), &FlecsServer::reset_world_frame_summary);
+	ClassDB::bind_method(D_METHOD("set_script_system_detailed_timing", "world_id", "script_system_id", "enabled"), &FlecsServer::set_script_system_detailed_timing);
+	ClassDB::bind_method(D_METHOD("get_script_system_detailed_timing", "world_id", "script_system_id"), &FlecsServer::get_script_system_detailed_timing);
+	ClassDB::bind_method(D_METHOD("set_script_system_multi_threaded", "world_id", "script_system_id", "enable"), &FlecsServer::set_script_system_multi_threaded);
+	ClassDB::bind_method(D_METHOD("get_script_system_multi_threaded", "world_id", "script_system_id"), &FlecsServer::get_script_system_multi_threaded);
+	ClassDB::bind_method(D_METHOD("set_script_system_batch_chunk_size", "world_id", "script_system_id", "size"), &FlecsServer::set_script_system_batch_chunk_size);
+	ClassDB::bind_method(D_METHOD("get_script_system_batch_chunk_size", "world_id", "script_system_id"), &FlecsServer::get_script_system_batch_chunk_size);
+	ClassDB::bind_method(D_METHOD("set_script_system_flush_min_interval_msec", "world_id", "script_system_id", "msec"), &FlecsServer::set_script_system_flush_min_interval_msec);
+	ClassDB::bind_method(D_METHOD("get_script_system_flush_min_interval_msec", "world_id", "script_system_id"), &FlecsServer::get_script_system_flush_min_interval_msec);
+	ClassDB::bind_method(D_METHOD("set_script_system_use_deferred_calls", "world_id", "script_system_id", "use_deferred"), &FlecsServer::set_script_system_use_deferred_calls);
+	ClassDB::bind_method(D_METHOD("get_script_system_use_deferred_calls", "world_id", "script_system_id"), &FlecsServer::get_script_system_use_deferred_calls);
+	ClassDB::bind_method(D_METHOD("get_script_system_event_totals", "world_id", "script_system_id"), &FlecsServer::get_script_system_event_totals);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_median_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_median_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_percentile_usec", "world_id", "script_system_id", "percentile"), &FlecsServer::get_script_system_frame_percentile_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_stddev_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_stddev_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_p99_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_p99_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_max_sample_count", "world_id", "script_system_id"), &FlecsServer::get_script_system_max_sample_count);
+	ClassDB::bind_method(D_METHOD("set_script_system_max_sample_count", "world_id", "script_system_id", "cap"), &FlecsServer::set_script_system_max_sample_count);
+	ClassDB::bind_method(D_METHOD("get_script_system_last_frame_entity_count", "world_id", "script_system_id"), &FlecsServer::get_script_system_last_frame_entity_count);
+	ClassDB::bind_method(D_METHOD("get_script_system_last_frame_dispatch_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_last_frame_dispatch_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_dispatch_invocations", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_dispatch_invocations);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_dispatch_accum_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_dispatch_accum_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_min_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_min_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_frame_max_usec", "world_id", "script_system_id"), &FlecsServer::get_script_system_frame_max_usec);
+	ClassDB::bind_method(D_METHOD("get_script_system_last_frame_onadd", "world_id", "script_system_id"), &FlecsServer::get_script_system_last_frame_onadd);
+	ClassDB::bind_method(D_METHOD("get_script_system_last_frame_onset", "world_id", "script_system_id"), &FlecsServer::get_script_system_last_frame_onset);
+	ClassDB::bind_method(D_METHOD("get_script_system_last_frame_onremove", "world_id", "script_system_id"), &FlecsServer::get_script_system_last_frame_onremove);
+	ClassDB::bind_method(D_METHOD("get_script_system_total_callbacks", "world_id", "script_system_id"), &FlecsServer::get_script_system_total_callbacks);
+	ClassDB::bind_method(D_METHOD("get_script_system_total_entities_processed", "world_id", "script_system_id"), &FlecsServer::get_script_system_total_entities_processed);
+	ClassDB::bind_method(D_METHOD("make_script_system_inspector", "world_id", "script_system_id"), &FlecsServer::make_script_system_inspector);
+	ClassDB::bind_method(D_METHOD("get_script_system_info", "world_id", "script_system_id"), &FlecsServer::get_script_system_info);
+	ClassDB::bind_method(D_METHOD("get_system_info", "world_id", "system_id"), &FlecsServer::get_system_info);
+	ClassDB::bind_method(D_METHOD("set_system_paused", "world_id", "system_id", "paused"), &FlecsServer::set_system_paused);
+	ClassDB::bind_method(D_METHOD("is_system_paused", "world_id", "system_id"), &FlecsServer::is_system_paused);
+	ClassDB::bind_method(D_METHOD("set_script_system_change_observe_remove", "world_id", "script_system_id", "enable"), &FlecsServer::set_script_system_change_observe_remove);
+
+	// Query API bindings
+	ClassDB::bind_method(D_METHOD("create_query", "world_id", "required_components"), &FlecsServer::create_query);
+	ClassDB::bind_method(D_METHOD("query_get_entities", "world_id", "query_id"), &FlecsServer::query_get_entities);
+	ClassDB::bind_method(D_METHOD("query_get_entities_with_components", "world_id", "query_id"), &FlecsServer::query_get_entities_with_components);
+	ClassDB::bind_method(D_METHOD("query_get_entity_count", "world_id", "query_id"), &FlecsServer::query_get_entity_count);
+	ClassDB::bind_method(D_METHOD("query_get_entities_limited", "world_id", "query_id", "max_count", "offset"), &FlecsServer::query_get_entities_limited);
+	ClassDB::bind_method(D_METHOD("query_get_entities_with_components_limited", "world_id", "query_id", "max_count", "offset"), &FlecsServer::query_get_entities_with_components_limited);
+	ClassDB::bind_method(D_METHOD("query_matches_entity", "world_id", "query_id", "entity_rid"), &FlecsServer::query_matches_entity);
+	ClassDB::bind_method(D_METHOD("query_set_required_components", "world_id", "query_id", "components"), &FlecsServer::query_set_required_components);
+	ClassDB::bind_method(D_METHOD("query_get_required_components", "world_id", "query_id"), &FlecsServer::query_get_required_components);
+	ClassDB::bind_method(D_METHOD("query_set_caching_strategy", "world_id", "query_id", "strategy"), &FlecsServer::query_set_caching_strategy);
+	ClassDB::bind_method(D_METHOD("query_get_caching_strategy", "world_id", "query_id"), &FlecsServer::query_get_caching_strategy);
+	ClassDB::bind_method(D_METHOD("query_set_filter_name_pattern", "world_id", "query_id", "pattern"), &FlecsServer::query_set_filter_name_pattern);
+	ClassDB::bind_method(D_METHOD("query_get_filter_name_pattern", "world_id", "query_id"), &FlecsServer::query_get_filter_name_pattern);
+	ClassDB::bind_method(D_METHOD("query_clear_filter", "world_id", "query_id"), &FlecsServer::query_clear_filter);
+	ClassDB::bind_method(D_METHOD("query_force_cache_refresh", "world_id", "query_id"), &FlecsServer::query_force_cache_refresh);
+	ClassDB::bind_method(D_METHOD("query_is_cache_dirty", "world_id", "query_id"), &FlecsServer::query_is_cache_dirty);
+	ClassDB::bind_method(D_METHOD("query_set_instrumentation_enabled", "world_id", "query_id", "enabled"), &FlecsServer::query_set_instrumentation_enabled);
+	ClassDB::bind_method(D_METHOD("query_get_instrumentation_enabled", "world_id", "query_id"), &FlecsServer::query_get_instrumentation_enabled);
+	ClassDB::bind_method(D_METHOD("query_get_instrumentation_data", "world_id", "query_id"), &FlecsServer::query_get_instrumentation_data);
+	ClassDB::bind_method(D_METHOD("query_reset_instrumentation", "world_id", "query_id"), &FlecsServer::query_reset_instrumentation);
+	ClassDB::bind_method(D_METHOD("free_query", "world_id", "query_id"), &FlecsServer::free_query);
+
+	// Script system constants (dispatch modes)
+	BIND_CONSTANT(FlecsScriptSystem::DISPATCH_PER_ENTITY);
+	BIND_CONSTANT(FlecsScriptSystem::DISPATCH_BATCH);
 
 
 	ClassDB::bind_method(D_METHOD("set_children", "parent_id", "children"), &FlecsServer::set_children);
@@ -140,6 +766,12 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_world_singleton_with_id", "world_id", "comp_type_id", "comp_data"), &FlecsServer::set_world_singleton_with_id);
 	ClassDB::bind_method(D_METHOD("get_world_singleton_with_name", "world_id", "name"), &FlecsServer::get_world_singleton_with_name);
 	ClassDB::bind_method(D_METHOD("get_world_singleton_with_id", "world_id", "comp_type_id"), &FlecsServer::get_world_singleton_with_id);
+
+
+	ClassDB::bind_method(D_METHOD("set_script_system_name", "world_id", "script_system_id", "name"), &FlecsServer::set_script_system_name);
+	ClassDB::bind_method(D_METHOD("get_script_system_name", "world_id", "script_system_id"), &FlecsServer::get_script_system_name);
+
+
 
 	// Debug helpers
 	ClassDB::bind_method(D_METHOD("debug_check_rid", "rid"), &FlecsServer::debug_check_rid);
@@ -188,27 +820,48 @@ RID FlecsServer::create_world() {
 
 	// Use the world reference from the initialized variant
 	flecs::world &world_ref = immediate->get_world();
-	world_ref.import<RenderingBaseComponents>();
-	world_ref.import<Physics2DBaseComponents>();
-	world_ref.import<Physics3DBaseComponents>();
-	world_ref.import<Navigation2DBaseComponents>();
-	world_ref.import<Navigation3DBaseComponents>();
-	ComponentRegistry::bind_to_world("Transform2DComponent", world_ref.component<Transform2DComponent>().id());
-	ComponentRegistry::bind_to_world("Transform3DComponent", world_ref.component<Transform3DComponent>().id());
-	ComponentRegistry::bind_to_world("VisibilityComponent", world_ref.component<VisibilityComponent>().id());
-	ComponentRegistry::bind_to_world("ObjectInstanceComponent", world_ref.component<ObjectInstanceComponent>().id());
-	ComponentRegistry::bind_to_world("DirtyTransform", world_ref.component<DirtyTransform>().id());
-	ComponentRegistry::bind_to_world("ResourceComponent", world_ref.component<ResourceComponent>().id());
-	ComponentRegistry::bind_to_world("SceneNodeComponent", world_ref.component<SceneNodeComponent>().id());
-	ComponentRegistry::bind_to_world("World3DComponent", world_ref.component<World3DComponent>().id());
-	ComponentRegistry::bind_to_world("World2DComponent", world_ref.component<World2DComponent>().id());
+
+
+	world_ref.component<Variant>();
+	world_ref.component<Dictionary>();
+	world_ref.component<Array>();
+	world_ref.component<Vector2>();
+	world_ref.component<Vector3>();
+	world_ref.component<Rect2>();
+	world_ref.component<Quaternion>();
+	world_ref.component<Plane>();
+	world_ref.component<Basis>();
+	world_ref.component<Transform2D>();
+	world_ref.component<Transform3D>();
+	world_ref.component<PackedInt64Array>();
+	world_ref.component<PackedInt32Array>();
+	world_ref.component<PackedByteArray>();
+	world_ref.component<PackedColorArray>();
+	world_ref.component<PackedStringArray>();
+	world_ref.component<PackedVector2Array>();
+	world_ref.component<PackedVector3Array>();
+	world_ref.component<PackedVector4Array>();
+	world_ref.component<PackedFloat32Array>();
+	world_ref.component<PackedFloat64Array>();
+	world_ref.component<String>();
+	world_ref.component<StringName>();
+	world_ref.component<NodePath>();
+	world_ref.component<Callable>();
+	world_ref.component<Signal>();
+	world_ref.component<RID>();
+
+
+	// Register all components using the new reflection system
+	AllComponents::register_all(world_ref, false);
+
+
 
 	flecs_variant_owners.insert(flecs_world, RID_Owner_Wrapper{
 		flecs_world
 	});
-    
-	node_storages.insert(flecs_world, NodeStorage());
-	ref_storages.insert(flecs_world, RefStorage());
+
+	node_storages.insert(flecs_world, memnew(NodeStorage()));
+	ref_storages.insert(flecs_world, memnew(RefStorage()));
 	// Record the world RID in the worlds vector so _get_world can find it.
 	worlds.insert(counter++, flecs_world);
 
@@ -271,12 +924,59 @@ bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 		ERR_PRINT("FlecsServer::progress_world: world not found");
 		return false;
 	}
-	for (auto &sys_id : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
-		run_script_system(world_id, sys_id);
-	}
-	
 
 	const bool progress = world->progress(delta);
+	// Aggregate per-frame summary: totals across script systems + breakdown
+	Dictionary summary;
+	uint64_t total_entities = 0; uint64_t total_callbacks_all_time = 0; uint64_t batch_systems = 0;
+	uint64_t max_dispatch_usec = 0; uint64_t script_system_count = 0; uint64_t total_dispatch_invocations = 0; uint64_t accum_dispatch_usec = 0;
+	Array systems_breakdown;
+	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
+		if (!ss) { continue; }
+		++script_system_count;
+		uint64_t ent = ss->get_last_frame_entity_count();
+		uint64_t last_usec = ss->get_last_frame_dispatch_usec();
+		uint64_t inv = ss->get_frame_dispatch_invocations();
+		uint64_t accum = ss->get_frame_dispatch_accum_usec();
+		total_entities += ent;
+		total_callbacks_all_time += ss->get_total_callbacks_invoked();
+		total_dispatch_invocations += inv;
+		accum_dispatch_usec += accum;
+		if (ss->get_dispatch_mode() == FlecsScriptSystem::DISPATCH_BATCH) { batch_systems += 1; }
+		if (last_usec > max_dispatch_usec) { max_dispatch_usec = last_usec; }
+		Dictionary row;
+		row["rid"] = ss_rid;
+		row["entities"] = (int64_t)ent;
+		row["last_dispatch_usec"] = (int64_t)last_usec;
+		row["dispatch_invocations"] = (int64_t)inv;
+		row["dispatch_accum_usec"] = (int64_t)accum;
+		row["dispatch_avg_usec"] = inv == 0 ? Variant() : Variant((int64_t)(accum / inv));
+		row["mode"] = (int64_t)ss->get_dispatch_mode();
+		row["min_dispatch_usec"] = (int64_t)ss->get_frame_dispatch_min_usec();
+		row["max_dispatch_usec_system"] = (int64_t)ss->get_frame_dispatch_max_usec();
+		if (ss->get_detailed_timing_enabled() && ss->get_frame_dispatch_invocations() > 0) {
+			row["median_dispatch_usec"] = ss->get_frame_dispatch_median_usec();
+			row["p99_dispatch_usec"] = ss->get_frame_dispatch_percentile_usec(99.0);
+			row["stddev_dispatch_usec"] = ss->get_frame_dispatch_stddev_usec();
+		}
+		row["onadd"] = (int64_t)ss->get_last_frame_onadd();
+		row["onset"] = (int64_t)ss->get_last_frame_onset();
+		row["onremove"] = (int64_t)ss->get_last_frame_onremove();
+		systems_breakdown.push_back(row);
+	}
+	summary["script_systems"] = (int64_t)script_system_count;
+	summary["total_entities_this_frame"] = (int64_t)total_entities;
+	summary["total_callbacks_all_time"] = (int64_t)total_callbacks_all_time;
+	summary["batch_system_count"] = (int64_t)batch_systems;
+	summary["max_dispatch_usec"] = (int64_t)max_dispatch_usec;
+	summary["dispatch_invocations"] = (int64_t)total_dispatch_invocations;
+	summary["dispatch_accum_usec"] = (int64_t)accum_dispatch_usec;
+	summary["dispatch_avg_usec"] = total_dispatch_invocations == 0 ? Variant() : Variant((int64_t)(accum_dispatch_usec / total_dispatch_invocations));
+	// For simplicity, we don't aggregate median/p99 across systems accurately (would need merge of distributions);
+	// could approximate by weighting but omitted for now. Per-system stats above carry detail.
+	summary["systems"] = systems_breakdown;
+	last_frame_summaries.insert(world_id, summary);
 
 	RS::get_singleton()->call_on_render_thread(command_handler_callback);
 
@@ -373,7 +1073,7 @@ flecs::world *FlecsServer::_get_world(const RID &world_id) {
 	ERR_PRINT("FlecsServer::_get_world: lookup returned null for world_id=" + itos(world_id.get_id()) + ", owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
 	ERR_PRINT("FlecsServer::_get_world: available worlds (worlds vector size)=" + itos(worlds.size()));
 	return nullptr;
-	
+
 }
 
 RID FlecsServer::get_world_of_entity(const RID &entity_id) {
@@ -460,8 +1160,15 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 	FlecsEntityVariant *entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		return ComponentRegistry::to_dict(entity, StringName(component_type));
-	} 
+		flecs::entity component = entity.world().lookup(component_type.ascii().get_data());
+		if (!component.is_valid()) {
+			ERR_PRINT("FlecsServer::get_component_by_name: component type not found: " + component_type);
+			return component_data;
+		}
+		
+		// Use cursor-based conversion for all types
+		return component_to_dict_cursor(entity, component.id());
+	}
 	ERR_PRINT("FlecsServer::get_component_by_name: entity_id is not a valid entity");
 	return component_data;
 }
@@ -561,7 +1268,10 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity comp_type = entity.world().component(component_type.ascii().get_data());
 		if (comp_type.is_valid()) {
-			ComponentRegistry::from_dict(entity, comp_data, StringName(component_type));
+			// Use cursor-based conversion for all types
+			component_from_dict_cursor(entity, comp_type.id(), comp_data);
+		} else {
+			ERR_PRINT("FlecsServer::set_component: component type not found: " + component_type);
 		}
 	} else {
 		ERR_PRINT("FlecsServer::set_component: entity_id is not a valid entity");
@@ -605,7 +1315,7 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 }
 
 Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& component_type_id) {
-	
+
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_by_id: world_id is not valid");
@@ -618,7 +1328,8 @@ Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& com
 		if(comp_variant){
 			flecs::entity_t comp_id = comp_variant->get_type();
 			if (comp_id) {
-				return ComponentRegistry::to_dict(entity, comp_id);
+				// Use cursor-based conversion for all types
+				return component_to_dict_cursor(entity, comp_id);
 			}
 		}
 	}
@@ -636,7 +1347,7 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 	if(is_entity){
 		CHECK_ENTITY_VALIDITY_V(entity_id, world_id, RID(), get_component_type_by_name)
 		flecs::entity comp_type;
-		comp_type = entity.world().component(String(component_type).ascii().get_data());
+		comp_type = entity.world().component(component_type.ascii().get_data());
 		if (comp_type.is_valid()) {
 			return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_type.id()));
 		}
@@ -656,8 +1367,8 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 	else{
 		CRASH_COND_MSG(is_world == true && is_entity == true, "is_world == true && is_entity == true, this should not happen.");
 		return RID();
-	} 
-	
+	}
+
 }
 
 RID FlecsServer::get_parent(const RID& entity_id) {
@@ -747,7 +1458,7 @@ void FlecsServer::remove_child_by_name(const RID &parent_id, const String &name)
 	} else {
 		ERR_PRINT("FlecsServer::remove_child_by_name: parent_id is not a valid entity");
 	}
-	
+
 }
 void FlecsServer::remove_child_by_index(const RID &parent_id, int index) {
 	RID world_id = get_world_of_entity(parent_id);
@@ -972,7 +1683,7 @@ void FlecsServer::free_world(const RID& rid) {
 			for (const RID& owned : flecs_variant_owners.get(rid).type_id_owner.get_owned_list()) {
 				flecs_variant_owners.get(rid).type_id_owner.free(owned);
 			}
-			
+
 		flecs_variant_owners.get(rid).system_owner.get_owned_list();
 		for (const RID& owned : flecs_variant_owners.get(rid).system_owner.get_owned_list()) {
 			flecs_variant_owners.get(rid).system_owner.free(owned);
@@ -988,8 +1699,14 @@ void FlecsServer::free_world(const RID& rid) {
 
 		pipeline_managers.erase(rid);
 
-		node_storages.erase(rid);
-		ref_storages.erase(rid);
+		if (node_storages.has(rid)) {
+			memdelete(node_storages.get(rid));
+			node_storages.erase(rid);
+		}
+		if (ref_storages.has(rid)) {
+			memdelete(ref_storages.get(rid));
+			ref_storages.erase(rid);
+		}
 		return;
 	}
 
@@ -1046,7 +1763,7 @@ void FlecsServer::free_type_id(const RID& world_id, const RID& type_id) {
 
 void FlecsServer::add_to_ref_storage(const Ref<Resource> &resource, const RID &world_id) {
 	if (ref_storages.has(world_id)) {
-		ref_storages.get(world_id).add(resource, resource->get_rid());
+		ref_storages.get(world_id)->add(resource, resource->get_rid());
 	} else {
 		ERR_PRINT("FlecsServer::add_to_ref_storage: world_id is not a valid world");
 	}
@@ -1054,7 +1771,7 @@ void FlecsServer::add_to_ref_storage(const Ref<Resource> &resource, const RID &w
 
 void FlecsServer::remove_from_ref_storage(const RID &resource_rid, const RID &world_id) {
 	if (ref_storages.has(world_id)) {
-		ref_storages.get(world_id).release(resource_rid);
+		ref_storages.get(world_id)->release(resource_rid);
 	} else {
 		ERR_PRINT("FlecsServer::remove_from_ref_storage: world_id is not a valid world");
 	}
@@ -1062,7 +1779,7 @@ void FlecsServer::remove_from_ref_storage(const RID &resource_rid, const RID &wo
 
 void FlecsServer::add_to_node_storage(Node *node, const RID &world_id) {
 	if (node_storages.has(world_id)) {
-		node_storages.get(world_id).add(node, node->get_instance_id());
+		node_storages.get(world_id)->add(node, node->get_instance_id());
 	} else {
 		ERR_PRINT("FlecsServer::add_to_node_storage: world_id is not a valid world");
 	}
@@ -1070,7 +1787,7 @@ void FlecsServer::add_to_node_storage(Node *node, const RID &world_id) {
 
 void FlecsServer::remove_from_node_storage(const int64_t node_id, const RID &world_id) {
 	if (node_storages.has(world_id)) {
-		node_storages.get(world_id).release(ObjectID(node_id));
+		node_storages.get(world_id)->release(ObjectID(node_id));
 	} else {
 		ERR_PRINT("FlecsServer::remove_from_node_storage: world_id is not a valid world");
 	}
@@ -1078,19 +1795,19 @@ void FlecsServer::remove_from_node_storage(const int64_t node_id, const RID &wor
 
 Ref<Resource> FlecsServer::get_resource_from_ref_storage(const RID &resource_rid, const RID &world_id) {
 	if (ref_storages.has(world_id)) {
-		RefContainer* ref_storage = ref_storages.get(world_id).get(resource_rid);
+		RefContainer* ref_storage = ref_storages.get(world_id)->get(resource_rid);
 		if(ref_storage){
 			return ref_storage->resource;
 		}
-	} 
+	}
 	ERR_PRINT("FlecsServer::get_resource_from_ref_storage: world_id is not a valid world");
 	return Ref<Resource>();
-	
+
 }
 
 Node* FlecsServer::get_node_from_node_storage(const int64_t node_id, const RID &world_id) {
 	if (node_storages.has(world_id)) {
-		NodeContainer* node_storage = node_storages.get(world_id).try_get(ObjectID(node_id));
+		NodeContainer* node_storage = node_storages.get(world_id)->try_get(ObjectID(node_id));
 		if (node_storage) {
 			return node_storage->node;
 		}
@@ -1146,7 +1863,7 @@ void FlecsServer::set_world_singleton_with_name(const RID &world_id, const Strin
 		return;
 	}
 	set_world_singleton_with_id(world_id, comp_type_id, comp_data);
-}	
+}
 void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &comp_type_id, const Dictionary& comp_data){
 	CHECK_WORLD_VALIDITY(world_id, set_world_singleton_with_id);
 	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
@@ -1160,7 +1877,12 @@ void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &co
 		return;
 	}
 	flecs::world &world = world_variant->get_world();
-	ComponentRegistry::from_dict(&world, comp_data, comp_type);
+	
+	// In Flecs, singletons are stored on the component entity itself
+	flecs::entity comp_entity(world.c_ptr(), comp_type);
+	
+	// Use cursor-based conversion for world singletons
+	component_from_dict_cursor(comp_entity, comp_type, comp_data);
 }
 Dictionary FlecsServer::get_world_singleton_with_name(const RID &world_id, const String& comp_type){
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_singleton_with_name);
@@ -1184,5 +1906,533 @@ Dictionary FlecsServer::get_world_singleton_with_id(const RID &world_id, const R
 		ERR_PRINT("FlecsServer::get_world_singleton_with_id: Component type is not valid");
 		return Dictionary();
 	}
-	return ComponentRegistry::to_dict(&world, comp_type);
+	
+	// In Flecs, singletons are stored on the component entity itself
+	flecs::entity comp_entity(world.c_ptr(), comp_type);
+	
+	// For world singletons, get the component data from the component entity
+	return component_to_dict_cursor(comp_entity, comp_type);
 }
+
+void FlecsServer::set_script_system_dispatch_mode(const RID &world_id, const RID &script_system_id, int mode) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_dispatch_mode);
+	if (mode < 0 || mode > 1) { ERR_PRINT("Invalid dispatch mode"); return; }
+	script_system->set_dispatch_mode(static_cast<FlecsScriptSystem::DispatchMode>(mode));
+}
+
+int FlecsServer::get_script_system_dispatch_mode(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, -1, get_script_system_dispatch_mode);
+	return (int)script_system->get_dispatch_mode();
+}
+
+void FlecsServer::set_script_system_change_only(const RID &world_id, const RID &script_system_id, bool change_only) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_change_only);
+	script_system->set_change_only(change_only);
+}
+
+bool FlecsServer::is_script_system_change_only(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, is_script_system_change_only);
+	return script_system->is_change_only();
+}
+
+void FlecsServer::set_script_system_instrumentation(const RID &world_id, const RID &script_system_id, bool enabled) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_instrumentation);
+	script_system->set_instrumentation_enabled(enabled);
+}
+
+Dictionary FlecsServer::get_script_system_instrumentation(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, Dictionary(), get_script_system_instrumentation);
+	Dictionary d;
+	d["last_frame_entity_count"] = (int64_t)script_system->get_last_frame_entity_count();
+	d["last_frame_batch_size"] = (int64_t)script_system->get_last_frame_batch_size();
+	d["last_frame_dispatch_usec"] = (int64_t)script_system->get_last_frame_dispatch_usec();
+	d["total_entities_processed"] = (int64_t)script_system->get_total_entities_processed();
+	d["total_callbacks_invoked"] = (int64_t)script_system->get_total_callbacks_invoked();
+	d["change_only"] = script_system->is_change_only();
+	d["dispatch_mode"] = (int64_t)script_system->get_dispatch_mode();
+	return d;
+}
+
+void FlecsServer::reset_script_system_instrumentation(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, reset_script_system_instrumentation);
+	script_system->reset_instrumentation();
+}
+
+void FlecsServer::set_script_system_paused(const RID &world_id, const RID &script_system_id, bool paused) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_paused);
+	script_system->set_is_paused(paused);
+}
+
+bool FlecsServer::is_script_system_paused(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, is_script_system_paused);
+	return script_system->get_is_paused();
+}
+
+void FlecsServer::set_script_system_dependency(const RID &world_id, const RID &script_system_id, uint32_t dep_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_dependency);
+	script_system->set_system_dependency(dep_id);
+}
+
+Dictionary FlecsServer::get_all_systems(const RID &world_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_all_systems);
+	Dictionary result;
+	Array cpp_list; Array script_list;
+	// C++ systems
+	for (RID rid : flecs_variant_owners.get(world_id).system_owner.get_owned_list()) {
+		FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(rid);
+		if (!sv) { continue; }
+		flecs::system sys = sv->get_system();
+		Dictionary d; d["rid"] = rid; d["name"] = String("cpp_system_") + itos((int64_t)sys.id()); d["depends_on"] = Variant(); d["type"] = String("cpp");
+		cpp_list.push_back(d);
+	}
+	// Script systems
+	for (RID rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(rid);
+		if (!ss) { continue; }
+		Dictionary d; d["rid"] = rid; d["name"] = String("ScriptSystem#") + itos(ss->get_system_id());
+		uint32_t dep = ss->get_system_dependency_id();
+		d["depends_on"] = dep == 0 ? Variant() : Variant((int64_t)dep);
+		d["type"] = String("script");
+		d["change_only"] = ss->is_change_only();
+		d["observe_add_and_set"] = ss->get_change_observe_add_and_set();
+		d["observe_remove"] = ss->get_change_observe_remove();
+		d["auto_reset"] = ss->get_auto_reset_per_frame();
+		d["dispatch_mode"] = (int64_t)ss->get_dispatch_mode();
+		script_list.push_back(d);
+	}
+	result["cpp"] = cpp_list;
+	result["script"] = script_list;
+	return result;
+}
+
+void FlecsServer::set_script_system_change_observe_add_and_set(const RID &world_id, const RID &script_system_id, bool both) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_change_observe_add_and_set);
+	script_system->set_change_observe_add_and_set(both);
+}
+
+bool FlecsServer::get_script_system_change_observe_add_and_set(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, get_script_system_change_observe_add_and_set);
+	return script_system->get_change_observe_add_and_set();
+}
+
+void FlecsServer::set_script_system_auto_reset(const RID &world_id, const RID &script_system_id, bool auto_reset) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_auto_reset);
+	script_system->set_auto_reset_per_frame(auto_reset);
+}
+
+bool FlecsServer::get_script_system_auto_reset(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, get_script_system_auto_reset);
+	return script_system->get_auto_reset_per_frame();
+}
+
+Dictionary FlecsServer::get_world_frame_summary(const RID &world_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_frame_summary);
+	Dictionary *found = last_frame_summaries.getptr(world_id);
+	if (!found) { return Dictionary(); }
+	return *found;
+}
+
+void FlecsServer::reset_world_frame_summary(const RID &world_id) {
+	CHECK_WORLD_VALIDITY(world_id, reset_world_frame_summary);
+	last_frame_summaries.erase(world_id);
+}
+
+void FlecsServer::set_script_system_detailed_timing(const RID &world_id, const RID &script_system_id, bool enabled) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_detailed_timing);
+	script_system->set_detailed_timing_enabled(enabled);
+}
+
+bool FlecsServer::get_script_system_detailed_timing(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, get_script_system_detailed_timing);
+	return script_system->get_detailed_timing_enabled();
+}
+
+Dictionary FlecsServer::get_script_system_event_totals(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, Dictionary(), get_script_system_event_totals);
+	Dictionary d;
+	d["onadd_total"] = script_system->get_total_onadd();
+	d["onset_total"] = script_system->get_total_onset();
+	d["onremove_total"] = script_system->get_total_onremove();
+	return d;
+}
+
+double FlecsServer::get_script_system_frame_median_usec(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0.0, get_script_system_frame_median_usec);
+	return script_system->get_frame_dispatch_median_usec();
+}
+
+double FlecsServer::get_script_system_frame_percentile_usec(const RID &world_id, const RID &script_system_id, double percentile) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0.0, get_script_system_frame_percentile_usec);
+	return script_system->get_frame_dispatch_percentile_usec(percentile);
+}
+
+double FlecsServer::get_script_system_frame_stddev_usec(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0.0, get_script_system_frame_stddev_usec);
+	return script_system->get_frame_dispatch_stddev_usec();
+}
+
+int FlecsServer::get_script_system_max_sample_count(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_max_sample_count);
+	return script_system->get_max_sample_count();
+}
+
+void FlecsServer::set_script_system_max_sample_count(const RID &world_id, const RID &script_system_id, int cap) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_max_sample_count);
+	script_system->set_max_sample_count(cap);
+}
+
+int FlecsServer::get_script_system_last_frame_entity_count(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_last_frame_entity_count); return (int)script_system->get_last_frame_entity_count(); }
+uint64_t FlecsServer::get_script_system_last_frame_dispatch_usec(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_last_frame_dispatch_usec); return script_system->get_last_frame_dispatch_usec(); }
+uint64_t FlecsServer::get_script_system_frame_dispatch_invocations(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_frame_dispatch_invocations); return script_system->get_frame_dispatch_invocations(); }
+uint64_t FlecsServer::get_script_system_frame_dispatch_accum_usec(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_frame_dispatch_accum_usec); return script_system->get_frame_dispatch_accum_usec(); }
+uint64_t FlecsServer::get_script_system_frame_min_usec(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_frame_min_usec); return script_system->get_frame_dispatch_min_usec(); }
+uint64_t FlecsServer::get_script_system_frame_max_usec(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_frame_max_usec); return script_system->get_frame_dispatch_max_usec(); }
+uint64_t FlecsServer::get_script_system_last_frame_onadd(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_last_frame_onadd); return script_system->get_last_frame_onadd(); }
+uint64_t FlecsServer::get_script_system_last_frame_onset(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_last_frame_onset); return script_system->get_last_frame_onset(); }
+uint64_t FlecsServer::get_script_system_last_frame_onremove(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_last_frame_onremove); return script_system->get_last_frame_onremove(); }
+uint64_t FlecsServer::get_script_system_total_callbacks(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_total_callbacks); return script_system->get_total_callbacks_invoked(); }
+uint64_t FlecsServer::get_script_system_total_entities_processed(const RID &world_id, const RID &script_system_id) { CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_total_entities_processed); return script_system->get_total_entities_processed(); }
+
+Ref<Resource> FlecsServer::make_script_system_inspector(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, Ref<Resource>(), make_script_system_inspector);
+	Ref<ScriptSystemInspector> insp;
+	insp.instantiate();
+	insp->_set_context(world_id, script_system_id, this);
+	return insp;
+}
+
+Dictionary FlecsServer::get_script_system_info(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, Dictionary(), get_script_system_info);
+	Dictionary d;
+	d["dispatch_mode"] = (int64_t)script_system->get_dispatch_mode();
+	d["change_only"] = script_system->is_change_only();
+	d["observe_add_and_set"] = script_system->get_change_observe_add_and_set();
+	d["observe_remove"] = script_system->get_change_observe_remove();
+	d["instrumentation_enabled"] = script_system->get_instrumentation_enabled();
+	d["detailed_timing_enabled"] = script_system->get_detailed_timing_enabled();
+	d["auto_reset_per_frame"] = script_system->get_auto_reset_per_frame();
+	d["paused"] = script_system->get_is_paused();
+	d["last_frame_entity_count"] = (int64_t)script_system->get_last_frame_entity_count();
+	d["last_frame_dispatch_usec"] = (int64_t)script_system->get_last_frame_dispatch_usec();
+	d["frame_dispatch_invocations"] = (int64_t)script_system->get_frame_dispatch_invocations();
+	d["frame_dispatch_accum_usec"] = (int64_t)script_system->get_frame_dispatch_accum_usec();
+	d["frame_dispatch_min_usec"] = (int64_t)script_system->get_frame_dispatch_min_usec();
+	d["frame_dispatch_max_usec"] = (int64_t)script_system->get_frame_dispatch_max_usec();
+	if (script_system->get_detailed_timing_enabled() && script_system->get_frame_dispatch_invocations() > 0) {
+		d["frame_dispatch_median_usec"] = script_system->get_frame_dispatch_median_usec();
+		d["frame_dispatch_p99_usec"] = script_system->get_frame_dispatch_percentile_usec(99.0);
+		d["frame_dispatch_stddev_usec"] = script_system->get_frame_dispatch_stddev_usec();
+	}
+	d["last_frame_onadd"] = (int64_t)script_system->get_last_frame_onadd();
+	d["last_frame_onset"] = (int64_t)script_system->get_last_frame_onset();
+	d["last_frame_onremove"] = (int64_t)script_system->get_last_frame_onremove();
+	d["total_callbacks_invoked"] = (int64_t)script_system->get_total_callbacks_invoked();
+	d["total_entities_processed"] = (int64_t)script_system->get_total_entities_processed();
+	return d;
+}
+
+Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_system_info);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
+	ERR_FAIL_NULL_V(wv, Dictionary());
+	flecs::world &w = wv->get_world();
+	flecs::entity e = w.entity(system_id.get_id());
+	if (!e.is_valid()) { ERR_PRINT("get_system_info: invalid system entity"); return Dictionary(); }
+	Dictionary d;
+	d["id"] = (int64_t)system_id.get_id();
+	d["name"] = String(e.name().c_str());
+	// Regular system pause via Disabled tag
+	flecs::entity disabled = w.lookup("flecs.core.Disabled");
+	bool paused_state = disabled.is_valid() ? e.has(disabled) : false;
+	d["paused"] = paused_state;
+	// Extended: attempt to extract phase/terms (best-effort)
+	// Phase: look for relationship 'flecs.core.Phase'
+	// Phase detection (best effort)
+	flecs::entity phase_rel = w.lookup("flecs.core.Phase");
+	if (phase_rel.is_valid()) { /* future: inspect relationships */ }
+	// Placeholder: terms enumeration not directly available without stored query; skip for now.
+	return d;
+}
+
+void FlecsServer::set_system_paused(const RID &world_id, const RID &system_id, bool paused) {
+	CHECK_WORLD_VALIDITY(world_id, set_system_paused);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
+	if (!wv) { return; }
+	flecs::world &w = wv->get_world();
+	flecs::entity e = w.entity(system_id.get_id());
+	if (!e.is_valid()) { ERR_PRINT("set_system_paused: invalid system"); return; }
+	if (paused) { e.disable(); } else { e.enable(); }
+}
+
+bool FlecsServer::is_system_paused(const RID &world_id, const RID &system_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, false, is_system_paused);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
+	ERR_FAIL_NULL_V(wv, false);
+	flecs::world &w = wv->get_world();
+	flecs::entity e = w.entity(system_id.get_id());
+	if (!e.is_valid()) { ERR_PRINT("is_system_paused: invalid system"); return false; }
+	flecs::entity disabled = w.lookup("flecs.core.Disabled");
+	return disabled.is_valid() ? e.has(disabled) : false;
+}
+
+void FlecsServer::pause_systems(const RID &world_id, const PackedInt64Array &system_ids) {
+	CHECK_WORLD_VALIDITY(world_id, pause_systems);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
+	flecs::world &w = wv->get_world();
+	for (int i = 0; i < system_ids.size(); ++i) {
+		uint64_t raw = (uint64_t)system_ids[i];
+		flecs::entity e = w.entity(raw);
+		if (e.is_valid()) {
+			e.disable();
+			regular_system_paused.insert(RID::from_uint64(raw), true);
+		}
+	}
+}
+
+void FlecsServer::set_script_system_change_observe_remove(const RID &world_id, const RID &script_system_id, bool observe_remove) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_change_observe_remove);
+	script_system->set_change_observe_remove(observe_remove);
+}
+
+bool FlecsServer::get_script_system_change_observe_remove(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, get_script_system_change_observe_remove);
+	return script_system->get_change_observe_remove();
+}
+
+void FlecsServer::resume_systems(const RID &world_id, const PackedInt64Array &system_ids) {
+	CHECK_WORLD_VALIDITY(world_id, resume_systems);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
+	flecs::world &w = wv->get_world();
+	for (int i = 0; i < system_ids.size(); ++i) {
+		uint64_t raw = (uint64_t)system_ids[i];
+		flecs::entity e = w.entity(raw);
+		if (e.is_valid()) {
+			e.enable();
+			regular_system_paused.insert(RID::from_uint64(raw), false);
+		}
+	}
+}
+
+void FlecsServer::pause_all_systems(const RID &world_id) {
+	CHECK_WORLD_VALIDITY(world_id, pause_all_systems);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
+	flecs::world &w = wv->get_world();
+	w.each([](flecs::entity e){ if (e.is_valid()) { e.disable(); }});
+}
+
+void FlecsServer::resume_all_systems(const RID &world_id) {
+	CHECK_WORLD_VALIDITY(world_id, resume_all_systems);
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
+	flecs::world &w = wv->get_world();
+	w.each([](flecs::entity e){ if (e.is_valid()) { e.enable(); }});
+}
+
+Dictionary FlecsServer::get_world_distribution_summary(const RID &world_id) {
+	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_distribution_summary);
+	Dictionary result;
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return result; }
+	// Build merged sample approximation by concatenating samples (potentially large; cap)
+	Vector<double> merged;
+	int total_invocations = 0;
+	const int MERGE_CAP = 4096;
+	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
+		if (!ss || !ss->get_detailed_timing_enabled()) { continue; }
+		const Vector<uint64_t> &samples = ss->_get_frame_dispatch_samples();
+		for (int i = 0; i < samples.size() && merged.size() < MERGE_CAP; ++i) {
+			merged.push_back((double)samples[i]);
+		}
+		total_invocations += ss->get_frame_dispatch_invocations();
+		if (merged.size() >= MERGE_CAP) { break; }
+	}
+	if (merged.is_empty()) { return result; }
+	merged.sort();
+	auto percentile = [&](double p) {
+		if (merged.is_empty()) { return 0.0; }
+		if (p <= 0.0) { return merged[0]; }
+		if (p >= 100.0) { return merged[merged.size() - 1]; }
+		double r = (p / 100.0) * (merged.size() - 1);
+		int lo = (int)r;
+		int hi = MIN(lo + 1, merged.size() - 1);
+		double f = r - (double)lo;
+		return merged[lo] + (merged[hi] - merged[lo]) * f;
+	};
+	double median = percentile(50.0);
+	double p99 = percentile(99.0);
+	// compute stddev
+	double sum = 0;
+	for (int i = 0; i < merged.size(); ++i) { sum += merged[i]; }
+	double mean = sum / merged.size();
+	double var = 0;
+	for (int i = 0; i < merged.size(); ++i) { double d = merged[i] - mean; var += d * d; }
+	var /= (merged.size()>1 ? (merged.size()-1) : 1);
+	result["median_usec"] = median;
+	result["p99_usec"] = p99;
+	result["mean_usec"] = mean;
+	result["stddev_usec"] = Math::sqrt(var);
+	result["samples_used"] = merged.size();
+	result["total_invocations"] = total_invocations;
+	result["approximation_cap"] = MERGE_CAP;
+	return result;
+}
+
+void FlecsServer::set_script_system_name(const RID &world_id, const RID &script_system_id, const String &name) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_name);
+	script_system->set_system_name(name);
+}
+
+String FlecsServer::get_script_system_name(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, String(), get_script_system_name);
+	return script_system->get_system_name();
+}
+
+void FlecsServer::set_script_system_multi_threaded(const RID &world_id, const RID &script_system_id, bool enable) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_multi_threaded);
+	script_system->set_multi_threaded(enable);
+}
+
+bool FlecsServer::get_script_system_multi_threaded(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, get_script_system_multi_threaded);
+	return script_system->get_multi_threaded();
+}
+
+void FlecsServer::set_script_system_batch_chunk_size(const RID &world_id, const RID &script_system_id, int chunk_size) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_batch_chunk_size);
+	script_system->set_batch_flush_chunk_size(chunk_size);
+}
+
+int FlecsServer::get_script_system_batch_chunk_size(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0, get_script_system_batch_chunk_size);
+	return script_system->get_batch_flush_chunk_size();
+}
+
+void FlecsServer::set_script_system_flush_min_interval_msec(const RID &world_id, const RID &script_system_id, double msec) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_flush_min_interval_msec);
+	script_system->set_flush_min_interval_msec(msec);
+}
+
+double FlecsServer::get_script_system_flush_min_interval_msec(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, 0.0, get_script_system_flush_min_interval_msec);
+	return script_system->get_flush_min_interval_msec();
+}
+
+void FlecsServer::set_script_system_use_deferred_calls(const RID &world_id, const RID &script_system_id, bool use_deferred) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, set_script_system_use_deferred_calls);
+	script_system->set_use_deferred_calls(use_deferred);
+}
+
+bool FlecsServer::get_script_system_use_deferred_calls(const RID &world_id, const RID &script_system_id) {
+	CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, false, get_script_system_use_deferred_calls);
+	return script_system->get_use_deferred_calls();
+}
+
+
+// ---- ScriptSystemInspector implementation ----
+void ScriptSystemInspector::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_dispatch_mode"), &ScriptSystemInspector::get_dispatch_mode);
+	ClassDB::bind_method(D_METHOD("set_dispatch_mode", "mode"), &ScriptSystemInspector::set_dispatch_mode);
+	ClassDB::bind_method(D_METHOD("get_change_only"), &ScriptSystemInspector::get_change_only);
+	ClassDB::bind_method(D_METHOD("set_change_only", "v"), &ScriptSystemInspector::set_change_only);
+	ClassDB::bind_method(D_METHOD("get_observe_add_and_set"), &ScriptSystemInspector::get_observe_add_and_set);
+	ClassDB::bind_method(D_METHOD("set_observe_add_and_set", "v"), &ScriptSystemInspector::set_observe_add_and_set);
+	ClassDB::bind_method(D_METHOD("get_observe_remove"), &ScriptSystemInspector::get_observe_remove);
+	ClassDB::bind_method(D_METHOD("set_observe_remove", "v"), &ScriptSystemInspector::set_observe_remove);
+	ClassDB::bind_method(D_METHOD("get_instrumentation"), &ScriptSystemInspector::get_instrumentation);
+	ClassDB::bind_method(D_METHOD("set_instrumentation", "v"), &ScriptSystemInspector::set_instrumentation);
+	ClassDB::bind_method(D_METHOD("get_detailed_timing"), &ScriptSystemInspector::get_detailed_timing);
+	ClassDB::bind_method(D_METHOD("set_detailed_timing", "v"), &ScriptSystemInspector::set_detailed_timing);
+	ClassDB::bind_method(D_METHOD("get_multi_threaded"), &ScriptSystemInspector::get_multi_threaded);
+	ClassDB::bind_method(D_METHOD("set_multi_threaded", "v"), &ScriptSystemInspector::set_multi_threaded);
+	ClassDB::bind_method(D_METHOD("get_batch_chunk_size"), &ScriptSystemInspector::get_batch_chunk_size);
+	ClassDB::bind_method(D_METHOD("set_batch_chunk_size", "v"), &ScriptSystemInspector::set_batch_chunk_size);
+	ClassDB::bind_method(D_METHOD("get_flush_min_interval_msec"), &ScriptSystemInspector::get_flush_min_interval_msec);
+	ClassDB::bind_method(D_METHOD("set_flush_min_interval_msec", "v"), &ScriptSystemInspector::set_flush_min_interval_msec);
+	ClassDB::bind_method(D_METHOD("get_max_sample_count"), &ScriptSystemInspector::get_max_sample_count);
+	ClassDB::bind_method(D_METHOD("set_max_sample_count", "cap"), &ScriptSystemInspector::set_max_sample_count);
+	ClassDB::bind_method(D_METHOD("get_auto_reset"), &ScriptSystemInspector::get_auto_reset);
+	ClassDB::bind_method(D_METHOD("set_auto_reset", "v"), &ScriptSystemInspector::set_auto_reset);
+	ClassDB::bind_method(D_METHOD("get_paused"), &ScriptSystemInspector::get_paused);
+	ClassDB::bind_method(D_METHOD("set_paused", "v"), &ScriptSystemInspector::set_paused);
+	ClassDB::bind_method(D_METHOD("get_last_frame_entities"), &ScriptSystemInspector::get_last_frame_entities);
+	ClassDB::bind_method(D_METHOD("get_last_frame_dispatch_usec"), &ScriptSystemInspector::get_last_frame_dispatch_usec);
+	ClassDB::bind_method(D_METHOD("get_frame_invocations"), &ScriptSystemInspector::get_frame_invocations);
+	ClassDB::bind_method(D_METHOD("get_frame_accum_usec"), &ScriptSystemInspector::get_frame_accum_usec);
+	ClassDB::bind_method(D_METHOD("get_frame_min_usec"), &ScriptSystemInspector::get_frame_min_usec);
+	ClassDB::bind_method(D_METHOD("get_frame_max_usec"), &ScriptSystemInspector::get_frame_max_usec);
+	ClassDB::bind_method(D_METHOD("get_frame_median_usec"), &ScriptSystemInspector::get_frame_median_usec);
+	ClassDB::bind_method(D_METHOD("get_frame_p99_usec"), &ScriptSystemInspector::get_frame_p99_usec);
+	ClassDB::bind_method(D_METHOD("get_frame_stddev_usec"), &ScriptSystemInspector::get_frame_stddev_usec);
+	ClassDB::bind_method(D_METHOD("get_last_frame_onadd"), &ScriptSystemInspector::get_last_frame_onadd);
+	ClassDB::bind_method(D_METHOD("get_last_frame_onset"), &ScriptSystemInspector::get_last_frame_onset);
+	ClassDB::bind_method(D_METHOD("get_last_frame_onremove"), &ScriptSystemInspector::get_last_frame_onremove);
+	ClassDB::bind_method(D_METHOD("get_total_callbacks"), &ScriptSystemInspector::get_total_callbacks);
+	ClassDB::bind_method(D_METHOD("get_total_entities_processed"), &ScriptSystemInspector::get_total_entities_processed);
+
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "dispatch_mode", PROPERTY_HINT_ENUM, "Per Entity,Batch"), "set_dispatch_mode", "get_dispatch_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "change_only", PROPERTY_HINT_NONE, "Observe only component changes"), "set_change_only", "get_change_only");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "observe_add_and_set", PROPERTY_HINT_NONE, "When change_only: also count OnAdd events"), "set_observe_add_and_set", "get_observe_add_and_set");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "observe_remove", PROPERTY_HINT_NONE, "Track removal events (OnRemove observer)"), "set_observe_remove", "get_observe_remove");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "instrumentation_enabled", PROPERTY_HINT_NONE, "Collect per-frame counters and timings"), "set_instrumentation", "get_instrumentation");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "detailed_timing_enabled", PROPERTY_HINT_NONE, "Collect per-invocation timing samples"), "set_detailed_timing", "get_detailed_timing");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "multi_threaded", PROPERTY_HINT_NONE, "Run multi-threaded; data is batched & flushed on main thread"), "set_multi_threaded", "get_multi_threaded");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "batch/flush_chunk_size", PROPERTY_HINT_RANGE, "0,100000,1"), "set_batch_chunk_size", "get_batch_chunk_size");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "batch/flush_min_interval_msec", PROPERTY_HINT_RANGE, "0,1000,0.1"), "set_flush_min_interval_msec", "get_flush_min_interval_msec");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_sample_count", PROPERTY_HINT_RANGE, "1,4096,1"), "set_max_sample_count", "get_max_sample_count");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_reset_per_frame", PROPERTY_HINT_NONE, "Auto reset frame counters each PreUpdate"), "set_auto_reset", "get_auto_reset");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "paused", PROPERTY_HINT_NONE, "Pause dispatch without destroying systems/observers"), "set_paused", "get_paused");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/entities", PROPERTY_HINT_NONE, "Entities processed this frame"), Variant(), "get_last_frame_entities");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/dispatch_usec", PROPERTY_HINT_NONE, "Last dispatch duration (microseconds)"), Variant(), "get_last_frame_dispatch_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/invocations", PROPERTY_HINT_NONE, "Callback invocations this frame"), Variant(), "get_frame_invocations");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/accum_usec", PROPERTY_HINT_NONE, "Accumulated dispatch time this frame"), Variant(), "get_frame_accum_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/min_usec", PROPERTY_HINT_NONE, "Min dispatch time among samples"), Variant(), "get_frame_min_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/max_usec", PROPERTY_HINT_NONE, "Max dispatch time among samples"), Variant(), "get_frame_max_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frame/median_usec", PROPERTY_HINT_NONE, "Median dispatch time"), Variant(), "get_frame_median_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frame/p99_usec", PROPERTY_HINT_NONE, "99th percentile dispatch time"), Variant(), "get_frame_p99_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "frame/stddev_usec", PROPERTY_HINT_NONE, "Stddev of dispatch times"), Variant(), "get_frame_stddev_usec");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/onadd", PROPERTY_HINT_NONE, "OnAdd events this frame"), Variant(), "get_last_frame_onadd");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/onset", PROPERTY_HINT_NONE, "OnSet events this frame"), Variant(), "get_last_frame_onset");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "frame/onremove", PROPERTY_HINT_NONE, "OnRemove events this frame"), Variant(), "get_last_frame_onremove");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "total/callbacks", PROPERTY_HINT_NONE, "Total callbacks invoked"), Variant(), "get_total_callbacks");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "total/entities_processed", PROPERTY_HINT_NONE, "Total entities processed (all time)"), Variant(), "get_total_entities_processed");
+}
+
+// Accessors
+int ScriptSystemInspector::get_dispatch_mode() const { return server->get_script_system_dispatch_mode(world_id, script_system_id); }
+void ScriptSystemInspector::set_dispatch_mode(int m) { server->set_script_system_dispatch_mode(world_id, script_system_id, m); }
+bool ScriptSystemInspector::get_change_only() const { return server->is_script_system_change_only(world_id, script_system_id); }
+void ScriptSystemInspector::set_change_only(bool v) { server->set_script_system_change_only(world_id, script_system_id, v); }
+bool ScriptSystemInspector::get_observe_add_and_set() const { return server->get_script_system_change_observe_add_and_set(world_id, script_system_id); }
+void ScriptSystemInspector::set_observe_add_and_set(bool v) { server->set_script_system_change_observe_add_and_set(world_id, script_system_id, v); }
+bool ScriptSystemInspector::get_observe_remove() const { return server->get_script_system_change_observe_remove(world_id, script_system_id); }
+void ScriptSystemInspector::set_observe_remove(bool v) { server->set_script_system_change_observe_remove(world_id, script_system_id, v); }
+bool ScriptSystemInspector::get_instrumentation() const { Dictionary d = server->get_script_system_instrumentation(world_id, script_system_id); return d.has("instrumentation_enabled") ? (bool)d["instrumentation_enabled"] : false; }
+void ScriptSystemInspector::set_instrumentation(bool v) { server->set_script_system_instrumentation(world_id, script_system_id, v); }
+bool ScriptSystemInspector::get_detailed_timing() const { return server->get_script_system_detailed_timing(world_id, script_system_id); }
+void ScriptSystemInspector::set_detailed_timing(bool v) { server->set_script_system_detailed_timing(world_id, script_system_id, v); }
+int ScriptSystemInspector::get_max_sample_count() const { return server->get_script_system_max_sample_count(world_id, script_system_id); }
+void ScriptSystemInspector::set_max_sample_count(int cap) { server->set_script_system_max_sample_count(world_id, script_system_id, cap); }
+bool ScriptSystemInspector::get_auto_reset() const { return server->get_script_system_auto_reset(world_id, script_system_id); }
+void ScriptSystemInspector::set_auto_reset(bool v) { server->set_script_system_auto_reset(world_id, script_system_id, v); }
+bool ScriptSystemInspector::get_paused() const { return server->is_script_system_paused(world_id, script_system_id); }
+void ScriptSystemInspector::set_paused(bool v) { server->set_script_system_paused(world_id, script_system_id, v); }
+int ScriptSystemInspector::get_last_frame_entities() const { return server->get_script_system_last_frame_entity_count(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_last_frame_dispatch_usec() const { return server->get_script_system_last_frame_dispatch_usec(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_frame_invocations() const { return server->get_script_system_frame_dispatch_invocations(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_frame_accum_usec() const { return server->get_script_system_frame_dispatch_accum_usec(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_frame_min_usec() const { return server->get_script_system_frame_min_usec(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_frame_max_usec() const { return server->get_script_system_frame_max_usec(world_id, script_system_id); }
+double ScriptSystemInspector::get_frame_median_usec() const { return server->get_script_system_frame_median_usec(world_id, script_system_id); }
+double ScriptSystemInspector::get_frame_p99_usec() const { return server->get_script_system_frame_p99_usec(world_id, script_system_id); }
+double ScriptSystemInspector::get_frame_stddev_usec() const { return server->get_script_system_frame_stddev_usec(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_last_frame_onadd() const { return server->get_script_system_last_frame_onadd(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_last_frame_onset() const { return server->get_script_system_last_frame_onset(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_last_frame_onremove() const { return server->get_script_system_last_frame_onremove(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_total_callbacks() const { return server->get_script_system_total_callbacks(world_id, script_system_id); }
+uint64_t ScriptSystemInspector::get_total_entities_processed() const { return server->get_script_system_total_entities_processed(world_id, script_system_id); }
+
+bool ScriptSystemInspector::get_multi_threaded() const { return server->get_script_system_multi_threaded(world_id, script_system_id); }
+void ScriptSystemInspector::set_multi_threaded(bool v) { server->set_script_system_multi_threaded(world_id, script_system_id, v); }
+int ScriptSystemInspector::get_batch_chunk_size() const { return server->get_script_system_batch_chunk_size(world_id, script_system_id); }
+void ScriptSystemInspector::set_batch_chunk_size(int v) { server->set_script_system_batch_chunk_size(world_id, script_system_id, v); }
+double ScriptSystemInspector::get_flush_min_interval_msec() const { return server->get_script_system_flush_min_interval_msec(world_id, script_system_id); }
+void ScriptSystemInspector::set_flush_min_interval_msec(double v) { server->set_script_system_flush_min_interval_msec(world_id, script_system_id, v); }

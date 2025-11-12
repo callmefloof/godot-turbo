@@ -416,3 +416,24 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Godot Turbo specific ignores
+# Temporary documentation files
+*_SUMMARY.md
+*_CHECKLIST.md
+*_STATUS.md
+*_VERIFICATION.md
+*IMPLEMENTATION_SUMMARY.md
+*COMPLETION_SUMMARY.md
+*VALIDATION_SUMMARY.md
+*DOCUMENTATION_STATUS.md
+
+# Build artifacts (SCons)
+*.o
+*.obj
+*.pyc
+*.so
+*.dll
+*.dylib
+*.a
+*.lib

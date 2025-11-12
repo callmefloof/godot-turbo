@@ -1,0 +1,399 @@
+/**************************************************************************/
+/*  test_navigation_utility.h                                             */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#ifndef TEST_NAVIGATION_UTILITY_H
+#define TEST_NAVIGATION_UTILITY_H
+
+#include "tests/test_macros.h"
+#include "test_fixtures.h"
+#include "modules/godot_turbo/ecs/utility/navigation2d_utility.h"
+#include "modules/godot_turbo/ecs/utility/navigation3d_utility.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/ecs/components/all_components.h"
+#include "servers/navigation_server_2d.h"
+#include "servers/navigation_server_3d.h"
+
+namespace TestNavigationUtility {
+
+// ========================================================================
+// Navigation2DUtility Tests
+// ========================================================================
+
+TEST_CASE("[Navigation2DUtility] Singleton access") {
+	Navigation2DUtility *util = Navigation2DUtility::get_singleton();
+	CHECK(util != nullptr);
+	
+	// Should return same instance
+	Navigation2DUtility *util2 = Navigation2DUtility::get_singleton();
+	CHECK(util == util2);
+}
+
+TEST_CASE("[Navigation2DUtility] Create NavAgent2D component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation2DUtility *util = Navigation2DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation2DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	RID entity_rid = server->create_entity(world_id);
+	CHECK(entity_rid.is_valid());
+	
+	// Create NavAgent2D component
+	RID agent_rid = util->create_nav_agent_2d(world_id, entity_rid);
+	CHECK(agent_rid.is_valid());
+	
+	// Verify component was added
+	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	CHECK(entity.has<NavAgent2DComponent>());
+	
+	const NavAgent2DComponent& agent_comp = entity.get<NavAgent2DComponent>();
+	CHECK(agent_comp.agent_id == agent_rid);
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation2DUtility] Create NavRegion2D component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation2DUtility *util = Navigation2DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation2DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	RID entity_rid = server->create_entity(world_id);
+	CHECK(entity_rid.is_valid());
+	
+	// Create NavRegion2D component
+	RID region_rid = util->create_nav_region_2d(world_id, entity_rid);
+	CHECK(region_rid.is_valid());
+	
+	// Verify component was added
+	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	CHECK(entity.has<NavRegion2DComponent>());
+	
+	const NavRegion2DComponent& region_comp = entity.get<NavRegion2DComponent>();
+	CHECK(region_comp.region_id == region_rid);
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation2DUtility] Create NavObstacle2D component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation2DUtility *util = Navigation2DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation2DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	RID entity_rid = server->create_entity(world_id);
+	CHECK(entity_rid.is_valid());
+	
+	// Create NavObstacle2D component
+	RID obstacle_rid = util->create_nav_obstacle_2d(world_id, entity_rid);
+	CHECK(obstacle_rid.is_valid());
+	
+	// Verify component was added
+	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	CHECK(entity.has<NavObstacle2DComponent>());
+	
+	const NavObstacle2DComponent& obstacle_comp = entity.get<NavObstacle2DComponent>();
+	CHECK(obstacle_comp.obstacle_id == obstacle_rid);
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation2DUtility] Multiple navigation components") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation2DUtility *util = Navigation2DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation2DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	// Create multiple entities with different navigation components
+	RID entity1 = server->create_entity(world_id);
+	RID entity2 = server->create_entity(world_id);
+	RID entity3 = server->create_entity(world_id);
+	
+	RID agent_rid = util->create_nav_agent_2d(world_id, entity1);
+	RID region_rid = util->create_nav_region_2d(world_id, entity2);
+	RID obstacle_rid = util->create_nav_obstacle_2d(world_id, entity3);
+	
+	CHECK(agent_rid.is_valid());
+	CHECK(region_rid.is_valid());
+	CHECK(obstacle_rid.is_valid());
+	
+	// Verify all components exist
+	flecs::entity e1 = server->_get_entity(world_id, entity1);
+	flecs::entity e2 = server->_get_entity(world_id, entity2);
+	flecs::entity e3 = server->_get_entity(world_id, entity3);
+	
+	CHECK(e1.has<NavAgent2DComponent>());
+	CHECK(e2.has<NavRegion2DComponent>());
+	CHECK(e3.has<NavObstacle2DComponent>());
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation2DUtility] Invalid world ID") {
+	Navigation2DUtility *util = Navigation2DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation2DUtility not available");
+		return;
+	}
+	
+	RID invalid_world;
+	RID invalid_entity;
+	
+	// Should handle invalid world gracefully
+	RID agent_rid = util->create_nav_agent_2d(invalid_world, invalid_entity);
+	CHECK_FALSE(agent_rid.is_valid());
+}
+
+// ========================================================================
+// Navigation3DUtility Tests
+// ========================================================================
+
+TEST_CASE("[Navigation3DUtility] Singleton access") {
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	CHECK(util != nullptr);
+	
+	// Should return same instance
+	Navigation3DUtility *util2 = Navigation3DUtility::get_singleton();
+	CHECK(util == util2);
+}
+
+TEST_CASE("[Navigation3DUtility] Create NavAgent3D component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation3DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	RID entity_rid = server->create_entity(world_id);
+	CHECK(entity_rid.is_valid());
+	
+	// Create NavAgent3D component
+	RID agent_rid = util->create_nav_agent_3d(world_id, entity_rid);
+	CHECK(agent_rid.is_valid());
+	
+	// Verify component was added
+	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	CHECK(entity.has<NavAgent3DComponent>());
+	
+	const NavAgent3DComponent& agent_comp = entity.get<NavAgent3DComponent>();
+	CHECK(agent_comp.agent_id == agent_rid);
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation3DUtility] Create NavRegion3D component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation3DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	RID entity_rid = server->create_entity(world_id);
+	CHECK(entity_rid.is_valid());
+	
+	// Create NavRegion3D component
+	RID region_rid = util->create_nav_region_3d(world_id, entity_rid);
+	CHECK(region_rid.is_valid());
+	
+	// Verify component was added
+	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	CHECK(entity.has<NavRegion3DComponent>());
+	
+	const NavRegion3DComponent& region_comp = entity.get<NavRegion3DComponent>();
+	CHECK(region_comp.region_id == region_rid);
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation3DUtility] Create NavObstacle3D component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation3DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	RID entity_rid = server->create_entity(world_id);
+	CHECK(entity_rid.is_valid());
+	
+	// Create NavObstacle3D component
+	RID obstacle_rid = util->create_nav_obstacle_3d(world_id, entity_rid);
+	CHECK(obstacle_rid.is_valid());
+	
+	// Verify component was added
+	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	CHECK(entity.has<NavObstacle3DComponent>());
+	
+	const NavObstacle3DComponent& obstacle_comp = entity.get<NavObstacle3DComponent>();
+	CHECK(obstacle_comp.obstacle_id == obstacle_rid);
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation3DUtility] Multiple navigation components") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation3DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	// Create multiple entities with different navigation components
+	RID entity1 = server->create_entity(world_id);
+	RID entity2 = server->create_entity(world_id);
+	RID entity3 = server->create_entity(world_id);
+	
+	RID agent_rid = util->create_nav_agent_3d(world_id, entity1);
+	RID region_rid = util->create_nav_region_3d(world_id, entity2);
+	RID obstacle_rid = util->create_nav_obstacle_3d(world_id, entity3);
+	
+	CHECK(agent_rid.is_valid());
+	CHECK(region_rid.is_valid());
+	CHECK(obstacle_rid.is_valid());
+	
+	// Verify all components exist
+	flecs::entity e1 = server->_get_entity(world_id, entity1);
+	flecs::entity e2 = server->_get_entity(world_id, entity2);
+	flecs::entity e3 = server->_get_entity(world_id, entity3);
+	
+	CHECK(e1.has<NavAgent3DComponent>());
+	CHECK(e2.has<NavRegion3DComponent>());
+	CHECK(e3.has<NavObstacle3DComponent>());
+	
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Navigation3DUtility] Invalid world ID") {
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation3DUtility not available");
+		return;
+	}
+	
+	RID invalid_world;
+	RID invalid_entity;
+	
+	// Should handle invalid world gracefully
+	RID agent_rid = util->create_nav_agent_3d(invalid_world, invalid_entity);
+	CHECK_FALSE(agent_rid.is_valid());
+}
+
+TEST_CASE("[Navigation3DUtility] Stress test - many navigation agents") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	Navigation3DUtility *util = Navigation3DUtility::get_singleton();
+	if (!util) {
+		MESSAGE("Skipping test - Navigation3DUtility not available");
+		server->free_world(world_id);
+		return;
+	}
+	
+	const int COUNT = 100;
+	Vector<RID> entities;
+	Vector<RID> agents;
+	
+	// Create many navigation agents
+	for (int i = 0; i < COUNT; i++) {
+		RID entity_rid = server->create_entity(world_id);
+		entities.push_back(entity_rid);
+		
+		RID agent_rid = util->create_nav_agent_3d(world_id, entity_rid);
+		agents.push_back(agent_rid);
+		
+		CHECK(agent_rid.is_valid());
+	}
+	
+	// Verify all agents exist and have components
+	for (int i = 0; i < COUNT; i++) {
+		flecs::entity entity = server->_get_entity(world_id, entities[i]);
+		CHECK(entity.has<NavAgent3DComponent>());
+		
+		const NavAgent3DComponent& agent_comp = entity.get<NavAgent3DComponent>();
+		CHECK(agent_comp.agent_id == agents[i]);
+	}
+	
+	server->free_world(world_id);
+}
+
+} // namespace TestNavigationUtility
+
+#endif // TEST_NAVIGATION_UTILITY_H

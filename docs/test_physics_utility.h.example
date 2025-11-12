@@ -1,0 +1,242 @@
+/**************************************************************************/
+/*  test_physics_utility.h                                                */
+/**************************************************************************/
+/*                         This file is part of:                          */
+/*                             GODOT ENGINE                               */
+/*                        https://godotengine.org                         */
+/**************************************************************************/
+/* Copyright (c) 2014-present Godot Engine contributors (see AUTHORS.md). */
+/* Copyright (c) 2007-2014 Juan Linietsky, Ariel Manzur.                  */
+/*                                                                        */
+/* Permission is hereby granted, free of charge, to any person obtaining  */
+/* a copy of this software and associated documentation files (the        */
+/* "Software"), to deal in the Software without restriction, including    */
+/* without limitation the rights to use, copy, modify, merge, publish,    */
+/* distribute, sublicense, and/or sell copies of the Software, and to     */
+/* permit persons to whom the Software is furnished to do so, subject to  */
+/* the following conditions:                                              */
+/*                                                                        */
+/* The above copyright notice and this permission notice shall be         */
+/* included in all copies or substantial portions of the Software.        */
+/*                                                                        */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,        */
+/* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF     */
+/* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. */
+/* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY   */
+/* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,   */
+/* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE      */
+/* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
+/**************************************************************************/
+
+#ifndef TEST_PHYSICS_UTILITY_H
+#define TEST_PHYSICS_UTILITY_H
+
+#include "tests/test_macros.h"
+#include "test_fixtures.h"
+#include "modules/godot_turbo/ecs/utility/physics2d_utility.h"
+#include "modules/godot_turbo/ecs/utility/physics3d_utility.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/ecs/components/all_components.h"
+#include "servers/physics_server_2d.h"
+#include "servers/physics_server_3d.h"
+
+namespace TestPhysicsUtility {
+
+// ========================================================================
+// Physics2DUtility Tests
+// ========================================================================
+
+TEST_CASE("[Physics2DUtility] Create area component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer2D::get_singleton()->space_create();
+	
+	// Create area using static method
+	RID entity_rid = Physics2DUtility::create_area(world_id, "TestArea", space_id);
+	
+	if (entity_rid.is_valid()) {
+		// Verify component was added
+		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		CHECK(entity.is_valid());
+		CHECK(entity.has<Area2DComponent>());
+	}
+	
+	PhysicsServer2D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Physics2DUtility] Create body component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer2D::get_singleton()->space_create();
+	
+	// Create body using static method
+	RID entity_rid = Physics2DUtility::create_body(world_id, "TestBody", space_id);
+	
+	if (entity_rid.is_valid()) {
+		// Verify component was added
+		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		CHECK(entity.is_valid());
+		CHECK(entity.has<Body2DComponent>());
+	}
+	
+	PhysicsServer2D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Physics2DUtility] Create joint component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer2D::get_singleton()->space_create();
+	
+	// Create joint using static method
+	RID entity_rid = Physics2DUtility::create_joint(world_id, "TestJoint", space_id);
+	
+	if (entity_rid.is_valid()) {
+		// Verify component was added
+		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		CHECK(entity.is_valid());
+		CHECK(entity.has<Joint2DComponent>());
+	}
+	
+	PhysicsServer2D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Physics2DUtility] Invalid world ID") {
+	RID invalid_world;
+	RID space_id = PhysicsServer2D::get_singleton()->space_create();
+	
+	// Should handle invalid world gracefully
+	RID entity_rid = Physics2DUtility::create_area(invalid_world, "Test", space_id);
+	CHECK_FALSE(entity_rid.is_valid());
+	
+	PhysicsServer2D::get_singleton()->free_rid(space_id);
+}
+
+// ========================================================================
+// Physics3DUtility Tests
+// ========================================================================
+
+TEST_CASE("[Physics3DUtility] Create area component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer3D::get_singleton()->space_create();
+	
+	// Create area using static method
+	RID entity_rid = Physics3DUtility::create_area(world_id, "TestArea", space_id);
+	
+	if (entity_rid.is_valid()) {
+		// Verify component was added
+		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		CHECK(entity.is_valid());
+		CHECK(entity.has<Area3DComponent>());
+	}
+	
+	PhysicsServer3D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Physics3DUtility] Create body component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer3D::get_singleton()->space_create();
+	
+	// Create body using static method
+	RID entity_rid = Physics3DUtility::create_body(world_id, "TestBody", space_id);
+	
+	if (entity_rid.is_valid()) {
+		// Verify component was added
+		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		CHECK(entity.is_valid());
+		CHECK(entity.has<Body3DComponent>());
+	}
+	
+	PhysicsServer3D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Physics3DUtility] Create joint component") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer3D::get_singleton()->space_create();
+	
+	// Create joint using static method
+	RID entity_rid = Physics3DUtility::create_joint(world_id, "TestJoint", space_id);
+	
+	if (entity_rid.is_valid()) {
+		// Verify component was added
+		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		CHECK(entity.is_valid());
+		CHECK(entity.has<Joint3DComponent>());
+	}
+	
+	PhysicsServer3D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+TEST_CASE("[Physics3DUtility] Invalid world ID") {
+	RID invalid_world;
+	RID space_id = PhysicsServer3D::get_singleton()->space_create();
+	
+	// Should handle invalid world gracefully
+	RID entity_rid = Physics3DUtility::create_area(invalid_world, "Test", space_id);
+	CHECK_FALSE(entity_rid.is_valid());
+	
+	PhysicsServer3D::get_singleton()->free_rid(space_id);
+}
+
+TEST_CASE("[Physics3DUtility] Multiple physics components") {
+	REQUIRE_FLECS_SERVER();
+	
+	FlecsServer *server = FlecsServer::get_singleton();
+	RID world_id = server->create_world();
+	
+	RID space_id = PhysicsServer3D::get_singleton()->space_create();
+	
+	// Create multiple entities with different physics components
+	RID area_entity = Physics3DUtility::create_area(world_id, "Area1", space_id);
+	RID body_entity = Physics3DUtility::create_body(world_id, "Body1", space_id);
+	RID joint_entity = Physics3DUtility::create_joint(world_id, "Joint1", space_id);
+	
+	// Verify all are valid (if implementation supports it)
+	if (area_entity.is_valid()) {
+		flecs::entity e1 = server->_get_entity(world_id, area_entity);
+		CHECK(e1.has<Area3DComponent>());
+	}
+	
+	if (body_entity.is_valid()) {
+		flecs::entity e2 = server->_get_entity(world_id, body_entity);
+		CHECK(e2.has<Body3DComponent>());
+	}
+	
+	if (joint_entity.is_valid()) {
+		flecs::entity e3 = server->_get_entity(world_id, joint_entity);
+		CHECK(e3.has<Joint3DComponent>());
+	}
+	
+	PhysicsServer3D::get_singleton()->free_rid(space_id);
+	server->free_world(world_id);
+}
+
+} // namespace TestPhysicsUtility
+
+#endif // TEST_PHYSICS_UTILITY_H

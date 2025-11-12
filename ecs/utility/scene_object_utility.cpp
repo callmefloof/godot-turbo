@@ -1,18 +1,18 @@
 #include "scene_object_utility.h"
 
 #include "core/templates/rid.h"
-#include "flecs_server.h"
-#include "thirdparty/flecs/distr/flecs.h"
-#include "ecs/components/scene_node_component.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
+#include "modules/godot_turbo/ecs/components/all_components.h"
 #include "core/math/transform_2d.h"
 #include "core/string/ustring.h"
 #include "core/variant/variant.h"
-#include "navigation/2d/navigation2d_utility.h"
-#include "navigation/3d/navigation3d_utility.h"
-#include "physics/2d/physics2d_utility.h"
-#include "physics/3d/physics3d_utility.h"
-#include "rendering/2d/render_utility_2d.h"
-#include "rendering/3d/render_utility_3d.h"
+#include "navigation2d_utility.h"
+#include "navigation3d_utility.h"
+#include "physics2d_utility.h"
+#include "physics3d_utility.h"
+#include "render_utility_2d.h"
+#include "render_utility_3d.h"
 #include "resource_object_utility.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
@@ -48,7 +48,6 @@
 #include "scene/3d/world_environment.h"
 #include "scene/3d/light_3d.h"
 #include "scene/3d/voxel_gi.h"
-#include "ecs/components/rendering/rendering_components.h"
 
 TypedArray<RID> SceneObjectUtility::create_entities_from_scene(const RID &world_id, SceneTree *tree){
     if (tree == nullptr) {
@@ -85,6 +84,8 @@ for (Variant &variant : children ) {
     }
     //gather resulting entities from entity creation
     TypedArray<RID> child_entity_result = create_entity(world_id, child_node);
+    // BUG FIX: append the created entities to the result (was missing in original)
+    result_entities.append_array(child_entity_result);
 
     //check to see if the node has children
     TypedArray<Node> node_children = child_node->get_children();
@@ -98,6 +99,7 @@ for (Variant &variant : children ) {
 //return resulting entities
 return result_entities;
 }
+
 
 TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *node)  {
     TypedArray<RID> result;
@@ -245,9 +247,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
         if(multi_mesh_instance_3d_entities.size() == 0){
             ERR_FAIL_COND_V(multi_mesh_instance_3d_entities.size() == 0 ,result);
         }
-        //RID multi_mesh_instance_3d_entity = multi_mesh_instance_3d_entities[0];
         result.append_array(multi_mesh_instance_3d_entities);
-        //result.append(get_node_script(world_id, node, multi_mesh_instance_3d_entity));
         return result;
     }
     GPUParticles3D *particles_3d = Object::cast_to<GPUParticles3D>(node);
@@ -346,8 +346,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
             }
             multi_mesh_instances.append(multi_mesh_instance_2d_entities[i]);
         }
-        
-        get_node_script(world_id, node, multi_mesh_instance_2d_entity);
+
         result.append_array(multi_mesh_instance_2d_entities);
         result.append(get_node_script(world_id, node, multi_mesh_instance_2d_entity));
         return result;
@@ -383,7 +382,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     LightOccluder2D * light_occluder = Object::cast_to<LightOccluder2D>(node);
     if ( light_occluder != nullptr) {
         const RID entity = RenderUtility2D::create_light_occluder_with_object(world_id, light_occluder);
-        
+
         result.append(entity);
         result.append(get_node_script(world_id, node, entity));
         return result;
@@ -403,6 +402,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
         result.append(entity);
         return result;
     }
+    // Fallback: create generic entity with SceneNodeComponent
     flecs::world *flecs_world = FlecsServer::get_singleton()->_get_world(world_id);
     String name = node->get_name();
     name = name + "_" + itos(Math::rand());
@@ -413,15 +413,13 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     scene_node_component.class_name = node->get_class();
     e.set<SceneNodeComponent>(scene_node_component);
     const RID entity = FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
-    // Note: SceneNodeComponentRef::create_component expects a Ref<FlecsEntity>, handled by caller if needed
 
     RID script_entity = get_node_script(world_id, node, entity);
     if(script_entity.is_valid()){
         result.append(script_entity);
     }
     result.append(entity);
-    
-    
+
     return result;
 }
 
@@ -445,7 +443,7 @@ void SceneObjectUtility::_bind_methods() {
     ClassDB::bind_method(D_METHOD("create_entities", "world_id", "base_node", "entities", "current_depth", "max_depth"), &SceneObjectUtility::create_entities, DEFVAL(0), DEFVAL(10000));
     ClassDB::bind_method(D_METHOD("create_entity", "world_id", "node"), &SceneObjectUtility::create_entity);
     ClassDB::bind_method(D_METHOD("get_node_script", "world_id", "node", "node_entity"), &SceneObjectUtility::get_node_script);
-    
+
 }
 
 SceneObjectUtility* SceneObjectUtility::get_singleton() {
