@@ -308,7 +308,7 @@ scons tests=yes target=editor dev_build=yes
 - 🧪 GDScriptRunner: Caching, filtering, stress tests (1000+ entities)
 
 **Components:**
-- 🔧 Refactored physics and navigation components
+- 🔧 Refactored rendering, physics and navigation components
 - 🔧 Added Flecs reflection support
 - 🔧 Improved component documentation
 
@@ -326,7 +326,6 @@ scons tests=yes target=editor dev_build=yes
 - None - fully backward compatible with 1.0.x
 
 **Known Issues:**
-- Godot 4.5 beta compatibility untested
 - Some pre-existing diagnostics in utility files (not from this release)
 
 ---
