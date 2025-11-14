@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1-a.2] - 2025-01-28
+
+### Fixed
+
+#### Documentation Examples
+- **Fixed all GDScript example files** to use correct RID-based API patterns
+  - `bad_apple_example.gd` - Fixed non-existent `MultiMeshComponent` class instantiation (line 247)
+    - Now uses Dictionary-based API: `FlecsServer.set_component(entity_rid, "MultiMeshComponent", {...})`
+    - Fixed `FlecsServer.get_singleton()` calls → use `FlecsServer` directly (static methods)
+    - Fixed incorrect `destroy_world()` → `free_world()`
+  - `example_query_usage.gd` - Replaced deprecated `register_component_type()` with `create_runtime_component()`
+    - Fixed `TYPE_FLOAT` constants → use actual default values (e.g., `0.0`)
+    - Fixed `FlecsServer.get_singleton()` → use `FlecsServer` static methods
+  - `gdscript_runner_example.gd` - Fixed incorrect API signatures
+    - Removed incorrect `world_rid` parameter from `get_component_by_name()` and `set_component()`
+    - Correct signature: `FlecsServer.get_component_by_name(entity_rid, "ComponentName")`
+    - Fixed `FlecsServer.get_singleton()` → use `FlecsServer` static methods
+  - `runtime_component_example.gd` - Fixed `FlecsServer.get_singleton()` → use `FlecsServer` static methods
+
+#### API Corrections
+- All examples now demonstrate correct usage patterns:
+  - **FlecsServer is singleton with static methods** - Call directly, not via `get_singleton()`
+  - **Components are C++ structs** - Use Dictionary to set/get, not GDScript class instantiation
+  - **Component methods take `entity_rid` only** - Don't pass `world_rid` to component get/set methods
+  - **Use `create_runtime_component()`** - Not deprecated `register_component_type()`
+
+#### Files Modified
+- `ecs/systems/demo/docs/bad_apple_example.gd` - 4 errors fixed
+- `ecs/flecs_types/example_query_usage.gd` - 1 error fixed  
+- `ecs/systems/gdscript_runner_example.gd` - 6 errors fixed
+- `ecs/examples/runtime_component_example.gd` - 1 error fixed
+
+**Result:** All example files now have **0 errors** and demonstrate correct API usage patterns.
+
+---
+
 ## [1.1.1-a.1] - 2025-01-28
 
 ### Added

@@ -5,12 +5,9 @@ extends Node
 ## create component types at runtime with custom fields and types.
 
 func _ready():
-	# Get the Flecs server singleton
-	var flecs = FlecsServer.get_singleton()
-
 	# Create a world
-	var world_id = flecs.create_world()
-	flecs.init_world(world_id)
+	var world_id = FlecsServer.create_world()
+	FlecsServer.init_world(world_id)
 
 	print("=== Runtime Component Creation Example ===\n")
 
@@ -21,7 +18,7 @@ func _ready():
 		"max": 100,          # int
 		"regen_rate": 5.0    # float
 	}
-	var health_comp_id = flecs.create_runtime_component(world_id, "Health", health_fields)
+	var health_comp_id = FlecsServer.create_runtime_component(world_id, "Health", health_fields)
 	if health_comp_id.is_valid():
 		print("✓ Health component created successfully: ", health_comp_id)
 	else:
@@ -37,7 +34,7 @@ func _ready():
 		"level": 1,                        # int
 		"experience": 0.0                  # float
 	}
-	var player_comp_id = flecs.create_runtime_component(world_id, "Player", player_fields)
+	var player_comp_id = FlecsServer.create_runtime_component(world_id, "Player", player_fields)
 	if player_comp_id.is_valid():
 		print("✓ Player component created successfully: ", player_comp_id)
 	else:
@@ -51,7 +48,7 @@ func _ready():
 		"metadata": {},                    # Dictionary
 		"equipped_weapon": RID()           # RID
 	}
-	var inventory_comp_id = flecs.create_runtime_component(world_id, "Inventory", inventory_fields)
+	var inventory_comp_id = FlecsServer.create_runtime_component(world_id, "Inventory", inventory_fields)
 	if inventory_comp_id.is_valid():
 		print("✓ Inventory component created successfully: ", inventory_comp_id)
 	else:
@@ -59,7 +56,7 @@ func _ready():
 
 	# Example 4: Test error handling - try to create duplicate component
 	print("\nExample 4: Testing duplicate component error handling")
-	var duplicate_comp_id = flecs.create_runtime_component(world_id, "Health", {"hp": 50})
+	var duplicate_comp_id = FlecsServer.create_runtime_component(world_id, "Health", {"hp": 50})
 	if !duplicate_comp_id.is_valid():
 		print("✓ Correctly prevented duplicate component creation")
 	else:
@@ -67,13 +64,13 @@ func _ready():
 
 	# Example 5: Use the runtime components on entities
 	print("\nExample 5: Using runtime components on entities")
-	var entity = flecs.create_entity_with_name(world_id, "PlayerEntity")
+	var entity = FlecsServer.create_entity_with_name(world_id, "PlayerEntity")
 
 	# Add the Player component
-	flecs.add_component(entity, player_comp_id)
+	FlecsServer.add_component(entity, player_comp_id)
 
 	# Set the component data
-	flecs.set_component(entity, "Player", {
+	FlecsServer.set_component(entity, "Player", {
 		"name": "Warrior",
 		"position": Vector3(10, 0, 5),
 		"velocity": Vector3(1, 0, 0),
@@ -83,7 +80,7 @@ func _ready():
 	})
 
 	# Retrieve and display the component data
-	var player_data = flecs.get_component_by_name(entity, "Player")
+	var player_data = FlecsServer.get_component_by_name(entity, "Player")
 	print("✓ Player component data:")
 	for key in player_data.keys():
 		print("  - %s: %s" % [key, player_data[key]])
@@ -98,7 +95,7 @@ func _ready():
 		"friction": 0.1,                   # float
 		"is_static": false                 # bool
 	}
-	var physics_comp_id = flecs.create_runtime_component(world_id, "Physics2D", physics_fields)
+	var physics_comp_id = FlecsServer.create_runtime_component(world_id, "Physics2D", physics_fields)
 	if physics_comp_id.is_valid():
 		print("✓ Physics2D component created successfully: ", physics_comp_id)
 	else:
@@ -112,7 +109,7 @@ func _ready():
 		"rotation": Quaternion(),          # Quaternion
 		"scale": Vector3.ONE               # Vector3
 	}
-	var transform_comp_id = flecs.create_runtime_component(world_id, "TransformData", transform_fields)
+	var transform_comp_id = FlecsServer.create_runtime_component(world_id, "TransformData", transform_fields)
 	if transform_comp_id.is_valid():
 		print("✓ TransformData component created successfully: ", transform_comp_id)
 	else:
@@ -120,34 +117,34 @@ func _ready():
 
 	# Example 8: Create entities with multiple runtime components
 	print("\nExample 8: Creating entity with multiple runtime components")
-	var multi_entity = flecs.create_entity_with_name(world_id, "ComplexEntity")
+	var multi_entity = FlecsServer.create_entity_with_name(world_id, "ComplexEntity")
 
-	flecs.add_component(multi_entity, health_comp_id)
-	flecs.add_component(multi_entity, player_comp_id)
-	flecs.add_component(multi_entity, inventory_comp_id)
+	FlecsServer.add_component(multi_entity, health_comp_id)
+	FlecsServer.add_component(multi_entity, player_comp_id)
+	FlecsServer.add_component(multi_entity, inventory_comp_id)
 
-	flecs.set_component(multi_entity, "Health", {
+	FlecsServer.set_component(multi_entity, "Health", {
 		"current": 75,
 		"max": 100,
 		"regen_rate": 2.5
 	})
 
-	flecs.set_component(multi_entity, "Inventory", {
+	FlecsServer.set_component(multi_entity, "Inventory", {
 		"items": ["sword", "shield", "potion"],
 		"capacity": 20,
 		"metadata": {"gold": 500, "keys": 3},
 		"equipped_weapon": RID()
 	})
 
-	var health_data = flecs.get_component_by_name(multi_entity, "Health")
-	var inventory_data = flecs.get_component_by_name(multi_entity, "Inventory")
+	var health_data = FlecsServer.get_component_by_name(multi_entity, "Health")
+	var inventory_data = FlecsServer.get_component_by_name(multi_entity, "Inventory")
 
 	print("✓ ComplexEntity components:")
 	print("  Health: ", health_data)
 	print("  Inventory: ", inventory_data)
 
 	# Get all component types on the entity
-	var component_names = flecs.get_component_types_as_name(multi_entity)
+	var component_names = FlecsServer.get_component_types_as_name(multi_entity)
 	print("✓ All components on ComplexEntity: ", component_names)
 
 	print("\n=== Runtime Component Creation Example Complete ===")

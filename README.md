@@ -113,7 +113,7 @@ extends Node
 func _flecs_process(entity_rid: RID, delta: float) -> void:
     # Access components via FlecsServer
     var transform = FlecsServer.get_component_by_name(
-        world, entity_rid, "Transform3DComponent"
+        entity_rid, "Transform3DComponent"
     )
     
     # Modify component
@@ -121,7 +121,7 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
     
     # Update component
     FlecsServer.set_component(
-        world, entity_rid, "Transform3DComponent", transform
+        entity_rid, "Transform3DComponent", transform
     )
 ```
 
@@ -196,37 +196,36 @@ All public APIs are documented in header files with comprehensive inline documen
 extends Node
 
 func _ready():
-    var flecs = FlecsServer.get_singleton()
-    var world_id = flecs.create_world()
-    flecs.init_world(world_id)
+    var world_id = FlecsServer.create_world()
+    FlecsServer.init_world(world_id)
     
     # Create component types at runtime with typed fields
-    var health_comp = flecs.create_runtime_component(world_id, "Health", {
+    var health_comp = FlecsServer.create_runtime_component(world_id, "Health", {
         "current": 100,      # int
         "max": 100,          # int
         "regen_rate": 5.0    # float
     })
     
-    var player_comp = flecs.create_runtime_component(world_id, "Player", {
+    var player_comp = FlecsServer.create_runtime_component(world_id, "Player", {
         "name": "Hero",              # String
         "position": Vector3.ZERO,    # Vector3
         "level": 1                   # int
     })
     
     # Use components on entities
-    var entity = flecs.create_entity(world_id)
-    flecs.add_component(entity, health_comp)
-    flecs.add_component(entity, player_comp)
+    var entity = FlecsServer.create_entity(world_id)
+    FlecsServer.add_component(entity, health_comp)
+    FlecsServer.add_component(entity, player_comp)
     
     # Set component data
-    flecs.set_component(entity, "Health", {
+    FlecsServer.set_component(entity, "Health", {
         "current": 75,
         "max": 100,
         "regen_rate": 2.5
     })
     
     # Retrieve component data
-    var health = flecs.get_component_by_name(entity, "Health")
+    var health = FlecsServer.get_component_by_name(entity, "Health")
     print("Health: ", health["current"], "/", health["max"])
 ```
 
@@ -319,6 +318,30 @@ scons tests=yes target=editor dev_build=yes
 | **Total** | **90+** | **90%+** |
 
 ## 📝 Changelog
+
+### Version 1.1.1-a.2 (2025-01-28)
+
+**Documentation Fixes:**
+- 🐛 **Fixed all GDScript example files** to use correct RID-based API patterns
+  - `bad_apple_example.gd` - Fixed non-existent `MultiMeshComponent` class instantiation
+    - Now uses Dictionary-based API: `FlecsServer.set_component(entity_rid, "MultiMeshComponent", {...})`
+    - Fixed `FlecsServer.get_singleton()` calls → use `FlecsServer` directly (static methods)
+    - Fixed incorrect `destroy_world()` → `free_world()`
+  - `example_query_usage.gd` - Replaced deprecated `register_component_type()` with `create_runtime_component()`
+    - Fixed `TYPE_FLOAT` constants → use actual default values (e.g., `0.0`)
+  - `gdscript_runner_example.gd` - Fixed incorrect API signatures
+    - Removed incorrect `world_rid` parameter from `get_component_by_name()` and `set_component()`
+  - `runtime_component_example.gd` - Fixed `FlecsServer.get_singleton()` usage
+
+**API Usage Corrections:**
+- ✅ **FlecsServer is singleton with static methods** - Call directly: `FlecsServer.create_world()`
+- ✅ **Components are C++ structs** - Use Dictionary to set/get, not GDScript class instantiation
+- ✅ **Component methods take `entity_rid` only** - Don't pass `world_rid` to component methods
+- ✅ **Use `create_runtime_component()`** - Not deprecated `register_component_type()`
+
+**Result:** All example files now have **0 errors** and demonstrate correct API usage patterns.
+
+---
 
 ### Version 1.1.1-a.1 (2025-01-28)
 
@@ -496,7 +519,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Version:** 1.1.0-a.1  
+**Version:** 1.1.1-a.2  
 **Last Updated:** 2025-01-28  
 **Godot Version:** 4.4+  
 **Maintainer:** [@callmefloof](https://github.com/callmefloof)

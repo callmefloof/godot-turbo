@@ -4,7 +4,6 @@ extends Node
 ## This demonstrates how to set up and configure the system for different scenarios
 
 # References
-var flecs_server: FlecsServer
 var world_rid: RID
 var bad_apple_system: BadAppleSystem
 var video_player: VideoStreamPlayer
@@ -23,10 +22,8 @@ func _ready():
 
 ## Basic setup - Auto-configured for most hardware
 func setup_basic_example():
-	flecs_server = FlecsServer.get_singleton()
-
 	# Create ECS world
-	world_rid = flecs_server.create_world()
+	world_rid = FlecsServer.create_world()
 
 	# Create video player
 	video_player = VideoStreamPlayer.new()
@@ -56,8 +53,7 @@ func setup_basic_example():
 
 ## High-performance setup - For powerful CPUs (8+ cores)
 func setup_high_performance_example():
-	flecs_server = FlecsServer.get_singleton()
-	world_rid = flecs_server.create_world()
+	world_rid = FlecsServer.create_world()
 
 	video_player = VideoStreamPlayer.new()
 	add_child(video_player)
@@ -86,8 +82,7 @@ func setup_high_performance_example():
 
 ## Low-end hardware setup - For 2-4 core CPUs
 func setup_low_end_hardware_example():
-	flecs_server = FlecsServer.get_singleton()
-	world_rid = flecs_server.create_world()
+	world_rid = FlecsServer.create_world()
 
 	video_player = VideoStreamPlayer.new()
 	add_child(video_player)
@@ -116,8 +111,7 @@ func setup_low_end_hardware_example():
 
 ## Benchmark example - Compare single vs multithreaded performance
 func setup_benchmark_example():
-	flecs_server = FlecsServer.get_singleton()
-	world_rid = flecs_server.create_world()
+	world_rid = FlecsServer.create_world()
 
 	video_player = VideoStreamPlayer.new()
 	add_child(video_player)
@@ -240,16 +234,19 @@ func create_multimesh_entity(width: int, height: int) -> RID:
 			multi_mesh.set_instance_color(idx, Color.WHITE)
 
 	# Create entity with MultiMeshComponent
-	var entity_rid = flecs_server.create_entity(world_rid)
+	var entity_rid = FlecsServer.create_entity(world_rid)
 
-	# Note: You'll need to implement this based on your ECS setup
-	# This is a placeholder showing the concept
-	var mm_component = MultiMeshComponent.new()
-	mm_component.multi_mesh_id = multi_mesh.get_rid()
-	mm_component.instance_count = instance_count
+	# Set MultiMeshComponent using Dictionary (RID-based API)
+	var mm_component_data = {
+		"multi_mesh_id": multi_mesh.get_rid(),
+		"instance_count": instance_count,
+		"has_data": false,
+		"has_color": true,
+		"is_instanced": false,
+		"transform_format": RenderingServer.MULTIMESH_TRANSFORM_3D
+	}
 
-	# Add component to entity (implementation depends on your ECS wrapper)
-	# flecs_server.add_component(entity_rid, mm_component)
+	FlecsServer.set_component(entity_rid, "MultiMeshComponent", mm_component_data)
 
 	return entity_rid
 
@@ -273,9 +270,9 @@ func record_frame_time(time_us: float):
 ## Display real-time performance stats
 func _process(_delta):
 	if frame_times.size() >= 10:
-		var avg = calculate_average_frame_time()
+		var _avg = calculate_average_frame_time()
 		# Update UI label or debug overlay
-		# $DebugLabel.text = "Avg frame time: %.2f μs" % avg
+		# $DebugLabel.text = "Avg frame time: %.2f μs" % _avg
 
 ## Cleanup
 func _exit_tree():
@@ -283,4 +280,4 @@ func _exit_tree():
 		bad_apple_system.queue_free()
 
 	if world_rid.is_valid():
-		flecs_server.destroy_world(world_rid)
+		FlecsServer.free_world(world_rid)

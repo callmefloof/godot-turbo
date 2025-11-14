@@ -11,18 +11,13 @@ extends Node3D
 ## @param entity_rid: RID - The RID of this entity in the ECS world
 ## @param delta: float - Time elapsed since last frame
 func _flecs_process(entity_rid: RID, delta: float) -> void:
-	# Access the FlecsServer to query/modify components
-	var flecs = FlecsServer.get_singleton()
-	if not flecs:
-		return
-
 	# Get the world RID (you need to store this when converting the scene)
 	var world_rid = get_meta("flecs_world_rid", RID())
 	if not world_rid.is_valid():
 		return
 
 	# Example: Read Transform3DComponent
-	var transform_comp = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
+	var transform_comp = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
 	if transform_comp:
 		# Modify position
 		var pos = transform_comp.get("position", Vector3.ZERO)
@@ -30,10 +25,10 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
 		transform_comp["position"] = pos
 
 		# Write back to ECS
-		flecs.set_component(world_rid, entity_rid, "Transform3DComponent", transform_comp)
+		FlecsServer.set_component(entity_rid, "Transform3DComponent", transform_comp)
 
 	# Example: Read custom components
-	var velocity_comp = flecs.get_component_by_name(world_rid, entity_rid, "VelocityComponent")
+	var velocity_comp = FlecsServer.get_component_by_name(entity_rid, "VelocityComponent")
 	if velocity_comp:
 		var velocity = velocity_comp.get("velocity", Vector3.ZERO)
 		# Process velocity...
@@ -44,26 +39,22 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
 ## @param entity_rid: RID - The RID of this entity in the ECS world
 ## @param delta: float - Physics time step (typically fixed at 0.016 for 60Hz)
 func _flecs_physics_process(entity_rid: RID, delta: float) -> void:
-	var flecs = FlecsServer.get_singleton()
-	if not flecs:
-		return
-
 	var world_rid = get_meta("flecs_world_rid", RID())
 	if not world_rid.is_valid():
 		return
 
 	# Example: Apply physics forces
-	var physics_comp = flecs.get_component_by_name(world_rid, entity_rid, "PhysicsBody3DComponent")
+	var physics_comp = FlecsServer.get_component_by_name(entity_rid, "PhysicsBody3DComponent")
 	if physics_comp:
 		# Apply gravity or other physics
 		var velocity = physics_comp.get("linear_velocity", Vector3.ZERO)
 		velocity.y -= 9.8 * delta  # Gravity
 		physics_comp["linear_velocity"] = velocity
 
-		flecs.set_component(world_rid, entity_rid, "PhysicsBody3DComponent", physics_comp)
+		FlecsServer.set_component(entity_rid, "PhysicsBody3DComponent", physics_comp)
 
 	# Example: Check collision
-	var collision_comp = flecs.get_component_by_name(world_rid, entity_rid, "CollisionComponent")
+	var collision_comp = FlecsServer.get_component_by_name(entity_rid, "CollisionComponent")
 	if collision_comp:
 		var is_colliding = collision_comp.get("is_colliding", false)
 		if is_colliding:
@@ -71,14 +62,13 @@ func _flecs_physics_process(entity_rid: RID, delta: float) -> void:
 
 
 ## Example: More complex entity logic
-func _flecs_process_advanced_example(entity_rid: RID, delta: float) -> void:
-	var flecs = FlecsServer.get_singleton()
+func _flecs_process_advanced_example(entity_rid: RID, _delta: float) -> void:
 	var world_rid = get_meta("flecs_world_rid", RID())
 
 	# Get multiple components at once
-	var transform = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
-	var health = flecs.get_component_by_name(world_rid, entity_rid, "HealthComponent")
-	var ai_state = flecs.get_component_by_name(world_rid, entity_rid, "AIStateComponent")
+	var transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
+	var health = FlecsServer.get_component_by_name(entity_rid, "HealthComponent")
+	var ai_state = FlecsServer.get_component_by_name(entity_rid, "AIStateComponent")
 
 	# Example: AI behavior based on health
 	if health and ai_state:
@@ -88,15 +78,15 @@ func _flecs_process_advanced_example(entity_rid: RID, delta: float) -> void:
 		if current_health < max_health * 0.3:
 			# Low health - flee behavior
 			ai_state["state"] = "fleeing"
-			flecs.set_component(world_rid, entity_rid, "AIStateComponent", ai_state)
+			FlecsServer.set_component(entity_rid, "AIStateComponent", ai_state)
 		elif current_health > max_health * 0.7:
 			# High health - aggressive behavior
 			ai_state["state"] = "aggressive"
-			flecs.set_component(world_rid, entity_rid, "AIStateComponent", ai_state)
+			FlecsServer.set_component(entity_rid, "AIStateComponent", ai_state)
 
 	# Example: Query nearby entities
-	var nearby_query = flecs.create_query(world_rid, PackedStringArray(["Transform3DComponent", "EnemyComponent"]))
-	var enemies = flecs.query_get_entities(world_rid, nearby_query)
+	var nearby_query = FlecsServer.create_query(world_rid, PackedStringArray(["Transform3DComponent", "EnemyComponent"]))
+	var enemies = FlecsServer.query_get_entities(world_rid, nearby_query)
 
 	if transform:
 		var my_pos = transform.get("position", Vector3.ZERO)
@@ -109,7 +99,7 @@ func _flecs_process_advanced_example(entity_rid: RID, delta: float) -> void:
 			if enemy_rid == entity_rid:
 				continue  # Skip self
 
-			var enemy_transform = flecs.get_component_by_name(world_rid, enemy_rid, "Transform3DComponent")
+			var enemy_transform = FlecsServer.get_component_by_name(enemy_rid, "Transform3DComponent")
 			if enemy_transform:
 				var enemy_pos = enemy_transform.get("position", Vector3.ZERO)
 				var distance = my_pos.distance_to(enemy_pos)
@@ -123,16 +113,15 @@ func _flecs_process_advanced_example(entity_rid: RID, delta: float) -> void:
 			print("Enemy nearby at distance: ", closest_distance)
 			# Update AI to target this enemy
 
-	flecs.free_query(world_rid, nearby_query)
+	FlecsServer.free_query(world_rid, nearby_query)
 
 
 ## Example: Scene conversion workflow
 static func example_convert_scene_to_ecs() -> void:
-	var flecs = FlecsServer.get_singleton()
 	var scene_util = SceneObjectUtility.get_singleton()
 
 	# Create ECS world
-	var world_rid = flecs.create_world()
+	var world_rid = FlecsServer.create_world()
 
 	# Get the scene tree
 	var tree = Engine.get_main_loop() as SceneTree
@@ -151,27 +140,24 @@ static func example_convert_scene_to_ecs() -> void:
 
 
 ## Example: Component-only approach (no scene tree)
-func _flecs_process_pure_ecs_example(entity_rid: RID, delta: float) -> void:
+func _flecs_process_pure_ecs_example(entity_rid: RID, _delta: float) -> void:
 	# This example shows how to work with pure ECS without relying on the scene tree
-	var flecs = FlecsServer.get_singleton()
-	var world_rid = get_meta("flecs_world_rid", RID())
-
 	# Get all component types on this entity
-	var component_types = flecs.get_component_types_as_name(world_rid, entity_rid)
+	var component_types = FlecsServer.get_component_types_as_name(entity_rid)
 
 	print("Entity has components: ", component_types)
 
 	# Dynamically process based on available components
 	if "Transform3DComponent" in component_types:
-		var transform = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
+		var _transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
 		# Process transform...
 
 	if "VelocityComponent" in component_types:
-		var velocity = flecs.get_component_by_name(world_rid, entity_rid, "VelocityComponent")
+		var _velocity = FlecsServer.get_component_by_name(entity_rid, "VelocityComponent")
 		# Apply velocity...
 
 	if "HealthComponent" in component_types:
-		var health = flecs.get_component_by_name(world_rid, entity_rid, "HealthComponent")
+		var _health = FlecsServer.get_component_by_name(entity_rid, "HealthComponent")
 		# Update health...
 
 
@@ -199,13 +185,11 @@ func _flecs_process_optimized(entity_rid: RID, delta: float) -> void:
 	if not cached_world_rid.is_valid():
 		return
 
-	var flecs = FlecsServer.get_singleton()
-
 	# Direct component access with caching
-	var transform = flecs.get_component_by_name(cached_world_rid, entity_rid, "Transform3DComponent")
+	var transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
 	if transform:
 		# Fast path - component exists
 		var pos = transform["position"]
 		pos.x += delta
 		transform["position"] = pos
-		flecs.set_component(cached_world_rid, entity_rid, "Transform3DComponent", transform)
+		FlecsServer.set_component(entity_rid, "Transform3DComponent", transform)
