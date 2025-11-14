@@ -632,7 +632,10 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("lookup", "world_id", "entity_name"), &FlecsServer::lookup);
 	ClassDB::bind_method(D_METHOD("get_world_of_entity", "entity_id"), &FlecsServer::get_world_of_entity);
 	//all underscore types are not exposed and are only used internally
+#ifndef DISABLE_DEPRECATED
 	ClassDB::bind_method(D_METHOD("register_component_type", "world_id", "type_name", "script_visible_component_data"), &FlecsServer::register_component_type);
+#endif // DISABLE_DEPRECATED
+	ClassDB::bind_method(D_METHOD("create_runtime_component", "world_id", "component_name", "fields"), &FlecsServer::create_runtime_component);
 	ClassDB::bind_method(D_METHOD("add_component", "entity_id", "component_type_id"), &FlecsServer::add_component);
 	ClassDB::bind_method(D_METHOD("has_component", "entity_id", "component_type"), &FlecsServer::has_component);
 	ClassDB::bind_method(D_METHOD("get_render_system_command_handler", "world_id"), &FlecsServer::get_render_system_command_handler);
@@ -1092,8 +1095,12 @@ void FlecsServer::set_log_level(const int level) {
 	flecs::log::set_level(level);
 }
 
-
+#ifndef DISABLE_DEPRECATED
 RID FlecsServer::register_component_type(const RID& world_id, const String &type_name, const Dictionary &script_visible_component_data) {
+	WARN_PRINT_ONCE("FlecsServer::register_component_type() is deprecated and will be removed in v2.0.0. "
+		"Use create_runtime_component() instead, which provides better performance and uses Flecs reflection API. "
+		"Old: register_component_type(world_id, name, data) -> New: create_runtime_component(world_id, name, fields)");
+	
 	CHECK_WORLD_VALIDITY_V(world_id,RID(), register_component_type);
 	const char *ctype_name = String(type_name).ascii().get_data();
 	ecs_component_desc_t desc = { 0 };
@@ -1103,6 +1110,119 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 	desc.type.alignment = alignof(ScriptVisibleComponent);
 	flecs::entity_t comp = ecs_component_init(world->c_ptr(), &desc);
 	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp));
+}
+#endif // DISABLE_DEPRECATED
+
+RID FlecsServer::create_runtime_component(const RID& world_id, const String &component_name, const Dictionary &fields) {
+	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_runtime_component);
+	
+	flecs::world *world = _get_world(world_id);
+	if (!world) {
+		ERR_PRINT("FlecsServer::create_runtime_component: Invalid world");
+		return RID();
+	}
+	
+	// Check if component already exists
+	flecs::entity existing = world->lookup(component_name.utf8().get_data());
+	if (existing.is_valid() && existing.has<EcsComponent>()) {
+		ERR_PRINT(vformat("FlecsServer::create_runtime_component: Component '%s' already exists", component_name));
+		return RID();
+	}
+	
+	// Helper to get Flecs type entity for Godot types
+	auto get_flecs_type = [&](const Variant &value) -> flecs::entity_t {
+		switch (value.get_type()) {
+			case Variant::BOOL:
+				return world->component<bool>();
+			case Variant::INT:
+				return world->component<int64_t>();
+			case Variant::FLOAT:
+				return world->component<double>();
+			case Variant::STRING:
+				return world->component<String>();
+			case Variant::STRING_NAME:
+				return world->component<StringName>();
+			case Variant::VECTOR2:
+				return world->component<Vector2>();
+			case Variant::VECTOR3:
+				return world->component<Vector3>();
+			case Variant::QUATERNION:
+				return world->component<Quaternion>();
+			case Variant::COLOR:
+				return world->component<Color>();
+			case Variant::RID:
+				return world->component<RID>();
+			case Variant::ARRAY:
+				return world->component<Array>();
+			case Variant::DICTIONARY:
+				return world->component<Dictionary>();
+			case Variant::VECTOR2I:
+				return world->component<Vector2i>();
+			case Variant::VECTOR3I:
+				return world->component<Vector3i>();
+			case Variant::VECTOR4:
+				return world->component<Vector4>();
+			case Variant::VECTOR4I:
+				return world->component<Vector4i>();
+			case Variant::TRANSFORM2D:
+				return world->component<Transform2D>();
+			case Variant::TRANSFORM3D:
+				return world->component<Transform3D>();
+			case Variant::PLANE:
+				return world->component<Plane>();
+			case Variant::AABB:
+				return world->component<AABB>();
+			case Variant::BASIS:
+				return world->component<Basis>();
+			case Variant::PROJECTION:
+				return world->component<Projection>();
+			case Variant::RECT2:
+				return world->component<Rect2>();
+			case Variant::RECT2I:
+				return world->component<Rect2i>();
+			default:
+				// Default to Variant for unsupported types
+				return world->component<Variant>();
+		}
+	};
+	
+	// Build struct members array
+	ecs_member_t members[ECS_MEMBER_DESC_CACHE_SIZE];
+	memset(members, 0, sizeof(members));
+	
+	Array keys = fields.keys();
+	int member_count = MIN(keys.size(), ECS_MEMBER_DESC_CACHE_SIZE);
+	
+	// Track member names to keep them alive
+	Vector<CharString> member_name_storage;
+	member_name_storage.resize(member_count);
+	
+	for (int i = 0; i < member_count; i++) {
+		String field_name = keys[i];
+		Variant field_value = fields[field_name];
+		
+		// Store the C string
+		member_name_storage.write[i] = field_name.utf8();
+		members[i].name = member_name_storage[i].get_data();
+		members[i].type = get_flecs_type(field_value);
+		members[i].count = 0; // Not an array
+		members[i].offset = 0; // Let Flecs calculate offsets
+	}
+	
+	// Create the struct component
+	ecs_struct_desc_t struct_desc = {};
+	struct_desc.entity = world->entity(component_name.utf8().get_data());
+	memcpy(struct_desc.members, members, sizeof(members));
+	
+	flecs::entity_t comp_id = ecs_struct_init(world->c_ptr(), &struct_desc);
+	
+	if (!comp_id) {
+		ERR_PRINT(vformat("FlecsServer::create_runtime_component: Failed to create component '%s'", component_name));
+		return RID();
+	}
+	
+	// Create and return RID for the component type
+	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_id));
 }
  RID FlecsServer::add_script_system(const RID& world_id, const Array &component_types, const Callable &callable) {
 	CHECK_WORLD_VALIDITY_V(world_id, RID(), add_script_system);

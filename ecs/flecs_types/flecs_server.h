@@ -240,7 +240,17 @@ public:
 	flecs::world *_get_world(const RID &world_id);
 	RID get_world_of_entity(const RID &entity_id);
 	void set_log_level(const int level);
+	
+#ifndef DISABLE_DEPRECATED
+	// DEPRECATED: Use create_runtime_component() instead. Will be removed in v2.0.0.
+	// This method uses heap-allocated ScriptVisibleComponent with Dictionary, which is less efficient.
 	RID register_component_type(const RID& world_id, const String &type_name, const Dictionary &script_visible_component_data);
+#endif // DISABLE_DEPRECATED
+	
+	// Create a component type at runtime with typed fields using Flecs reflection API.
+	// Supports all Godot Variant types (primitives, vectors, transforms, etc.)
+	// Returns component type RID on success, invalid RID on failure.
+	RID create_runtime_component(const RID& world_id, const String &component_name, const Dictionary &fields);
 	Ref<CommandHandler> get_render_system_command_handler(const RID &world_id);
 	PipelineManager* _get_pipeline_manager(const RID &world_id);
 	void remove_all_components_from_entity(const RID &entity_id);
