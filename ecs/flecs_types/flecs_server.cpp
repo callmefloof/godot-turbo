@@ -17,9 +17,9 @@
 #include "core/variant/typed_array.h"
 #include "core/variant/variant.h"
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
-#include "flecs_script_system.h"
-#include "node_storage.h"
-#include "ref_storage.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_script_system.h"
+#include "modules/godot_turbo/ecs/systems/utility/node_storage.h"
+#include "modules/godot_turbo/ecs/systems/utility/ref_storage.h"
 #include "core/string/ustring.h"
 #include "flecs_variant.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
@@ -29,21 +29,21 @@
 // Helper function to recursively convert flecs cursor data to Godot Variant
 static Variant cursor_to_variant(flecs::cursor& cur) {
 	flecs::entity type = cur.get_type();
-	
+
 	// Check if type entity is valid (non-zero ID)
 	if (!type.is_valid()) {
 		ERR_PRINT("cursor_to_variant: Type entity is invalid (ID is 0)");
 		return Variant();
 	}
-	
+
 	const char* type_name = type.name().c_str();
-	
+
 	// Check if type name is valid
 	if (!type_name || strlen(type_name) == 0) {
 		ERR_PRINT("cursor_to_variant: Type has no name");
 		return Variant();
 	}
-	
+
 	// Handle opaque Godot types by getting the raw pointer and dereferencing
 	if (strcmp(type_name, "Variant") == 0) {
 		Variant* ptr = static_cast<Variant*>(cur.get_ptr());
@@ -85,7 +85,7 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 		}
 		return *ptr;
 	}
-	
+
 	// Handle packed arrays
 	if (strcmp(type_name, "PackedByteArray") == 0) {
 		PackedByteArray* ptr = static_cast<PackedByteArray*>(cur.get_ptr());
@@ -123,7 +123,7 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 		PackedColorArray* ptr = static_cast<PackedColorArray*>(cur.get_ptr());
 		return ptr ? *ptr : PackedColorArray();
 	}
-	
+
 	// Handle Godot math types
 	if (strcmp(type_name, "Vector2") == 0) {
 		Vector2* ptr = static_cast<Vector2*>(cur.get_ptr());
@@ -189,7 +189,7 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 		Projection* ptr = static_cast<Projection*>(cur.get_ptr());
 		return ptr ? *ptr : Projection();
 	}
-	
+
 	// Try to get type kind from EcsType component
 	if (type.has<EcsType>()) {
 		const EcsType& ecs_type = type.get<EcsType>();
@@ -218,7 +218,7 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 				default: break;
 			}
 		}
-		
+
 		// Handle structs/nested types
 		if (ecs_type.kind == EcsStructType) {
 			Dictionary dict;
@@ -235,7 +235,7 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 			return dict;
 		}
 	}
-	
+
 	// If we reach here, the type wasn't handled - print warning for debugging
 	// Check if it's an opaque type without reflection metadata
 	if (!type.has<EcsType>()) {
@@ -252,17 +252,17 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 	if (!entity.has(comp_type_id)) {
 		return Dictionary();
 	}
-	
+
 	const void* comp_ptr = entity.get(comp_type_id);
 	if (!comp_ptr) {
 		return Dictionary();
 	}
-	
+
 	flecs::cursor cur = entity.world().cursor(comp_type_id, const_cast<void*>(comp_ptr));
-	
+
 	// Get the type to check if it's a struct
 	flecs::entity type = cur.get_type();
-	
+
 	// Check if type is valid (non-zero entity ID)
 	if (type.is_valid() && type.has<EcsType>()) {
 		const EcsType& ecs_type = type.get<EcsType>();
@@ -282,7 +282,7 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 			return dict;
 		}
 	}
-	
+
 	// Not a struct (opaque type or primitive), wrap in dictionary with "value" key
 	Dictionary result;
 	Variant value = cursor_to_variant(cur);
@@ -298,21 +298,21 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 		ERR_PRINT("Failed to get mutable component pointer");
 		return;
 	}
-	
+
 	// For opaque types, get the type name directly from the component entity
 	// instead of relying on cursor (which may not have type info for opaque types)
 	flecs::entity comp_entity(entity.world().c_ptr(), comp_type_id);
 	const char* type_name = comp_entity.name().c_str();
-	
+
 	if (!type_name || strlen(type_name) == 0) {
 		ERR_PRINT("component_from_dict_cursor: Component type has no name");
 		return;
 	}
-	
+
 	// Handle opaque Godot types directly
 	// Check if the dictionary has a single "value" key (opaque type wrapped)
 	bool is_wrapped_opaque = dict.size() == 1 && dict.has("value");
-	
+
 	if (strcmp(type_name, "Variant") == 0) {
 		Variant* ptr = static_cast<Variant*>(comp_ptr);
 		if (ptr) {
@@ -373,12 +373,12 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 		entity.modified(comp_type_id);
 		return;
 	}
-	
+
 	// For structs, iterate through dictionary keys and set members
 	// Create cursor after handling opaque types
 	flecs::cursor cur = entity.world().cursor(comp_type_id, comp_ptr);
 	flecs::entity type = cur.get_type();
-	
+
 	if (type.is_valid() && type.has<EcsType>()) {
 		const EcsType& ecs_type = type.get<EcsType>();
 		if (ecs_type.kind == EcsStructType && cur.push() == 0) {
@@ -386,11 +386,11 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 		for (int i = 0; i < keys.size(); i++) {
 			String key = keys[i];
 			Variant value = dict[key];
-			
+
 			if (cur.member(key.utf8().get_data()) == 0) {
 				flecs::entity member_type = cur.get_type();
 				const char* member_type_name = member_type.name().c_str();
-				
+
 				// Set value based on type
 				if (strcmp(member_type_name, "Variant") == 0) {
 					Variant* ptr = static_cast<Variant*>(cur.get_ptr());
@@ -465,7 +465,7 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 			cur.pop();
 		}
 	}
-	
+
 	entity.modified(comp_type_id);
 }
 
@@ -715,8 +715,6 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_system_info", "world_id", "system_id"), &FlecsServer::get_system_info);
 	ClassDB::bind_method(D_METHOD("set_system_paused", "world_id", "system_id", "paused"), &FlecsServer::set_system_paused);
 	ClassDB::bind_method(D_METHOD("is_system_paused", "world_id", "system_id"), &FlecsServer::is_system_paused);
-	ClassDB::bind_method(D_METHOD("set_script_system_change_observe_remove", "world_id", "script_system_id", "enable"), &FlecsServer::set_script_system_change_observe_remove);
-
 	// Query API bindings
 	ClassDB::bind_method(D_METHOD("create_query", "world_id", "required_components"), &FlecsServer::create_query);
 	ClassDB::bind_method(D_METHOD("query_get_entities", "world_id", "query_id"), &FlecsServer::query_get_entities);
@@ -906,13 +904,17 @@ void FlecsServer::init_world(const RID& world_id) {
 	CHECK_WORLD_VALIDITY(world_id, init_world);
 	flecs::world &world = world_variant->get_world();
 	world.import<flecs::stats>();
-	world.set<flecs::Rest>({});
-    print_line("World initialized: " + itos((uint64_t)world.c_ptr()));
+
+	// Configure REST API with default port for explorer access
+	world.set<flecs::Rest>({.port = 27750});
+	print_line("Flecs REST explorer available at http://localhost:27750");
+
+	print_line("World initialized: " + itos((uint64_t)world.c_ptr()));
+
+	// Configure Flecs to use multiple threads for systems marked with multi_threaded()
 	auto threads = std::thread::hardware_concurrency();
 	print_line("Detected hardware concurrency: " + itos(threads));
 	world.set_threads(threads);
-
-
 }
 
 bool FlecsServer::progress_world(const RID& world_id, const double delta) {
@@ -1100,7 +1102,7 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 	WARN_PRINT_ONCE("FlecsServer::register_component_type() is deprecated and will be removed in v2.0.0. "
 		"Use create_runtime_component() instead, which provides better performance and uses Flecs reflection API. "
 		"Old: register_component_type(world_id, name, data) -> New: create_runtime_component(world_id, name, fields)");
-	
+
 	CHECK_WORLD_VALIDITY_V(world_id,RID(), register_component_type);
 	const char *ctype_name = String(type_name).ascii().get_data();
 	ecs_component_desc_t desc = { 0 };
@@ -1115,21 +1117,23 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 
 RID FlecsServer::create_runtime_component(const RID& world_id, const String &component_name, const Dictionary &fields) {
 	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_runtime_component);
-	
+
 	flecs::world *world = _get_world(world_id);
 	if (!world) {
 		ERR_PRINT("FlecsServer::create_runtime_component: Invalid world");
 		return RID();
 	}
-	
+
 	// Check if component already exists
 	flecs::entity existing = world->lookup(component_name.utf8().get_data());
 	if (existing.is_valid() && existing.has<EcsComponent>()) {
 		ERR_PRINT(vformat("FlecsServer::create_runtime_component: Component '%s' already exists", component_name));
 		return RID();
 	}
-	
+
 	// Helper to get Flecs type entity for Godot types
+	// These types must be registered as opaque types or components beforehand
+	// (see FlecsOpaqueTypes::register_opaque_types and AllComponents::register_all)
 	auto get_flecs_type = [&](const Variant &value) -> flecs::entity_t {
 		switch (value.get_type()) {
 			case Variant::BOOL:
@@ -1185,22 +1189,22 @@ RID FlecsServer::create_runtime_component(const RID& world_id, const String &com
 				return world->component<Variant>();
 		}
 	};
-	
+
 	// Build struct members array
 	ecs_member_t members[ECS_MEMBER_DESC_CACHE_SIZE];
 	memset(members, 0, sizeof(members));
-	
+
 	Array keys = fields.keys();
 	int member_count = MIN(keys.size(), ECS_MEMBER_DESC_CACHE_SIZE);
-	
+
 	// Track member names to keep them alive
 	Vector<CharString> member_name_storage;
 	member_name_storage.resize(member_count);
-	
+
 	for (int i = 0; i < member_count; i++) {
 		String field_name = keys[i];
 		Variant field_value = fields[field_name];
-		
+
 		// Store the C string
 		member_name_storage.write[i] = field_name.utf8();
 		members[i].name = member_name_storage[i].get_data();
@@ -1208,23 +1212,31 @@ RID FlecsServer::create_runtime_component(const RID& world_id, const String &com
 		members[i].count = 0; // Not an array
 		members[i].offset = 0; // Let Flecs calculate offsets
 	}
-	
-	// Create the struct component
+
+	// Create the struct component with reflection metadata
+	// ecs_struct_init automatically provides reflection data for the component,
+	// allowing Flecs to:
+	// - Open scopes for the component (e.g., for .has<>() checks)
+	// - Access member data through the reflection API
+	// - Serialize/deserialize component data
+	// - Display component info in the Flecs explorer
+	// This is equivalent to using .member<>() in the C++ API
 	ecs_struct_desc_t struct_desc = {};
 	struct_desc.entity = world->entity(component_name.utf8().get_data());
 	memcpy(struct_desc.members, members, sizeof(members));
-	
+
 	flecs::entity_t comp_id = ecs_struct_init(world->c_ptr(), &struct_desc);
-	
+
 	if (!comp_id) {
 		ERR_PRINT(vformat("FlecsServer::create_runtime_component: Failed to create component '%s'", component_name));
 		return RID();
 	}
-	
+
 	// Create and return RID for the component type
 	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_id));
 }
- RID FlecsServer::add_script_system(const RID& world_id, const Array &component_types, const Callable &callable) {
+
+RID FlecsServer::add_script_system(const RID& world_id, const Array &component_types, const Callable &callable) {
 	CHECK_WORLD_VALIDITY_V(world_id, RID(), add_script_system);
 	FlecsScriptSystem flecs_script_system;
 	flecs_script_system.set_world(world_id);
@@ -1285,7 +1297,7 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 			ERR_PRINT("FlecsServer::get_component_by_name: component type not found: " + component_type);
 			return component_data;
 		}
-		
+
 		// Use cursor-based conversion for all types
 		return component_to_dict_cursor(entity, component.id());
 	}
@@ -1997,10 +2009,10 @@ void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &co
 		return;
 	}
 	flecs::world &world = world_variant->get_world();
-	
+
 	// In Flecs, singletons are stored on the component entity itself
 	flecs::entity comp_entity(world.c_ptr(), comp_type);
-	
+
 	// Use cursor-based conversion for world singletons
 	component_from_dict_cursor(comp_entity, comp_type, comp_data);
 }
@@ -2026,10 +2038,10 @@ Dictionary FlecsServer::get_world_singleton_with_id(const RID &world_id, const R
 		ERR_PRINT("FlecsServer::get_world_singleton_with_id: Component type is not valid");
 		return Dictionary();
 	}
-	
+
 	// In Flecs, singletons are stored on the component entity itself
 	flecs::entity comp_entity(world.c_ptr(), comp_type);
-	
+
 	// For world singletons, get the component data from the component entity
 	return component_to_dict_cursor(comp_entity, comp_type);
 }

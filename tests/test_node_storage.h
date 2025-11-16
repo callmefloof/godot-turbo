@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "modules/godot_turbo/ecs/utility/node_storage.h"
+#include "modules/godot_turbo/ecs/systems/utility/node_storage.h"
 
 #include "core/os/thread.h"
 #include "scene/main/node.h"

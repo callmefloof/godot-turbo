@@ -19,8 +19,8 @@
 #include "modules/godot_turbo/ecs/systems/pipeline_manager.h"
 #include "core/variant/callable.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_variant.h"
-#include "modules/godot_turbo/ecs/utility/node_storage.h"
-#include "modules/godot_turbo/ecs/utility/ref_storage.h"
+#include "modules/godot_turbo/ecs/systems/utility/node_storage.h"
+#include "modules/godot_turbo/ecs/systems/utility/ref_storage.h"
 #include <limits>
 #include <atomic>
 

@@ -2,17 +2,17 @@
 
 #include "../../core/object/class_db.h"
 #include "core/os/memory.h"
-#include "modules/godot_turbo/ecs/utility/world_utility.h"
-#include "modules/godot_turbo/ecs/utility/scene_object_utility.h"
-#include "modules/godot_turbo/ecs/utility/resource_object_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/world_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/scene_object_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/resource_object_utility.h"
 
-#include "modules/godot_turbo/ecs/utility/navigation2d_utility.h"
-#include "modules/godot_turbo/ecs/utility/navigation3d_utility.h"
-#include "modules/godot_turbo/ecs/utility/physics2d_utility.h"
-#include "modules/godot_turbo/ecs/utility/physics3d_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/navigation2d_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/navigation3d_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/physics2d_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/physics3d_utility.h"
 
-#include "modules/godot_turbo/ecs/utility/render_utility_2d.h"
-#include "modules/godot_turbo/ecs/utility/render_utility_3d.h"
+#include "modules/godot_turbo/ecs/systems/utility/render_utility_2d.h"
+#include "modules/godot_turbo/ecs/systems/utility/render_utility_3d.h"
 #include "modules/godot_turbo/ecs/systems/command.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 

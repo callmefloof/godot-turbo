@@ -6,7 +6,6 @@
 #include "modules/godot_turbo/ecs/systems/pipeline_manager.h"
 #include "scene/gui/video_stream_player.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
-#include "core/object/worker_thread_pool.h"
 #include "core/templates/local_vector.h"
 #include <cassert>
 
@@ -39,41 +38,47 @@ class BadAppleSystem : public Object {
     PipelineManager* pipeline_manager = nullptr;
     BASMode mode = BASMode::REGULAR;
     struct ImageData {
-        PackedByteArray data;
+        const uint8_t* ptr = nullptr;  // Direct pointer (no copy!)
         int width = 0;
         int height = 0;
         Image::Format format = Image::FORMAT_MAX;
     } image_data;
     MultiMeshComponent component;
     
-    // Data structure for chunk processing in parallel
-    struct ChunkProcessData {
-        const ImageData* img_data;
-        LocalVector<Color>* colors;
-        BASMode mode;
-        uint32_t chunk_size;
-        uint32_t instance_count;
-    };
-    
     // Threading configuration
     bool use_multithreading = true;
     uint32_t threading_threshold = 10000; // Only use threading if pixel count exceeds this
     uint32_t max_threads = 8;
     
-    // Helper methods for pixel processing
-    void process_pixels_optimized(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const;
-    void process_pixel_chunk_rgba8(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const;
-    void process_pixel_chunk_rgb8(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const;
-    void process_pixel_chunk_generic(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const;
-    void process_chunk_by_index(uint32_t p_chunk_index, ChunkProcessData p_data) const;
+    // Image orientation
+    bool flip_y = true; // Flip Y axis when reading image (true = correct for standard 3D Y-up multimesh layout)
     
-    // SIMD-optimized implementations (used when available)
-#ifdef BAD_APPLE_SIMD_SSE2
-    void process_pixel_chunk_rgba8_sse2(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const;
-#endif
-#ifdef BAD_APPLE_SIMD_NEON
-    void process_pixel_chunk_rgba8_neon(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const;
-#endif
+    // Chunk-based processing component
+    struct ImageProcessChunk {
+        uint32_t start_index;
+        uint32_t end_index;
+        const ImageData* img_data;
+        BASMode mode;
+        Color* output_ptr;  // Direct write to shared buffer
+    };
+    
+    // Shared output buffer (eliminates per-chunk allocation)
+    PackedColorArray shared_output_buffer;
+    
+    // Pre-created chunk entities (reused every frame)
+    LocalVector<flecs::entity> chunk_entities;
+    bool chunks_initialized = false;
+    
+    // Fast-path pixel processing (avoids switch per pixel)
+    void process_pixels_rgba8(uint32_t start_idx, uint32_t end_idx, int width, int height, 
+                              const uint8_t* data, BASMode mode, Color* output, bool p_flip_y);
+    void process_pixels_rgb8(uint32_t start_idx, uint32_t end_idx, int width, int height, 
+                             const uint8_t* data, BASMode mode, Color* output, bool p_flip_y);
+    
+    // Helper methods for pixel processing
+
+    
+
     
     // Fast hash for random mode (avoids expensive Math::randf())
     static inline float hash_to_float(uint32_t x) {
@@ -107,6 +112,10 @@ class BadAppleSystem : public Object {
     uint32_t get_threading_threshold() const { return threading_threshold; }
     void set_max_threads(uint32_t p_max) { max_threads = CLAMP(p_max, 1U, 32U); }
     uint32_t get_max_threads() const { return max_threads; }
+    
+    // Image orientation
+    void set_flip_y(bool p_flip) { flip_y = p_flip; }
+    bool get_flip_y() const { return flip_y; }
     
     static void _bind_methods();
 

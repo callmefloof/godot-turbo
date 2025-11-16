@@ -9,15 +9,15 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/flecs_types/flecs_query.cpp",
     "ecs/flecs_types/flecs_script_system.cpp",
     "ecs/systems/pipeline_manager.cpp",
-    "ecs/utility/navigation2d_utility.cpp",
-    "ecs/utility/navigation3d_utility.cpp",
-    "ecs/utility/physics2d_utility.cpp",
-    "ecs/utility/physics3d_utility.cpp",
-    "ecs/utility/render_utility_2d.cpp",
-    "ecs/utility/render_utility_3d.cpp",
-    "ecs/utility/resource_object_utility.cpp",
-    "ecs/utility/scene_object_utility.cpp",
-    "ecs/utility/world_utility.cpp",
+    "ecs/systems/utility/navigation2d_utility.cpp",
+    "ecs/systems/utility/navigation3d_utility.cpp",
+    "ecs/systems/utility/physics2d_utility.cpp",
+    "ecs/systems/utility/physics3d_utility.cpp",
+    "ecs/systems/utility/render_utility_2d.cpp",
+    "ecs/systems/utility/render_utility_3d.cpp",
+    "ecs/systems/utility/resource_object_utility.cpp",
+    "ecs/systems/utility/scene_object_utility.cpp",
+    "ecs/systems/utility/world_utility.cpp",
     "ecs/systems/demo/bad_apple_system.cpp",
     "ecs/flecs_types/flecs_server.cpp"
 ])
@@ -40,6 +40,8 @@ module_env.Append(CPPPATH=[
     env.Dir('ecs/flecs_types'),
     env.Dir('ecs/components'),
     env.Dir('ecs/utility'),
+    env.Dir('ecs/systems'),
+    env.Dir('ecs/systems/utility'),
 ])
 
 # NOTE: No build-level override for concurrentqueue is applied by default here.

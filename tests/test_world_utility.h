@@ -33,7 +33,7 @@
 
 #include "tests/test_macros.h"
 #include "test_fixtures.h"
-#include "modules/godot_turbo/ecs/utility/world_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/world_utility.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
 #include "scene/resources/world_2d.h"
