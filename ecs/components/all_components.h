@@ -359,6 +359,12 @@ struct SourceGeometryParser3DComponent {
 };
 
 // ============================================================================
+// DEMO/UTILITY COMPONENTS
+// ============================================================================
+
+
+
+// ============================================================================
 // SERIALIZATION FUNCTIONS (OPTIONAL)
 // ============================================================================
 
@@ -671,6 +677,7 @@ FLECS_COMPONENT(NavObstacle3DComponent)
 FLECS_COMPONENT(NavRegion3DComponent)
 FLECS_COMPONENT(SourceGeometryParser3DComponent)
 
+
 // ============================================================================
 // WORLD REGISTRATION HELPER
 // ============================================================================
@@ -686,76 +693,177 @@ inline void register_all(flecs::world& world, bool enable_serialization = false)
 	FlecsOpaqueTypes::register_opaque_types(world);
 	
 	// Core components
-	world.component<Transform2DComponent>();
-	world.component<Transform3DComponent>();
-	world.component<DirtyTransform>();
-	world.component<VisibilityComponent>();
-	world.component<SceneNodeComponent>();
-	world.component<ObjectInstanceComponent>();
-	world.component<GameScriptComponent>();
-	world.component<ResourceComponent>();
-	world.component<World2DComponent>();
-	world.component<World3DComponent>();
+	// Note: Godot types (Transform2D, RID, StringName, etc.) are registered as opaque types.
+	// We don't use .member<>() for them because Flecs can't introspect their internal structure.
+	// This prevents "unknown member" errors while still allowing component usage.
+	// Components containing Transform2D/3D - use reflection, Godot types are opaque
+	world.component<Transform2DComponent>()
+		.member<Transform2D>("transform");
+	world.component<Transform3DComponent>()
+		.member<Transform3D>("transform");
+	world.component<DirtyTransform>(); // Tag component
 	
-	// Mesh components
-	world.component<MeshComponent>();
-	world.component<MultiMeshComponent>();
-	world.component<MultiMeshInstanceComponent>();
-	world.component<MultiMeshInstanceDataComponent>();
+	world.component<VisibilityComponent>()
+		.member<bool>("visible");
 	
-	// Particles & effects
-	world.component<ParticlesComponent>();
-	world.component<ReflectionProbeComponent>();
-	world.component<VoxelGIComponent>();
+	// Components containing ObjectID/StringName/RID/Dictionary - use reflection
+	world.component<SceneNodeComponent>()
+		.member<ObjectID>("node_id")
+		.member<StringName>("class_name");
+	world.component<ObjectInstanceComponent>()
+		.member<ObjectID>("object_instance_id");
+	world.component<GameScriptComponent>()
+		.member<StringName>("instance_type");
+	world.component<ResourceComponent>()
+		.member<RID>("resource_id")
+		.member<StringName>("resource_type")
+		.member<StringName>("resource_name")
+		.member<bool>("is_script_type");
+	world.component<ScriptVisibleComponent>()
+		.member<Dictionary>("data");
+	world.component<World2DComponent>()
+		.member<RID>("canvas_id")
+		.member<RID>("navigation_map_id")
+		.member<RID>("space_id");
+	world.component<World3DComponent>()
+		.member<RID>("camera_attributes_id")
+		.member<RID>("environment_id")
+		.member<RID>("fallback_environment_id")
+		.member<RID>("navigation_map_id")
+		.member<RID>("scenario_id")
+		.member<RID>("space_id");
 	
-	// Skeleton & animation
-	world.component<SkeletonComponent>();
+	// Mesh components - use reflection, nested Godot types are opaque
+	world.component<MeshComponent>()
+		.member<RID>("mesh_id")
+		.member<Vector<RID>>("material_ids")
+		.member<AABB>("custom_aabb");
 	
-	// Environment & camera
-	world.component<EnvironmentComponent>();
-	world.component<CameraComponent>();
-	world.component<MainCamera>();
-	world.component<CompositorComponent>();
-	world.component<ViewportComponent>();
+	world.component<MultiMeshComponent>()
+		.member<RID>("multi_mesh_id")
+		.member<uint32_t>("instance_count")
+		.member<bool>("has_data")
+		.member<bool>("has_color")
+		.member<bool>("is_instanced")
+		.member<RS::MultimeshTransformFormat>("transform_format");
 	
-	// Lighting
-	world.component<DirectionalLight3DComponent>();
-	world.component<DirectionalLight2DComponent>();
-	world.component<PointLightComponent>();
-	world.component<OmniLightComponent>();
-	world.component<SpotLightComponent>();
+	world.component<MultiMeshInstanceComponent>()
+		.member<uint32_t>("index")
+		.member<AABB>("custom_aabb");
+	
+	world.component<MultiMeshInstanceDataComponent>()
+		.member<Vector4>("data")
+		.member<Color>("color");
+	
+	// Particles & effects - use reflection
+	world.component<ParticlesComponent>()
+		.member<RID>("particles_id");
+	world.component<ReflectionProbeComponent>()
+		.member<RID>("probe_id");
+	world.component<VoxelGIComponent>()
+		.member<RID>("voxel_gi_id");
+	
+	// Skeleton & animation - use reflection
+	world.component<SkeletonComponent>()
+		.member<uint32_t>("bone_count")
+		.member<RID>("skeleton_id");
+	
+	// Environment & camera - use reflection
+	world.component<EnvironmentComponent>()
+		.member<RID>("environment_id");
+	
+	world.component<CameraComponent>()
+		.member<RID>("camera_id")
+		.member<Vector<Plane>>("frustum")
+		.member<Vector3>("position")
+		.member<float>("far")
+		.member<float>("near")
+		.member<Projection>("projection")
+		.member<Vector2>("camera_offset");
+	
+	world.component<MainCamera>(); // Tag component
+	world.component<CompositorComponent>()
+		.member<RID>("compositor_id");
+	world.component<ViewportComponent>()
+		.member<RID>("viewport_id");
+	
+	// Lighting - use reflection
+	world.component<DirectionalLight3DComponent>()
+		.member<RID>("light_id")
+		.member<Color>("light_color")
+		.member<float>("intensity");
+	
+	world.component<DirectionalLight2DComponent>()
+		.member<RID>("light_id")
+		.member<Color>("light_color")
+		.member<float>("intensity");
+	
+	world.component<PointLightComponent>()
+		.member<RID>("light_id")
+		.member<Color>("light_color")
+		.member<float>("intensity")
+		.member<float>("range");
+	
+	world.component<OmniLightComponent>()
+		.member<RID>("light_id")
+		.member<Color>("light_color")
+		.member<float>("intensity")
+		.member<float>("range");
+	
+	world.component<SpotLightComponent>()
+		.member<RID>("light_id")
+		.member<Color>("light_color")
+		.member<float>("intensity")
+		.member<float>("range");
+	
 	world.component<LightOccluderComponent>();
 	
-	// Canvas & scenario
+	// Canvas & scenario (contain opaque types - no reflection)
 	world.component<ScenarioComponent>();
+	
 	world.component<RenderInstanceComponent>();
+	
 	world.component<CanvasItemComponent>();
 	
-	// Physics 2D
+	// Physics 2D (contain RID - no reflection)
 	world.component<Area2DComponent>();
+	
 	world.component<Body2DComponent>();
+	
 	world.component<Joint2DComponent>();
 	
-	// Physics 3D
+	// Physics 3D (contain RID - no reflection)
 	world.component<Area3DComponent>();
+	
 	world.component<Body3DComponent>();
+	
 	world.component<Joint3DComponent>();
+	
 	world.component<SoftBody3DComponent>();
 	
-	// Navigation 2D
+	// Navigation 2D (contain RID - no reflection)
 	world.component<NavAgent2DComponent>();
+	
 	world.component<NavLink2DComponent>();
+	
 	world.component<NavObstacle2DComponent>();
+	
 	world.component<NavRegion2DComponent>();
+	
 	world.component<SourceGeometryParser2DComponent>();
 	
-	// Navigation 3D
+	// Navigation 3D (contain RID - no reflection)
 	world.component<NavAgent3DComponent>();
+	
 	world.component<NavLink3DComponent>();
+	
 	world.component<NavObstacle3DComponent>();
+	
 	world.component<NavRegion3DComponent>();
+	
 	world.component<SourceGeometryParser3DComponent>();
 	
+
 	// Optional: Register serialization handlers
 	if (enable_serialization) {
 		auto& registry = FlecsReflection::Registry::get();

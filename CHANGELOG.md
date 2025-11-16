@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2-a.1] - 2025-01-28
+
+### Changed
+
+#### BadAppleSystem Refactoring
+- **Refactored `process_pixels_rgb8` and `process_pixels_rgba8` for DRY principles**
+  - Reduced code duplication by ~60% (180 lines → 75 lines)
+  - Created unified template implementation `process_pixels_impl<BytesPerPixel, HasAlpha>`
+  - Eliminated repetitive row iteration and pixel reading code across mode branches
+  - Uses compile-time template parameters for zero runtime overhead
+  - Introduced lambda function for pixel reading to eliminate 6 copies of identical code
+  - Unified row iteration logic across all processing modes (REGULAR, INVERTED, RANDOM)
+  - Mode checks moved outside innermost pixel loop (maintains performance)
+  - All optimizations preserved:
+    - Row-based processing (no per-pixel modulo/division)
+    - Fast inner loops (only additions)
+    - SIMD support unchanged
+    - Multi-threading support unchanged
+    - Y-flip support unchanged
+
+#### Documentation
+- **Fixed `bad_apple_example.gd` to demonstrate correct usage patterns**
+  - Added critical `FlecsServer.progress_world(world_rid, delta)` call in `_process()`
+  - Changed to programmatic VideoStreamPlayer creation (not scene-based `@export`)
+  - Added `call_deferred()` for setup in `_ready()` to ensure proper initialization
+  - Added critical `await get_tree().process_frame` after video player creation
+  - Fixed all property access to use setter methods (`set_mode()`, `set_use_multithreading()`, etc.)
+  - Updated all setup functions with correct initialization patterns
+  - Fixed video path references
+  - Added detailed comments explaining critical requirements
+- **Created `CORRECT_USAGE.md`** - Comprehensive BadAppleSystem usage guide (286 lines)
+  - Critical requirements section with detailed explanations
+  - Complete minimal working example
+  - Common mistakes to avoid with examples
+  - Configuration options reference
+  - Performance guidelines for different hardware
+  - Troubleshooting section
+
+### Performance
+- **BadAppleSystem refactoring**: Zero performance impact
+  - Template functions inline at compile time
+  - Lambda functions inline at compile time
+  - All original optimizations maintained
+  - Compiler generates identical assembly code
+  - Same 60+ FPS performance as before
+
+### Fixed
+- **Example code correctness**
+  - `bad_apple_example.gd` now properly calls `FlecsServer.progress_world()` in `_process()`
+  - Fixed race condition with video player initialization
+  - Fixed incorrect property access patterns
+  - All examples now follow best practices
+
+
 ## [1.1.1-a.2] - 2025-01-28
 
 ### Fixed

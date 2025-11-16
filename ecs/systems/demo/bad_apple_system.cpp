@@ -6,8 +6,87 @@
 #include "core/math/vector2i.h"
 #include "modules/godot_turbo/ecs/systems/pipeline_manager.h"
 #include "modules/godot_turbo/ecs/systems/command.h"
-#include "core/object/worker_thread_pool.h"
 
+
+// OPTIMIZED: Row-based processing WITH Y-flip
+// Multimesh instances: y=0 at BOTTOM, y=height-1 at TOP (3D Y-up convention)
+// Image data: y=0 at TOP, y=height-1 at BOTTOM (standard image convention)
+// Therefore we need to flip Y when reading from image
+// Eliminates per-pixel modulo/division by processing rows
+// Template implementation to avoid code duplication between RGBA8 and RGB8
+template<uint32_t BytesPerPixel, bool HasAlpha>
+static inline void process_pixels_impl(uint32_t start_idx, uint32_t end_idx, int width, int height,
+                                        const uint8_t* data, BASMode processing_mode, Color* output, bool p_flip_y) {
+	const float inv_255 = 1.0f / 255.0f;
+
+	// Calculate which rows this chunk covers (only ~2-10 divisions total!)
+	uint32_t start_row = start_idx / width;
+	uint32_t end_row = (end_idx - 1) / width + 1;
+
+	// Helper lambda to read pixel color components
+	auto read_pixel = [&](uint32_t pixel_offset) -> Color {
+		float r = data[pixel_offset + 0] * inv_255;
+		float g = data[pixel_offset + 1] * inv_255;
+		float b = data[pixel_offset + 2] * inv_255;
+		float a = HasAlpha ? (data[pixel_offset + 3] * inv_255) : 1.0f;
+		return Color(r, g, b, a);
+	};
+
+	// Pre-compute time seed for RANDOM mode (outside loop)
+	uint32_t time_seed = (processing_mode == BASMode::RANDOM) ? OS::get_singleton()->get_ticks_msec() : 0;
+
+	// Common row iteration - only mode-specific pixel processing differs
+	for (uint32_t y = start_row; y < end_row; y++) {
+		uint32_t row_start_idx = y * width;
+		uint32_t row_end_idx = row_start_idx + width;
+
+		// Clamp to chunk boundaries
+		uint32_t actual_start = (row_start_idx < start_idx) ? start_idx : row_start_idx;
+		uint32_t actual_end = (row_end_idx > end_idx) ? end_idx : row_end_idx;
+
+		// Y-flip if enabled: instance y=0 is at bottom, but image y=0 is at top
+		uint32_t read_y = p_flip_y ? (height - 1 - y) : y;
+		uint32_t pixel_row_base = read_y * width * BytesPerPixel;
+
+		// Fast inner loop - only additions, no modulo/division!
+		// Mode check is outside the pixel loop to avoid branching per pixel
+		if (processing_mode == BASMode::REGULAR) {
+			for (uint32_t idx = actual_start; idx < actual_end; idx++) {
+				uint32_t x = idx - row_start_idx;
+				uint32_t pixel_offset = pixel_row_base + x * BytesPerPixel;
+				output[idx] = read_pixel(pixel_offset);
+			}
+		} else if (processing_mode == BASMode::INVERTED) {
+			for (uint32_t idx = actual_start; idx < actual_end; idx++) {
+				uint32_t x = idx - row_start_idx;
+				uint32_t pixel_offset = pixel_row_base + x * BytesPerPixel;
+				Color c = read_pixel(pixel_offset);
+				output[idx] = Color(1.0f - c.r, 1.0f - c.g, 1.0f - c.b, c.a);
+			}
+		} else { // BASMode::RANDOM
+			for (uint32_t idx = actual_start; idx < actual_end; idx++) {
+				uint32_t x = idx - row_start_idx;
+				uint32_t pixel_offset = pixel_row_base + x * BytesPerPixel;
+				Color c = read_pixel(pixel_offset);
+				if (Math::half_to_float(idx + time_seed) > 0.5f) {
+					output[idx] = Color(1.0f - c.r, 1.0f - c.g, 1.0f - c.b, c.a);
+				} else {
+					output[idx] = c;
+				}
+			}
+		}
+	}
+}
+
+void BadAppleSystem::process_pixels_rgba8(uint32_t start_idx, uint32_t end_idx, int width, int height,
+                                          const uint8_t* data, BASMode processing_mode, Color* output, bool p_flip_y) {
+	process_pixels_impl<4, true>(start_idx, end_idx, width, height, data, processing_mode, output, p_flip_y);
+}
+
+void BadAppleSystem::process_pixels_rgb8(uint32_t start_idx, uint32_t end_idx, int width, int height,
+                                         const uint8_t* data, BASMode processing_mode, Color* output, bool p_flip_y) {
+	process_pixels_impl<3, false>(start_idx, end_idx, width, height, data, processing_mode, output, p_flip_y);
+}
 
 void BadAppleSystem::start() {
     if(!world) {
@@ -22,10 +101,16 @@ void BadAppleSystem::start() {
         ERR_PRINT_ONCE("MM entity is not set for BadAppleSystem.");
         return;
     }
+    // Validate MultiMeshComponent exists before creating systems
+    if(!mm_entity.is_alive()) {
+        ERR_PRINT_ONCE("MM entity is not alive for BadAppleSystem.");
+        return;
+    }
     if(!mm_entity.has<MultiMeshComponent>()) {
         ERR_PRINT_ONCE("MM entity does not have MultiMeshComponent for BadAppleSystem.");
         return;
     }
+    const MultiMeshComponent& mm_comp = mm_entity.get<MultiMeshComponent>();
     if(!command_handler.is_valid()) {
         ERR_PRINT_ONCE("CommandHandler is not set for BadAppleSystem.");
         return;
@@ -39,116 +124,238 @@ void BadAppleSystem::start() {
 		return;
 	}
 
-    auto bas_get_image_data = world->system<>().interval(1.0 / 30.0).run([&](flecs::iter it){
+    // Cache the multimesh RID and configuration to avoid component lookups in lambdas
+    const RID cached_mm_rid = mm_comp.multi_mesh_id;
+    const bool uses_colors = mm_comp.has_color;
+    const bool uses_custom_data = mm_comp.has_data;
+    const RS::MultimeshTransformFormat transform_format = mm_comp.transform_format;
+
+    // Calculate multimesh buffer stride
+    // Format: [Transform Data][Color (if enabled)][Custom Data (if enabled)]
+    // Transform3D = 12 floats, Transform2D = 8 floats
+    // Color = 4 floats, Custom Data = 4 floats
+    const uint32_t transform_stride = (transform_format == RS::MULTIMESH_TRANSFORM_2D) ? 8 : 12;
+    const uint32_t color_offset = transform_stride;
+    const uint32_t total_stride = transform_stride + (uses_colors ? 4 : 0) + (uses_custom_data ? 4 : 0);
+
+    // System to update image data and prepare chunks for processing
+    auto bas_get_image_data = world->system<>().interval(1.0 / 30.0).run([&, cached_mm_rid](flecs::iter it){
         if (!video_player) {
-            ERR_PRINT_ONCE("Video player is not set for BadAppleSystem.");
             return;
         }
-        if(!video_player->has_autoplay() && !video_player->is_playing()) {
-            return;
+
+        // Try to start playback if not playing
+        if (!video_player->is_playing()) {
+            // Check if we have a valid stream first
+            Ref<VideoStream> stream = video_player->get_stream();
+            if (!stream.is_valid()) {
+                static bool printed_no_stream = false;
+                if (!printed_no_stream) {
+                    ERR_PRINT("BadAppleSystem: VideoStreamPlayer has no stream set. Cannot play video.");
+                    printed_no_stream = true;
+                }
+                return;
+            }
+
+            // Try to play
+            video_player->play();
+
+            // Verify it actually started playing
+            if (!video_player->is_playing()) {
+                static int retry_count = 0;
+                static bool printed_cant_play = false;
+                retry_count++;
+
+                if (!printed_cant_play && retry_count > 10) {
+                    ERR_PRINT("BadAppleSystem: VideoStreamPlayer.play() called but video is not playing. Check if video player is in scene tree and stream is valid.");
+                    printed_cant_play = true;
+                }
+                return;
+            }
         }
+
         Ref<Texture2D> texture = video_player->get_video_texture();
         if (!texture.is_valid()) {
-            ERR_PRINT_ONCE("Video player texture is not valid.");
             return;
         }
         if (texture->get_width() == 0 || texture->get_height() == 0) {
-            ERR_PRINT_ONCE("Video player texture has invalid dimensions.");
             return;
         }
+
+        // OPTIMIZATION: Get image reference (not copy if possible)
         Ref<Image> image = texture->get_image();
         if (!image.is_valid()) {
-            ERR_PRINT_ONCE("Video player image is not valid.");
             return;
         }
         if (image->get_width() == 0 || image->get_height() == 0) {
-            ERR_PRINT_ONCE("Video player image has invalid dimensions.");
             return;
         }
+
+        // Update image data with direct pointer access (zero-copy)
         image_data.width = image->get_width();
         image_data.height = image->get_height();
         image_data.format = image->get_format();
-        image_data.data = image->get_data();
-		const MultiMeshComponent& mm_comp = mm_entity.get<MultiMeshComponent>();
-		const uint32_t instance_count = mm_comp.instance_count;
-		
-		// Prepare the full frame's colors
-		static thread_local LocalVector<Color> s_frame_colors;
-		if (s_frame_colors.size() != instance_count) {
-			s_frame_colors.resize(instance_count);
+        image_data.ptr = image->get_data().ptr();  // Direct pointer, no copy!
+
+		// Get instance count - avoid .get<>() call by using cached RID
+		uint32_t instance_count = RS::get_singleton()->multimesh_get_instance_count(cached_mm_rid);
+		if (instance_count == 0) {
+			return;
 		}
 
-		// Determine if we should use multithreading
-		const bool should_use_threading = use_multithreading && 
-		                                   instance_count >= threading_threshold && 
-		                                   WorkerThreadPool::get_singleton() != nullptr;
-		
-		if (should_use_threading) {
-			// === MULTITHREADED PATH ===
-			WorkerThreadPool* pool = WorkerThreadPool::get_singleton();
-			const int available_threads = pool->get_thread_count();
-			const int num_threads = MIN(MIN(available_threads, (int)max_threads), MAX((int)instance_count / 1000, 1));
-			
-			if (num_threads > 1) {
-				// Use group task for parallel processing
-				// Each thread will process chunk_index from 0 to num_threads-1
-				const uint32_t chunk_size = (instance_count + num_threads - 1) / num_threads;
-				
-				WorkerThreadPool::GroupID group_id = pool->add_template_group_task(
-					this,
-					&BadAppleSystem::process_chunk_by_index,
-					ChunkProcessData{&image_data, &s_frame_colors, mode, chunk_size, instance_count},
-					num_threads,
-					-1,
-					true,
-					String("BadApplePixelProcessing")
-				);
-				
-				pool->wait_for_group_task_completion(group_id);
-			} else {
-				// Fall back to single-threaded if num_threads == 1
-				process_pixels_optimized(0, instance_count, image_data, s_frame_colors, mode);
+		// Allocate shared output buffer once
+		if (shared_output_buffer.size() != (int)instance_count) {
+			shared_output_buffer.resize(instance_count);
+		}
+
+		// Initialize chunk entities if needed
+		if (!chunks_initialized) {
+			// Determine optimal chunk count based on thread count
+			uint32_t num_chunks = use_multithreading ? MIN(max_threads, (uint32_t)OS::get_singleton()->get_processor_count()) : 1;
+			num_chunks = CLAMP(num_chunks, 1U, 32U);
+
+			chunk_entities.clear();
+			chunk_entities.resize(num_chunks);
+
+			for (uint32_t i = 0; i < num_chunks; ++i) {
+				chunk_entities[i] = world->entity();
 			}
-		} else {
-			// === SINGLE-THREADED PATH ===
-			process_pixels_optimized(0, instance_count, image_data, s_frame_colors, mode);
+
+			chunks_initialized = true;
 		}
 
-		// Flush once per frame to RenderingServer
-		// Copy to PackedColorArray for safe lambda capture
-		PackedColorArray color_array;
-		color_array.resize(s_frame_colors.size());
-		Color *color_ptr = color_array.ptrw();
-		for (uint32_t i = 0; i < s_frame_colors.size(); ++i) {
-			color_ptr[i] = s_frame_colors[i];
+		// Distribute work across chunks
+		uint32_t num_chunks = chunk_entities.size();
+		uint32_t pixels_per_chunk = (instance_count + num_chunks - 1) / num_chunks;
+		Color* output_ptr = shared_output_buffer.ptrw();
+
+		for (uint32_t i = 0; i < num_chunks; ++i) {
+			uint32_t start = i * pixels_per_chunk;
+			uint32_t end = MIN((i + 1) * pixels_per_chunk, instance_count);
+
+			if (start >= instance_count) {
+				// Clear this chunk if we don't need it this frame
+				if (chunk_entities[i].has<ImageProcessChunk>()) {
+					chunk_entities[i].remove<ImageProcessChunk>();
+				}
+				continue;
+			}
+
+			ImageProcessChunk chunk = {};
+			chunk.start_index = start;
+			chunk.end_index = end;
+			chunk.img_data = &image_data;
+			chunk.mode = mode;
+			chunk.output_ptr = output_ptr;  // Shared buffer
+
+			chunk_entities[i].set<ImageProcessChunk>(chunk);
 		}
-		
-		RID mm_multi_mesh_id = mm_comp.multi_mesh_id;
-		command_handler->enqueue_command_unpooled([mm_multi_mesh_id, color_array]() {
-			int rd_count = RS::get_singleton()->multimesh_get_instance_count(mm_multi_mesh_id);
-			for (uint32_t idx = 0; idx < (uint32_t)color_array.size() && idx < (uint32_t)rd_count; ++idx) {
-				RS::get_singleton()->multimesh_instance_set_color(mm_multi_mesh_id, idx, color_array[idx]);
+    });
+    bas_get_image_data.set_name("BadAppleSystem/UpdateImageData");
+
+	// Multi-threaded system to process pixel chunks in parallel
+	auto bas_process_chunks = world->system<ImageProcessChunk>()
+		.multi_threaded(use_multithreading)
+		.each([this](flecs::entity e, ImageProcessChunk& chunk) {
+			const ImageData* img_data = chunk.img_data;
+			if (!img_data || !img_data->ptr) {
+				// Fill with black
+				for (uint32_t idx = chunk.start_index; idx < chunk.end_index; ++idx) {
+					chunk.output_ptr[idx] = Color(0, 0, 0, 1);
+				}
+				return;
+			}
+
+			// Use fast-path for common formats
+			if (img_data->format == Image::FORMAT_RGBA8) {
+				process_pixels_rgba8(chunk.start_index, chunk.end_index, img_data->width, img_data->height,
+				                     img_data->ptr, chunk.mode, chunk.output_ptr, flip_y);
+			} else if (img_data->format == Image::FORMAT_RGB8) {
+				process_pixels_rgb8(chunk.start_index, chunk.end_index, img_data->width, img_data->height,
+				                    img_data->ptr, chunk.mode, chunk.output_ptr, flip_y);
+			} else {
+				// Fallback to slow path for other formats
+				for (uint32_t idx = chunk.start_index; idx < chunk.end_index; ++idx) {
+					int x = idx % img_data->width;
+					int y = idx / img_data->width;
+
+					Color result;
+					if (x >= img_data->width || y >= img_data->height) {
+						result = Color(0, 0, 0, 1);
+					} else {
+						// Use the generic get_pixel for uncommon formats
+						result = get_pixel(*img_data, x, y);
+
+						// Apply mode
+						switch (chunk.mode) {
+							case BASMode::INVERTED:
+								result = Color(1.0f - result.r, 1.0f - result.g, 1.0f - result.b, result.a);
+								break;
+							case BASMode::RANDOM:
+								if (BadAppleSystem::hash_to_float(idx + OS::get_singleton()->get_ticks_msec()) > 0.5f) {
+									result = Color(1.0f - result.r, 1.0f - result.g, 1.0f - result.b, result.a);
+								}
+								break;
+							default:
+								break;
+						}
+					}
+
+					chunk.output_ptr[idx] = result;
+				}
 			}
 		});
+	bas_process_chunks.set_name("BadAppleSystem/ProcessChunks");
 
+	// OPTIMIZATION: Use direct buffer update instead of per-instance calls
+	// Single-threaded flush system that sends results to RenderingServer
+	auto bas_flush_results = world->system<>().run([&, cached_mm_rid, total_stride, color_offset, uses_colors](flecs::iter it) {
+		// Get instance count from RenderingServer directly
+		int instance_count = RS::get_singleton()->multimesh_get_instance_count(cached_mm_rid);
+		if (instance_count == 0 || shared_output_buffer.size() == 0) {
+			return;
+		}
 
+		// Only update if multimesh uses colors
+		if (!uses_colors) {
+			return;
+		}
 
-    });
+		// Get current buffer to preserve transform data
+		Vector<float> current_buffer = RS::get_singleton()->multimesh_get_buffer(cached_mm_rid);
 
-    bas_get_image_data.set_name("BadAppleSystem/UpdateImageData");
-	// auto bas_get_image_data_phase = pm->create_custom_phase("BadAppleSystem/UpdateImageData", "Flecs::OnUpdate");
+		// Update color data in buffer
+		const Color* colors = shared_output_buffer.ptr();
+		float* buffer_ptr = current_buffer.ptrw();
 
+		for (int i = 0; i < instance_count && i < shared_output_buffer.size(); ++i) {
+			uint32_t base_offset = i * total_stride + color_offset;
+			buffer_ptr[base_offset + 0] = colors[i].r;
+			buffer_ptr[base_offset + 1] = colors[i].g;
+			buffer_ptr[base_offset + 2] = colors[i].b;
+			buffer_ptr[base_offset + 3] = colors[i].a;
+		}
+
+		// Send entire buffer in one call (much faster!)
+		command_handler->enqueue_command_unpooled([cached_mm_rid, current_buffer]() {
+			RS::get_singleton()->multimesh_set_buffer(cached_mm_rid, current_buffer);
+		});
+	});
+	bas_flush_results.set_name("BadAppleSystem/FlushResults");
+
+	// Add all systems to pipeline in order
 	pm->add_to_pipeline(bas_get_image_data, flecs::OnUpdate);
-
+	pm->add_to_pipeline(bas_process_chunks, flecs::OnUpdate);
+	pm->add_to_pipeline(bas_flush_results, flecs::OnUpdate);
 }
 
 RID BadAppleSystem::get_mm_entity() const {
     return gd_mm_entity;
 }
 
-void BadAppleSystem::set_mm_entity(const RID& rid_mm_entity) {
-    gd_mm_entity = rid_mm_entity;
-	this->mm_entity = FlecsServer::get_singleton()->_get_entity(rid_mm_entity, world_id);
+void BadAppleSystem::set_mm_entity(const RID& p_mm_entity) {
+    gd_mm_entity = p_mm_entity;
+    mm_entity = FlecsServer::get_singleton()->_get_entity(p_mm_entity, world_id);
 }
 
 void BadAppleSystem::set_video_player(VideoStreamPlayer *p_video_player) {
@@ -156,582 +363,112 @@ void BadAppleSystem::set_video_player(VideoStreamPlayer *p_video_player) {
 }
 
 VideoStreamPlayer *BadAppleSystem::get_video_player() const {
-	return video_player;
+    return video_player;
 }
 
 void BadAppleSystem::set_world_id(const RID& p_world_id) {
     world_id = p_world_id;
     world = FlecsServer::get_singleton()->_get_world(world_id);
-	PipelineManager* pipeline_ptr = FlecsServer::get_singleton()->_get_pipeline_manager(world_id);
-	pipeline_manager = pipeline_ptr;
-    command_handler = FlecsServer::get_singleton()->get_render_system_command_handler(world_id);
+    if (command_handler.is_null()) {
+        command_handler = FlecsServer::get_singleton()->get_render_system_command_handler(world_id);
+    }
 }
 
 RID BadAppleSystem::get_world_id() const {
     return world_id;
 }
 
-
+// Generic pixel access for uncommon formats
 Color BadAppleSystem::_get_color_at_ofs(const Image::Format format, const uint8_t *ptr, uint32_t ofs) const {
-	switch (format) {
-		case Image::FORMAT_L8: {
-			float l = ptr[ofs] / 255.0;
-			return Color(l, l, l, 1);
-		}
-		case Image::FORMAT_LA8: {
-			float l = ptr[ofs * 2 + 0] / 255.0;
-			float a = ptr[ofs * 2 + 1] / 255.0;
-			return Color(l, l, l, a);
-		}
-		case Image::FORMAT_R8: {
-			float r = ptr[ofs] / 255.0;
-			return Color(r, 0, 0, 1);
-		}
-		case Image::FORMAT_RG8: {
-			float r = ptr[ofs * 2 + 0] / 255.0;
-			float g = ptr[ofs * 2 + 1] / 255.0;
-			return Color(r, g, 0, 1);
-		}
-		case Image::FORMAT_RGB8: {
-			float r = ptr[ofs * 3 + 0] / 255.0;
-			float g = ptr[ofs * 3 + 1] / 255.0;
-			float b = ptr[ofs * 3 + 2] / 255.0;
-			return Color(r, g, b, 1);
-		}
-		case Image::FORMAT_RGBA8: {
-			float r = ptr[ofs * 4 + 0] / 255.0;
-			float g = ptr[ofs * 4 + 1] / 255.0;
-			float b = ptr[ofs * 4 + 2] / 255.0;
-			float a = ptr[ofs * 4 + 3] / 255.0;
-			return Color(r, g, b, a);
-		}
-		case Image::FORMAT_RGBA4444: {
-			uint16_t u = ((uint16_t *)ptr)[ofs];
-			float r = ((u >> 12) & 0xF) / 15.0;
-			float g = ((u >> 8) & 0xF) / 15.0;
-			float b = ((u >> 4) & 0xF) / 15.0;
-			float a = (u & 0xF) / 15.0;
-			return Color(r, g, b, a);
-		}
-		case Image::FORMAT_RGB565: {
-			uint16_t u = ((uint16_t *)ptr)[ofs];
-			float r = (u & 0x1F) / 31.0;
-			float g = ((u >> 5) & 0x3F) / 63.0;
-			float b = ((u >> 11) & 0x1F) / 31.0;
-			return Color(r, g, b, 1.0);
-		}
-		case Image::FORMAT_RF: {
-			float r = ((float *)ptr)[ofs];
-			return Color(r, 0, 0, 1);
-		}
-		case Image::FORMAT_RGF: {
-			float r = ((float *)ptr)[ofs * 2 + 0];
-			float g = ((float *)ptr)[ofs * 2 + 1];
-			return Color(r, g, 0, 1);
-		}
-		case Image::FORMAT_RGBF: {
-			float r = ((float *)ptr)[ofs * 3 + 0];
-			float g = ((float *)ptr)[ofs * 3 + 1];
-			float b = ((float *)ptr)[ofs * 3 + 2];
-			return Color(r, g, b, 1);
-		}
-		case Image::FORMAT_RGBAF: {
-			float r = ((float *)ptr)[ofs * 4 + 0];
-			float g = ((float *)ptr)[ofs * 4 + 1];
-			float b = ((float *)ptr)[ofs * 4 + 2];
-			float a = ((float *)ptr)[ofs * 4 + 3];
-			return Color(r, g, b, a);
-		}
-		case Image::FORMAT_RH: {
-			uint16_t r = ((uint16_t *)ptr)[ofs];
-			return Color(Math::half_to_float(r), 0, 0, 1);
-		}
-		case Image::FORMAT_RGH: {
-			uint16_t r = ((uint16_t *)ptr)[ofs * 2 + 0];
-			uint16_t g = ((uint16_t *)ptr)[ofs * 2 + 1];
-			return Color(Math::half_to_float(r), Math::half_to_float(g), 0, 1);
-		}
-		case Image::FORMAT_RGBH: {
-			uint16_t r = ((uint16_t *)ptr)[ofs * 3 + 0];
-			uint16_t g = ((uint16_t *)ptr)[ofs * 3 + 1];
-			uint16_t b = ((uint16_t *)ptr)[ofs * 3 + 2];
-			return Color(Math::half_to_float(r), Math::half_to_float(g), Math::half_to_float(b), 1);
-		}
-		case Image::FORMAT_RGBAH: {
-			uint16_t r = ((uint16_t *)ptr)[ofs * 4 + 0];
-			uint16_t g = ((uint16_t *)ptr)[ofs * 4 + 1];
-			uint16_t b = ((uint16_t *)ptr)[ofs * 4 + 2];
-			uint16_t a = ((uint16_t *)ptr)[ofs * 4 + 3];
-			return Color(Math::half_to_float(r), Math::half_to_float(g), Math::half_to_float(b), Math::half_to_float(a));
-		}
-		case Image::FORMAT_RGBE9995: {
-			return Color::from_rgbe9995(((uint32_t *)ptr)[ofs]);
-		}
-
-		default: {
-			ERR_FAIL_V_MSG(Color(), "Can't get_pixel() on compressed image, sorry.");
-		}
-	}
+    switch (format) {
+        case Image::FORMAT_L8: {
+            float l = ptr[ofs] / 255.0f;
+            return Color(l, l, l);
+        }
+        case Image::FORMAT_LA8: {
+            float l = ptr[ofs] / 255.0f;
+            float a = ptr[ofs + 1] / 255.0f;
+            return Color(l, l, l, a);
+        }
+        case Image::FORMAT_R8: {
+            float r = ptr[ofs] / 255.0f;
+            return Color(r, 0, 0);
+        }
+        case Image::FORMAT_RG8: {
+            float r = ptr[ofs] / 255.0f;
+            float g = ptr[ofs + 1] / 255.0f;
+            return Color(r, g, 0);
+        }
+        case Image::FORMAT_RGB8: {
+            float r = ptr[ofs] / 255.0f;
+            float g = ptr[ofs + 1] / 255.0f;
+            float b = ptr[ofs + 2] / 255.0f;
+            return Color(r, g, b);
+        }
+        case Image::FORMAT_RGBA8: {
+            float r = ptr[ofs] / 255.0f;
+            float g = ptr[ofs + 1] / 255.0f;
+            float b = ptr[ofs + 2] / 255.0f;
+            float a = ptr[ofs + 3] / 255.0f;
+            return Color(r, g, b, a);
+        }
+        default:
+            return Color();
+    }
 }
 
-Color BadAppleSystem::get_pixel(const ImageData& p_image_data, const int x, const int y) const {
-
-    Color color = _get_color_at_ofs(p_image_data.format, p_image_data.data.ptr(), y * p_image_data.width + x);
-    return color;
+Color BadAppleSystem::get_pixel(const ImageData& image_data, const int x, const int y) const {
+    uint32_t ofs = 0;
+    switch (image_data.format) {
+        case Image::FORMAT_L8:
+        case Image::FORMAT_R8:
+            ofs = y * image_data.width + x;
+            break;
+        case Image::FORMAT_LA8:
+        case Image::FORMAT_RG8:
+            ofs = (y * image_data.width + x) * 2;
+            break;
+        case Image::FORMAT_RGB8:
+            ofs = (y * image_data.width + x) * 3;
+            break;
+        case Image::FORMAT_RGBA8:
+            ofs = (y * image_data.width + x) * 4;
+            break;
+        default:
+            return Color();
+    }
+    return _get_color_at_ofs(image_data.format, image_data.ptr, ofs);
 }
 
-
-void BadAppleSystem::process_chunk_by_index(uint32_t p_chunk_index, ChunkProcessData p_data) const {
-	const uint32_t start_idx = p_chunk_index * p_data.chunk_size;
-	const uint32_t end_idx = MIN(start_idx + p_data.chunk_size, p_data.instance_count);
-	
-	if (start_idx < end_idx) {
-		process_pixels_optimized(start_idx, end_idx, *p_data.img_data, *p_data.colors, p_data.mode);
-	}
-}
-
-void BadAppleSystem::process_pixels_optimized(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const {
-	// Dispatch to format-specific optimized implementation
-	switch(img_data.format) {
-		case Image::FORMAT_RGBA8:
-			process_pixel_chunk_rgba8(start_idx, end_idx, img_data, out_colors, processing_mode);
-			break;
-		case Image::FORMAT_RGB8:
-			process_pixel_chunk_rgb8(start_idx, end_idx, img_data, out_colors, processing_mode);
-			break;
-		default:
-			process_pixel_chunk_generic(start_idx, end_idx, img_data, out_colors, processing_mode);
-			break;
-	}
-}
-
-void BadAppleSystem::process_pixel_chunk_rgba8(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const {
-#ifdef BAD_APPLE_SIMD_SSE2
-	// Use SSE2 SIMD implementation when available
-	process_pixel_chunk_rgba8_sse2(start_idx, end_idx, img_data, out_colors, processing_mode);
-#elif defined(BAD_APPLE_SIMD_NEON)
-	// Use NEON SIMD implementation when available
-	process_pixel_chunk_rgba8_neon(start_idx, end_idx, img_data, out_colors, processing_mode);
-#else
-	// Scalar fallback
-	const int width = img_data.width;
-	const int height = img_data.height;
-	const uint8_t* data_ptr = img_data.data.ptr();
-	const float inv_255 = 1.0f / 255.0f;
-	
-	for (uint32_t idx = start_idx; idx < end_idx; ++idx) {
-		const int x = idx % width;
-		const int row = idx / width;
-		const uint32_t flipped_row = height - 1 - row;
-		const uint32_t flipped_ofs = (flipped_row * width + x) * 4;
-		
-		// Inline RGBA8 pixel access (avoid function call overhead)
-		const float r = data_ptr[flipped_ofs + 0] * inv_255;
-		const float g = data_ptr[flipped_ofs + 1] * inv_255;
-		const float b = data_ptr[flipped_ofs + 2] * inv_255;
-		
-		// Compute luminance
-		const float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-		
-		// Apply mode
-		switch(processing_mode) {
-			case BASMode::REGULAR:
-				out_colors[idx] = (luminance > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::INVERTED:
-				out_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::RANDOM:
-				// Use fast hash instead of Math::randf() (3× faster)
-				if (luminance > 0.5f) {
-					out_colors[idx] = Color(
-						hash_to_float(idx * 3),
-						hash_to_float(idx * 3 + 1),
-						hash_to_float(idx * 3 + 2),
-						1.0f
-					);
-				} else {
-					out_colors[idx] = Color(0, 0, 0, 1);
-				}
-				break;
-		}
-	}
-#endif
-}
-
-void BadAppleSystem::process_pixel_chunk_rgb8(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const {
-	const int width = img_data.width;
-	const int height = img_data.height;
-	const uint8_t* data_ptr = img_data.data.ptr();
-	const float inv_255 = 1.0f / 255.0f;
-	
-	for (uint32_t idx = start_idx; idx < end_idx; ++idx) {
-		const int x = idx % width;
-		const int row = idx / width;
-		const uint32_t flipped_row = height - 1 - row;
-		const uint32_t flipped_ofs = (flipped_row * width + x) * 3;
-		
-		// Inline RGB8 pixel access
-		const float r = data_ptr[flipped_ofs + 0] * inv_255;
-		const float g = data_ptr[flipped_ofs + 1] * inv_255;
-		const float b = data_ptr[flipped_ofs + 2] * inv_255;
-		
-		// Compute luminance
-		const float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-		
-		// Apply mode (same as RGBA8)
-		switch(processing_mode) {
-			case BASMode::REGULAR:
-				out_colors[idx] = (luminance > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::INVERTED:
-				out_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::RANDOM:
-				if (luminance > 0.5f) {
-					out_colors[idx] = Color(
-						hash_to_float(idx * 3),
-						hash_to_float(idx * 3 + 1),
-						hash_to_float(idx * 3 + 2),
-						1.0f
-					);
-				} else {
-					out_colors[idx] = Color(0, 0, 0, 1);
-				}
-				break;
-		}
-	}
-}
-
-void BadAppleSystem::process_pixel_chunk_generic(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const {
-	// Fallback for other formats using the existing get_pixel method
-	const int width = img_data.width;
-	const int height = img_data.height;
-	
-	for (uint32_t idx = start_idx; idx < end_idx; ++idx) {
-		const int x = idx % width;
-		const int y = height - 1 - (idx / width);
-		
-		Color pixel = get_pixel(img_data, x, y);
-		const float luminance = 0.2126f * pixel.r + 0.7152f * pixel.g + 0.0722f * pixel.b;
-		
-		switch(processing_mode) {
-			case BASMode::REGULAR:
-				out_colors[idx] = (luminance > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::INVERTED:
-				out_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::RANDOM:
-				if (luminance > 0.5f) {
-					out_colors[idx] = Color(
-						hash_to_float(idx * 3),
-						hash_to_float(idx * 3 + 1),
-						hash_to_float(idx * 3 + 2),
-						1.0f
-					);
-				} else {
-					out_colors[idx] = Color(0, 0, 0, 1);
-				}
-				break;
-		}
-	}
-}
-
-#ifdef BAD_APPLE_SIMD_SSE2
-void BadAppleSystem::process_pixel_chunk_rgba8_sse2(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const {
-	const int width = img_data.width;
-	const int height = img_data.height;
-	const uint8_t* data_ptr = img_data.data.ptr();
-	
-	// SSE2 constants
-	const __m128 inv_255_vec = _mm_set1_ps(1.0f / 255.0f);
-	const __m128 lum_r = _mm_set1_ps(0.2126f);
-	const __m128 lum_g = _mm_set1_ps(0.7152f);
-	const __m128 lum_b = _mm_set1_ps(0.0722f);
-	
-	uint32_t idx = start_idx;
-	
-	// Process 4 pixels at a time with SSE2
-	const uint32_t simd_end = start_idx + ((end_idx - start_idx) / 4) * 4;
-	
-	for (; idx < simd_end; idx += 4) {
-		// Calculate pixel positions for 4 pixels
-		uint32_t offsets[4];
-		for (int i = 0; i < 4; ++i) {
-			const uint32_t pixel_idx = idx + i;
-			const int x = pixel_idx % width;
-			const int row = pixel_idx / width;
-			const uint32_t flipped_row = height - 1 - row;
-			offsets[i] = (flipped_row * width + x) * 4;
-		}
-		
-		// Load 4 RGBA pixels (interleaved)
-		__m128i pixel0 = _mm_cvtsi32_si128(*(const int32_t*)(data_ptr + offsets[0]));
-		__m128i pixel1 = _mm_cvtsi32_si128(*(const int32_t*)(data_ptr + offsets[1]));
-		__m128i pixel2 = _mm_cvtsi32_si128(*(const int32_t*)(data_ptr + offsets[2]));
-		__m128i pixel3 = _mm_cvtsi32_si128(*(const int32_t*)(data_ptr + offsets[3]));
-		
-		// Unpack to 16-bit
-		pixel0 = _mm_unpacklo_epi8(pixel0, _mm_setzero_si128());
-		pixel1 = _mm_unpacklo_epi8(pixel1, _mm_setzero_si128());
-		pixel2 = _mm_unpacklo_epi8(pixel2, _mm_setzero_si128());
-		pixel3 = _mm_unpacklo_epi8(pixel3, _mm_setzero_si128());
-		
-		// Unpack to 32-bit
-		pixel0 = _mm_unpacklo_epi16(pixel0, _mm_setzero_si128());
-		pixel1 = _mm_unpacklo_epi16(pixel1, _mm_setzero_si128());
-		pixel2 = _mm_unpacklo_epi16(pixel2, _mm_setzero_si128());
-		pixel3 = _mm_unpacklo_epi16(pixel3, _mm_setzero_si128());
-		
-		// Convert to float
-		__m128 pf0 = _mm_cvtepi32_ps(pixel0);
-		__m128 pf1 = _mm_cvtepi32_ps(pixel1);
-		__m128 pf2 = _mm_cvtepi32_ps(pixel2);
-		__m128 pf3 = _mm_cvtepi32_ps(pixel3);
-		
-		// Multiply by 1/255
-		pf0 = _mm_mul_ps(pf0, inv_255_vec);
-		pf1 = _mm_mul_ps(pf1, inv_255_vec);
-		pf2 = _mm_mul_ps(pf2, inv_255_vec);
-		pf3 = _mm_mul_ps(pf3, inv_255_vec);
-		
-		// Extract R, G, B channels (transpose)
-		__m128 r_vec = _mm_shuffle_ps(pf0, pf1, _MM_SHUFFLE(0, 0, 0, 0));
-		__m128 g_vec = _mm_shuffle_ps(pf0, pf1, _MM_SHUFFLE(1, 1, 1, 1));
-		__m128 b_vec = _mm_shuffle_ps(pf0, pf1, _MM_SHUFFLE(2, 2, 2, 2));
-		
-		__m128 r_vec2 = _mm_shuffle_ps(pf2, pf3, _MM_SHUFFLE(0, 0, 0, 0));
-		__m128 g_vec2 = _mm_shuffle_ps(pf2, pf3, _MM_SHUFFLE(1, 1, 1, 1));
-		__m128 b_vec2 = _mm_shuffle_ps(pf2, pf3, _MM_SHUFFLE(2, 2, 2, 2));
-		
-		r_vec = _mm_shuffle_ps(r_vec, r_vec2, _MM_SHUFFLE(2, 0, 2, 0));
-		g_vec = _mm_shuffle_ps(g_vec, g_vec2, _MM_SHUFFLE(2, 0, 2, 0));
-		b_vec = _mm_shuffle_ps(b_vec, b_vec2, _MM_SHUFFLE(2, 0, 2, 0));
-		
-		// Compute luminance: 0.2126*R + 0.7152*G + 0.0722*B
-		__m128 luminance = _mm_mul_ps(r_vec, lum_r);
-		luminance = _mm_add_ps(luminance, _mm_mul_ps(g_vec, lum_g));
-		luminance = _mm_add_ps(luminance, _mm_mul_ps(b_vec, lum_b));
-		
-		// Apply mode
-		float lum[4];
-		_mm_store_ps(lum, luminance);
-		
-		for (int i = 0; i < 4; ++i) {
-			switch(processing_mode) {
-				case BASMode::REGULAR:
-					out_colors[idx + i] = (lum[i] > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-					break;
-				case BASMode::INVERTED:
-					out_colors[idx + i] = (lum[i] < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-					break;
-				case BASMode::RANDOM:
-					if (lum[i] > 0.5f) {
-						out_colors[idx + i] = Color(
-							hash_to_float((idx + i) * 3),
-							hash_to_float((idx + i) * 3 + 1),
-							hash_to_float((idx + i) * 3 + 2),
-							1.0f
-						);
-					} else {
-						out_colors[idx + i] = Color(0, 0, 0, 1);
-					}
-					break;
-			}
-		}
-	}
-	
-	// Process remaining pixels (scalar)
-	const float inv_255 = 1.0f / 255.0f;
-	for (; idx < end_idx; ++idx) {
-		const int x = idx % width;
-		const int row = idx / width;
-		const uint32_t flipped_row = height - 1 - row;
-		const uint32_t flipped_ofs = (flipped_row * width + x) * 4;
-		
-		const float r = data_ptr[flipped_ofs + 0] * inv_255;
-		const float g = data_ptr[flipped_ofs + 1] * inv_255;
-		const float b = data_ptr[flipped_ofs + 2] * inv_255;
-		const float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-		
-		switch(processing_mode) {
-			case BASMode::REGULAR:
-				out_colors[idx] = (luminance > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::INVERTED:
-				out_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::RANDOM:
-				if (luminance > 0.5f) {
-					out_colors[idx] = Color(
-						hash_to_float(idx * 3),
-						hash_to_float(idx * 3 + 1),
-						hash_to_float(idx * 3 + 2),
-						1.0f
-					);
-				} else {
-					out_colors[idx] = Color(0, 0, 0, 1);
-				}
-				break;
-		}
-	}
-}
-#endif
-
-#ifdef BAD_APPLE_SIMD_NEON
-void BadAppleSystem::process_pixel_chunk_rgba8_neon(uint32_t start_idx, uint32_t end_idx, const ImageData& img_data, LocalVector<Color>& out_colors, BASMode processing_mode) const {
-	const int width = img_data.width;
-	const int height = img_data.height;
-	const uint8_t* data_ptr = img_data.data.ptr();
-	
-	// NEON constants
-	const float32x4_t inv_255_vec = vdupq_n_f32(1.0f / 255.0f);
-	const float32x4_t lum_r = vdupq_n_f32(0.2126f);
-	const float32x4_t lum_g = vdupq_n_f32(0.7152f);
-	const float32x4_t lum_b = vdupq_n_f32(0.0722f);
-	
-	uint32_t idx = start_idx;
-	
-	// Process 4 pixels at a time with NEON
-	const uint32_t simd_end = start_idx + ((end_idx - start_idx) / 4) * 4;
-	
-	for (; idx < simd_end; idx += 4) {
-		// Calculate pixel positions for 4 pixels
-		uint32_t offsets[4];
-		for (int i = 0; i < 4; ++i) {
-			const uint32_t pixel_idx = idx + i;
-			const int x = pixel_idx % width;
-			const int row = pixel_idx / width;
-			const uint32_t flipped_row = height - 1 - row;
-			offsets[i] = (flipped_row * width + x) * 4;
-		}
-		
-		// Load 4 RGBA pixels
-		uint8x8_t pixel0 = vld1_u8(data_ptr + offsets[0]);
-		uint8x8_t pixel1 = vld1_u8(data_ptr + offsets[1]);
-		uint8x8_t pixel2 = vld1_u8(data_ptr + offsets[2]);
-		uint8x8_t pixel3 = vld1_u8(data_ptr + offsets[3]);
-		
-		// Unpack to 16-bit
-		uint16x8_t pixel0_16 = vmovl_u8(pixel0);
-		uint16x8_t pixel1_16 = vmovl_u8(pixel1);
-		uint16x8_t pixel2_16 = vmovl_u8(pixel2);
-		uint16x8_t pixel3_16 = vmovl_u8(pixel3);
-		
-		// Unpack to 32-bit and convert to float
-		float32x4_t pf0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel0_16)));
-		float32x4_t pf1 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel1_16)));
-		float32x4_t pf2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel2_16)));
-		float32x4_t pf3 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel3_16)));
-		
-		// Multiply by 1/255
-		pf0 = vmulq_f32(pf0, inv_255_vec);
-		pf1 = vmulq_f32(pf1, inv_255_vec);
-		pf2 = vmulq_f32(pf2, inv_255_vec);
-		pf3 = vmulq_f32(pf3, inv_255_vec);
-		
-		// Extract R, G, B channels
-		float r[4] = {vgetq_lane_f32(pf0, 0), vgetq_lane_f32(pf1, 0), vgetq_lane_f32(pf2, 0), vgetq_lane_f32(pf3, 0)};
-		float g[4] = {vgetq_lane_f32(pf0, 1), vgetq_lane_f32(pf1, 1), vgetq_lane_f32(pf2, 1), vgetq_lane_f32(pf3, 1)};
-		float b[4] = {vgetq_lane_f32(pf0, 2), vgetq_lane_f32(pf1, 2), vgetq_lane_f32(pf2, 2), vgetq_lane_f32(pf3, 2)};
-		
-		float32x4_t r_vec = vld1q_f32(r);
-		float32x4_t g_vec = vld1q_f32(g);
-		float32x4_t b_vec = vld1q_f32(b);
-		
-		// Compute luminance: 0.2126*R + 0.7152*G + 0.0722*B
-		float32x4_t luminance = vmulq_f32(r_vec, lum_r);
-		luminance = vmlaq_f32(luminance, g_vec, lum_g);
-		luminance = vmlaq_f32(luminance, b_vec, lum_b);
-		
-		// Store luminance and apply mode
-		float lum[4];
-		vst1q_f32(lum, luminance);
-		
-		for (int i = 0; i < 4; ++i) {
-			switch(processing_mode) {
-				case BASMode::REGULAR:
-					out_colors[idx + i] = (lum[i] > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-					break;
-				case BASMode::INVERTED:
-					out_colors[idx + i] = (lum[i] < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-					break;
-				case BASMode::RANDOM:
-					if (lum[i] > 0.5f) {
-						out_colors[idx + i] = Color(
-							hash_to_float((idx + i) * 3),
-							hash_to_float((idx + i) * 3 + 1),
-							hash_to_float((idx + i) * 3 + 2),
-							1.0f
-						);
-					} else {
-						out_colors[idx + i] = Color(0, 0, 0, 1);
-					}
-					break;
-			}
-		}
-	}
-	
-	// Process remaining pixels (scalar)
-	const float inv_255 = 1.0f / 255.0f;
-	for (; idx < end_idx; ++idx) {
-		const int x = idx % width;
-		const int row = idx / width;
-		const uint32_t flipped_row = height - 1 - row;
-		const uint32_t flipped_ofs = (flipped_row * width + x) * 4;
-		
-		const float r = data_ptr[flipped_ofs + 0] * inv_255;
-		const float g = data_ptr[flipped_ofs + 1] * inv_255;
-		const float b = data_ptr[flipped_ofs + 2] * inv_255;
-		const float luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b;
-		
-		switch(processing_mode) {
-			case BASMode::REGULAR:
-				out_colors[idx] = (luminance > 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::INVERTED:
-				out_colors[idx] = (luminance < 0.5f) ? Color(1, 1, 1, 1) : Color(0, 0, 0, 1);
-				break;
-			case BASMode::RANDOM:
-				if (luminance > 0.5f) {
-					out_colors[idx] = Color(
-						hash_to_float(idx * 3),
-						hash_to_float(idx * 3 + 1),
-						hash_to_float(idx * 3 + 2),
-						1.0f
-					);
-				} else {
-					out_colors[idx] = Color(0, 0, 0, 1);
-				}
-				break;
-		}
-	}
-}
-#endif
 
 void BadAppleSystem::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("start"), &BadAppleSystem::start);
-	ClassDB::bind_method(D_METHOD("set_mm_entity", "mm_entity"), &BadAppleSystem::set_mm_entity);
-	ClassDB::bind_method(D_METHOD("get_mm_entity"), &BadAppleSystem::get_mm_entity);
-	ClassDB::bind_method(D_METHOD("set_video_player", "video_player"), &BadAppleSystem::set_video_player);
-	ClassDB::bind_method(D_METHOD("get_video_player"), &BadAppleSystem::get_video_player);
-	ClassDB::bind_method(D_METHOD("set_world_id", "world_id"), &BadAppleSystem::set_world_id);
-	ClassDB::bind_method(D_METHOD("get_world_id"), &BadAppleSystem::get_world_id);
-	ClassDB::bind_method(D_METHOD("get_mode"), &BadAppleSystem::get_mode);
-	ClassDB::bind_method(D_METHOD("set_mode", "mode"), &BadAppleSystem::set_mode);
-	
-	// Threading configuration
-	ClassDB::bind_method(D_METHOD("set_use_multithreading", "enabled"), &BadAppleSystem::set_use_multithreading);
-	ClassDB::bind_method(D_METHOD("get_use_multithreading"), &BadAppleSystem::get_use_multithreading);
-	ClassDB::bind_method(D_METHOD("set_threading_threshold", "threshold"), &BadAppleSystem::set_threading_threshold);
-	ClassDB::bind_method(D_METHOD("get_threading_threshold"), &BadAppleSystem::get_threading_threshold);
-	ClassDB::bind_method(D_METHOD("set_max_threads", "max_threads"), &BadAppleSystem::set_max_threads);
-	ClassDB::bind_method(D_METHOD("get_max_threads"), &BadAppleSystem::get_max_threads);
+    ClassDB::bind_method(D_METHOD("start"), &BadAppleSystem::start);
+    ClassDB::bind_method(D_METHOD("set_mm_entity", "mm_entity"), &BadAppleSystem::set_mm_entity);
+    ClassDB::bind_method(D_METHOD("get_mm_entity"), &BadAppleSystem::get_mm_entity);
+    ClassDB::bind_method(D_METHOD("set_video_player", "video_player"), &BadAppleSystem::set_video_player);
+    ClassDB::bind_method(D_METHOD("get_video_player"), &BadAppleSystem::get_video_player);
+    ClassDB::bind_method(D_METHOD("set_world_id", "world_id"), &BadAppleSystem::set_world_id);
+    ClassDB::bind_method(D_METHOD("get_world_id"), &BadAppleSystem::get_world_id);
+    ClassDB::bind_method(D_METHOD("set_mode", "mode"), &BadAppleSystem::set_mode);
+    ClassDB::bind_method(D_METHOD("get_mode"), &BadAppleSystem::get_mode);
 
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_ENUM, "Regular,Inverted,Random"), "set_mode", "get_mode");
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_multithreading"), "set_use_multithreading", "get_use_multithreading");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "threading_threshold", PROPERTY_HINT_RANGE, "1000,1000000,1000"), "set_threading_threshold", "get_threading_threshold");
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_threads", PROPERTY_HINT_RANGE, "1,32,1"), "set_max_threads", "get_max_threads");
+    // Threading configuration
+    ClassDB::bind_method(D_METHOD("set_use_multithreading", "enabled"), &BadAppleSystem::set_use_multithreading);
+    ClassDB::bind_method(D_METHOD("get_use_multithreading"), &BadAppleSystem::get_use_multithreading);
+    ClassDB::bind_method(D_METHOD("set_threading_threshold", "threshold"), &BadAppleSystem::set_threading_threshold);
+    ClassDB::bind_method(D_METHOD("get_threading_threshold"), &BadAppleSystem::get_threading_threshold);
+    ClassDB::bind_method(D_METHOD("set_max_threads", "max_threads"), &BadAppleSystem::set_max_threads);
+    ClassDB::bind_method(D_METHOD("get_max_threads"), &BadAppleSystem::get_max_threads);
 
+    ADD_PROPERTY(PropertyInfo(Variant::RID, "mm_entity"), "set_mm_entity", "get_mm_entity");
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "video_player", PROPERTY_HINT_RESOURCE_TYPE, "VideoStreamPlayer"), "set_video_player", "get_video_player");
+    ADD_PROPERTY(PropertyInfo(Variant::RID, "world_id"), "set_world_id", "get_world_id");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "mode"), "set_mode", "get_mode");
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_multithreading"), "set_use_multithreading", "get_use_multithreading");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "threading_threshold"), "set_threading_threshold", "get_threading_threshold");
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "max_threads"), "set_max_threads", "get_max_threads");
+
+    ClassDB::bind_method(D_METHOD("set_flip_y", "flip"), &BadAppleSystem::set_flip_y);
+    ClassDB::bind_method(D_METHOD("get_flip_y"), &BadAppleSystem::get_flip_y);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "flip_y"), "set_flip_y", "get_flip_y");
 }

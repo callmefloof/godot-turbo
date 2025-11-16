@@ -33,7 +33,7 @@
 
 #include "tests/test_macros.h"
 #include "test_fixtures.h"
-#include "modules/godot_turbo/ecs/utility/resource_object_utility.h"
+#include "modules/godot_turbo/ecs/systems/utility/resource_object_utility.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
 #include "core/io/resource.h"

@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "modules/godot_turbo/ecs/utility/ref_storage.h"
+#include "modules/godot_turbo/ecs/systems/utility/ref_storage.h"
 #include "test_fixtures.h"
 
 #include "core/io/resource.h"
