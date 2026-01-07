@@ -8,7 +8,7 @@ A high-performance Entity Component System (ECS) module for Godot 4.4+, powered 
 
 - **Flecs Integration** - Industry-leading ECS library with excellent performance
 - **Godot Native** - Seamless integration with Godot's scene system and scripting
-- **High Performance** - SIMD optimizations, multi-threading, and lock-free queues
+- **High Performance** - Multi-threading, template optimizations, and lock-free queues
 - **Script Bridge** - Execute GDScript/C# methods on ECS entities
 - **Flexible Pipeline** - Custom execution phases and system ordering
 - **Comprehensive Documentation** - 90+ unit tests, detailed API docs, and examples
@@ -281,7 +281,7 @@ See the `ecs/systems/demo/` directory for complete working examples, including t
 |--------------|-----|---------|
 | Baseline | 5 FPS | 1x |
 | Format-specific loops | 12 FPS | 2.4x |
-| + SIMD (SSE2/NEON) | 23 FPS | 4.6x |
+| + Row-based processing | 18 FPS | 3.6x |
 | + Multi-threading (4 cores) | 60+ FPS | 12+x |
 
 **CommandQueue** (lock-free):
@@ -416,14 +416,14 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 **Major Features:**
 - ✨ **Comprehensive Documentation** - Added 3,400+ lines of documentation across all systems
 - ✨ **Unit Test Suite** - 90+ comprehensive unit tests with 90%+ code coverage
-- ✨ **Performance Optimizations** - BadAppleSystem with SIMD and multi-threading (12x speedup)
+- ✨ **Performance Optimizations** - BadAppleSystem with template optimizations and multi-threading (12x speedup)
 - ✨ **GDScript/C# Integration** - Full support for script methods on ECS entities
 
 **Systems:**
 - ✅ **PipelineManager** - Fully documented with 20+ unit tests
 - ✅ **CommandQueue/Handler** - Lock-free queue with 40+ unit tests, comprehensive API docs
 - ✅ **GDScriptRunnerSystem** - Script bridge with 30+ tests, method caching
-- ✅ **BadAppleSystem** - Optimized demo with SIMD (SSE2/NEON) and multi-threading
+- ✅ **BadAppleSystem** - Optimized demo with template-based processing and multi-threading
 
 **Documentation:**
 - 📚 Master systems documentation (SYSTEMS_DOCUMENTATION.md)
@@ -432,7 +432,8 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 - 📚 Migration guides, usage examples, and quick references
 
 **Performance:**
-- ⚡ SIMD vectorization for pixel processing (SSE2 x86, NEON ARM)
+- ⚡ Template-based format-specific pixel processing
+- ⚡ Row-based processing (eliminates per-pixel modulo/division)
 - ⚡ Multi-threaded processing with WorkerThreadPool
 - ⚡ Lock-free command queue with object pooling
 - ⚡ Method caching in script runner (10ns lookup)
@@ -518,7 +519,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Version:** 1.1.1-a.2  
-**Last Updated:** 2025-01-28  
+**Version:** 1.2.0-beta.1  
+**Last Updated:** 2025-01-29  
 **Godot Version:** 4.4+  
 **Maintainer:** [@callmefloof](https://github.com/callmefloof)

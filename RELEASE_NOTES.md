@@ -1,290 +1,337 @@
-# Release Notes - Godot Turbo ECS v1.1.0-a.1
+# Release Notes - Godot Turbo ECS v1.2.0-beta.1
 
-**Release Date:** January 28, 2025  
-**Status:** Alpha Release  
+**Release Date:** January 29, 2025  
+**Status:** Beta Release  
 **Godot Version:** 4.4+
 
 ---
 
 ## 🎉 Overview
 
-This is the first alpha release of Godot Turbo ECS version 1.1.0, bringing **comprehensive documentation**, **extensive unit testing**, and **major performance optimizations** to the module.
+This is the first beta release of Godot Turbo ECS version 1.2.0, introducing a **complete multiplayer networking layer** built on top of the ECS foundation. This release also includes significant **editor improvements** for multi-instance coordination and enhanced profiling tools.
 
 ### Highlights
 
-- ✨ **3,400+ lines of documentation** across all systems
-- 🧪 **90+ unit tests** with 90%+ code coverage
-- ⚡ **12x performance improvement** in BadAppleSystem demo
-- 🔧 **Zero breaking changes** - fully backward compatible with 1.0.x
+- 🌐 **Full Networking System** - Entity replication, authority, prediction, interpolation
+- 🔧 **Multi-Instance Support** - InstanceManager prevents editor conflicts
+- 📊 **Enhanced Profiler** - Instance status display, clearer local-only messaging
+- 📚 **Comprehensive Documentation** - Network guides, remote debugging, troubleshooting
+- ✨ **Zero Breaking Changes** - Fully backward compatible with 1.1.x
 
 ---
 
-## 📊 What's New
+## 🌐 Networking System (Major Feature)
 
-### Documentation (3,400+ Lines Added)
+### NetworkServer Singleton
 
-**Systems Documentation:**
-- Complete API documentation for all system classes
-- Master reference guide ([SYSTEMS_DOCUMENTATION.md](ecs/systems/SYSTEMS_DOCUMENTATION.md))
-- Comprehensive testing guide ([tests/README.md](ecs/systems/tests/README.md))
-- Quick start examples and usage patterns
+A complete multiplayer networking layer that integrates seamlessly with the Flecs ECS:
 
-**Component Documentation:**
-- Migration guide for refactored components
-- Usage examples with code samples
-- Flecs reflection integration guide
-
-**Utility Documentation:**
-- Scene conversion utilities
-- Domain-specific utilities (physics, rendering, navigation)
-- API reference for all utility functions
-
-### Unit Testing (90+ Tests, 1,800+ Lines)
-
-**PipelineManager** (20+ tests, 90%+ coverage):
-- Constructor and initialization
-- System registration and lookup
-- Custom phase creation
-- Execution order verification
-- Edge case handling
-
-**CommandQueue/CommandHandler** (40+ tests, 95%+ coverage):
-- Pool allocation and thread safety
-- FIFO ordering and performance
-- Multi-threaded producer scenarios
-- Stress tests (10,000+ commands)
-
-**GDScriptRunnerSystem** (30+ tests, 85%+ coverage):
-- Method caching and lookup
-- Component filtering
-- System enable/disable
-- Stress tests (1,000+ entities)
-
-### New Features
-
-**GDScriptRunnerSystem:**
-- Execute GDScript/C# methods on ECS entities
-- Automatic method caching (~10ns lookup)
-- Support for both `_flecs_process` and `_FlecsProcess` conventions
-- Separate process and physics process phases
-
-**Example Usage:**
 ```gdscript
-extends Node
+# Host a game server
+NetworkServer.host_game(7777, 16)  # port, max_clients
 
-func _flecs_process(entity_rid: RID, delta: float) -> void:
-    var transform = FlecsServer.get_component_by_name(
-        world, entity_rid, "Transform3DComponent"
-    )
-    transform["position"] += Vector3.RIGHT * delta
-    FlecsServer.set_component(world, entity_rid, "Transform3DComponent", transform)
+# Join an existing game
+NetworkServer.join_game("192.168.1.100", 7777)
+
+# Register entity for network replication
+var entity = FlecsServer.create_entity(world)
+NetworkServer.register_networked_entity(entity, "res://player.tscn")
+
+# Configure replication
+NetworkServer.set_replicated_component(entity, "Transform3DComponent", NetworkTypes.CONTINUOUS)
+NetworkServer.set_replicated_component(entity, "HealthComponent", NetworkTypes.ON_CHANGE)
 ```
 
-**CommandQueue (Lock-Free):**
-- Thread-safe command queue with object pooling
-- Multi-producer safe enqueueing
-- ~50-100ns enqueue performance
-- Zero-allocation pooled commands
+### Network Components
 
-**Example Usage:**
+Full suite of ECS components for multiplayer:
+
+| Component | Purpose |
+|-----------|---------|
+| `NetworkIdentity` | Unique network ID, spawn tracking |
+| `NetworkAuthority` | Authority mode, owner peer ID |
+| `NetworkReplicated` | Per-component replication config |
+| `NetworkDirty` | Change tracking for delta updates |
+| `NetworkInterpolation` | Generic state interpolation buffer |
+| `NetworkTransformInterpolation3D/2D` | Transform-specific interpolation |
+| `NetworkPrediction` | Client-side prediction buffer |
+| `NetworkInput` | Input frame buffer with acknowledgment |
+| `NetworkStats` | Per-entity network statistics |
+| `NetworkRelevancy` | Distance-based relevancy filtering |
+| `NetworkRPCQueue` | Batched RPC calls |
+
+### Authority Modes
+
 ```cpp
-Ref<CommandHandler> handler = memnew(CommandHandler);
-
-// Enqueue from any thread
-handler->enqueue_command([data]() {
-    process_data(data);
-});
-
-// Process on main thread
-handler->process_commands();
+enum AuthorityMode {
+    SERVER,       // Server has full authority
+    CLIENT,       // Owning client has authority
+    TRANSFERABLE, // Authority can be transferred
+    SHARED        // Multiple peers share authority
+};
 ```
 
-**PipelineManager Enhancements:**
-- Custom execution phase creation
-- System lookup by name
-- Multi-world support
-- Comprehensive inline documentation
+### Replication Modes
 
-### Performance Optimizations
+```cpp
+enum ReplicationMode {
+    CONTINUOUS,  // Update every tick
+    ON_CHANGE,   // Update only when changed
+    RELIABLE,    // Guaranteed delivery
+    ONCE,        // Single update at spawn
+    NONE         // No automatic replication
+};
+```
 
-**BadAppleSystem Demo** (6400 instances, 640x480 video):
+### Features
 
-| Stage | FPS | Speedup | Technique |
-|-------|-----|---------|-----------|
-| Baseline | 5 | 1.0x | Original implementation |
-| Optimized | 12 | 2.4x | Format-specific loops |
-| + SIMD | 23 | 4.6x | SSE2/NEON vectorization |
-| + Threading | 60+ | 12+x | Multi-threaded processing |
-
-**Optimizations Applied:**
-- SIMD vectorization (SSE2 for x86/x64, NEON for ARM)
-- Multi-threaded pixel processing with WorkerThreadPool
-- Format-specific optimized processing loops
-- Fast hash for random mode (replaces expensive RNG)
-- Single batched RenderingServer update per frame
-
-**CommandQueue Performance:**
-- Enqueue: ~50-100ns (lock-free)
-- Process: ~30ns overhead per command
-- Throughput: 10,000+ commands/frame tested
-
-**GDScriptRunnerSystem Performance:**
-- Method existence check: Once per script type (cached)
-- Cache lookup: ~10ns per entity
-- Method call overhead: ~500ns per entity
-
-### Component System Improvements
-
-**Refactored Components:**
-- Physics components (RigidBody2D/3D, CollisionShape2D/3D)
-- Navigation components (NavigationAgent2D/3D, NavigationObstacle2D/3D)
-- Added Flecs reflection support
-- Improved documentation and examples
-
-**Benefits:**
-- Cleaner API surface
-- Better type safety
-- Automatic serialization with Flecs reflection
+- ✅ Host/join game with configurable tick rate
+- ✅ Automatic entity spawning/despawning across network
+- ✅ Component replication with multiple modes
+- ✅ Authority management (server, client, transferable, shared)
+- ✅ Input prediction and reconciliation
+- ✅ Transform interpolation for smooth movement
+- ✅ RPC queue for remote method calls
+- ✅ Network statistics tracking
+- ✅ Relevancy system for bandwidth optimization
+- ✅ ENet transport integration
 
 ---
 
-## 🧹 Cleanup
+## 🔧 Editor Improvements
 
-**Removed:**
-- All `.obj` build artifacts (now properly gitignored)
-- Temporary documentation files (9 files removed)
-- In-progress summary and status files
+### InstanceManager
 
-**Added to .gitignore:**
-- Build artifacts (*.obj, *.o, *.so, *.dll)
-- Temporary documentation patterns (*_SUMMARY.md, *_STATUS.md, etc.)
+Manages multiple Godot editor instances to prevent conflicts:
+
+```cpp
+// Check if this is the primary instance
+if (InstanceManager::get_singleton()->is_primary_instance()) {
+    // Safe to use shared resources (debugger, profiler)
+} else {
+    // Show warning or use local-only mode
+}
+
+// Try to acquire a named resource lock
+if (InstanceManager::get_singleton()->try_acquire_resource("profiler")) {
+    // We own the profiler resource
+}
+```
+
+**Features:**
+- Instance identification using unique IDs
+- Lock file management for resource coordination
+- Detection of other running instances
+- Graceful degradation when conflicts detected
+- Primary/secondary instance election
+
+### Profiler Enhancements
+
+- **Instance Status Display** - Shows "Primary" or "Secondary" status in profiler UI
+- **Improved Messaging** - Clearer indication that profiler is for local editor use only
+- **Resource Locking** - Integrates with InstanceManager for conflict prevention
+- **Fallback Behavior** - Secondary instances gracefully fall back to local mode
+
+### Network Editor Plugin
+
+New "Network Inspector" dock for debugging multiplayer:
+
+- Connection status display
+- Entity replication monitoring
+- Network statistics visualization
 
 ---
 
-## 📁 Repository Structure
+## 📚 Documentation
+
+### New Documentation
+
+| Document | Description |
+|----------|-------------|
+| `network/README.md` | Complete networking guide with examples |
+| `REMOTE_DEBUGGING_GUIDE.md` | Remote debugging setup and usage |
+| `DEBUGGER_PLUGIN_DOCUMENTATION.md` | Debugger plugin architecture |
+| `docs/PROFILER_TROUBLESHOOTING.md` | Common profiler issues and solutions |
+
+### Network Documentation Highlights
+
+- Quick start examples for server/client setup
+- Architecture overview with data flow diagrams
+- Complete API reference for NetworkServer
+- Component documentation with struct definitions
+- Configuration options (tick rate, interpolation, debug logging)
+- Best practices for authority, bandwidth, and error handling
+
+---
+
+## 🔄 Changes
+
+### API Changes
+
+**NetworkServer Bindings:**
+- Changed bound method signatures to use `int` instead of namespaced enums
+- `NetworkTypes::DisconnectReason` → `int` in public bindings
+- Internal casting preserves type safety
+- Fixes Godot Variant binding compatibility issues
+
+### Editor Changes
+
+- Profiler plugin now integrates with InstanceManager
+- Shows instance status in info panel
+- Falls back gracefully when not primary instance
+- Editor plugin properly initializes/shuts down InstanceManager
+
+---
+
+## 🐛 Fixes
+
+| Issue | Solution |
+|-------|----------|
+| Enum binding errors | Use `int` in bound signatures with internal casting |
+| Network dock missing name | Set TabContainer name to "Network Inspector" |
+| Multi-instance profiler conflicts | InstanceManager coordinates access |
+| Remote debugging to wrong instance | Lock file coordination |
+
+---
+
+## 📁 New Files
 
 ```
 godot_turbo/
-├── README.md                    # ✨ New comprehensive README
-├── CHANGELOG.md                 # ✨ New detailed changelog
-├── RELEASE_NOTES.md            # ✨ This file
-├── .gitignore                  # 🔧 Enhanced with build artifacts
-├── ecs/
-│   ├── components/             # Refactored components with docs
-│   ├── flecs_types/            # FlecsServer and core types
-│   ├── systems/                # ✨ Fully documented systems
-│   │   ├── SYSTEMS_DOCUMENTATION.md  # ✨ Master reference
-│   │   ├── README.md                 # ✨ Navigation index
-│   │   ├── demo/                     # ⚡ Optimized BadApple demo
-│   │   └── tests/                    # 🧪 90+ comprehensive tests
-│   └── utility/                # Utility functions with docs
-└── thirdparty/
-    ├── flecs/                  # Flecs ECS library
-    └── concurrentqueue/        # Lock-free queue
+├── network/
+│   ├── README.md                    # ✨ Networking guide
+│   ├── network_server.h/cpp         # ✨ NetworkServer singleton
+│   ├── network_types.h              # ✨ Network enums and types
+│   ├── components/
+│   │   └── network_components.h     # ✨ All network components
+│   └── systems/                     # ✨ Network systems (future)
+├── editor/
+│   ├── instance_manager.h           # ✨ Multi-instance coordination
+│   ├── network_editor_plugin.h/cpp  # ✨ Network inspector dock
+│   └── ... (existing files enhanced)
+├── REMOTE_DEBUGGING_GUIDE.md        # ✨ Remote debugging docs
+├── DEBUGGER_PLUGIN_DOCUMENTATION.md # ✨ Debugger architecture
+└── docs/
+    └── PROFILER_TROUBLESHOOTING.md  # ✨ Profiler troubleshooting
 ```
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Getting Started with Networking
 
-### Installation
+### Server Setup
 
-```bash
-# Clone Godot
-git clone https://github.com/godotengine/godot.git
-cd godot
-git checkout 4.4-stable
+```gdscript
+extends Node
 
-# Add module
-cd modules
-git clone https://github.com/callmefloof/godot-turbo.git godot_turbo
+func _ready():
+    # Connect signals
+    NetworkServer.peer_connected.connect(_on_peer_connected)
+    NetworkServer.peer_disconnected.connect(_on_peer_disconnected)
+    
+    # Start server
+    var result = NetworkServer.host_game(7777, 16)
+    if result == OK:
+        print("Server started on port 7777")
 
-# Build
-cd ..
-scons target=editor
+func _on_peer_connected(peer_id: int):
+    print("Peer connected: ", peer_id)
+    # Spawn player entity for this peer
+    var player = FlecsServer.create_entity(world)
+    NetworkServer.register_networked_entity(player, "res://player.tscn")
+    NetworkServer.set_authority(player, NetworkServer.CLIENT, peer_id)
 ```
 
-### Run Tests
+### Client Setup
 
-```bash
-# Build with tests
-scons target=editor tests=yes dev_build=yes
+```gdscript
+extends Node
 
-# Run all tests
-./bin/godot.linuxbsd.editor.dev.x86_64 --test
+func _ready():
+    NetworkServer.connected_to_server.connect(_on_connected)
+    NetworkServer.connection_failed.connect(_on_failed)
+    
+    var result = NetworkServer.join_game("127.0.0.1", 7777)
+    if result == OK:
+        print("Connecting to server...")
 
-# Run specific system tests
-./bin/godot.linuxbsd.editor.dev.x86_64 --test --tc="[PipelineManager]*"
-./bin/godot.linuxbsd.editor.dev.x86_64 --test --tc="[Command]*"
-./bin/godot.linuxbsd.editor.dev.x86_64 --test --tc="[GDScriptRunnerSystem]*"
+func _on_connected():
+    print("Connected to server!")
+
+func _process(delta):
+    if NetworkServer.is_connected():
+        # Send input to server
+        var input = {
+            "move": Input.get_vector("left", "right", "up", "down"),
+            "jump": Input.is_action_just_pressed("jump")
+        }
+        NetworkServer.send_input(local_player, input)
 ```
-
-### First Steps
-
-1. Read the [README.md](README.md) for an overview
-2. Check [SYSTEMS_DOCUMENTATION.md](ecs/systems/SYSTEMS_DOCUMENTATION.md) for detailed API docs
-3. Run the included tests to verify your build
-4. Explore the [demo/](ecs/systems/demo/) folder for examples
 
 ---
 
-## 🔄 Migration from 1.0.x
+## 🔄 Migration from 1.1.x
 
 **Good news:** This release is **100% backward compatible**!
 
-No code changes are required. Existing systems will continue to work as-is.
+No code changes required. Existing ECS code continues to work as-is.
 
 ### Optional: Adopt New Features
 
-**1. Use GDScriptRunnerSystem for script integration:**
-```cpp
-GDScriptRunnerSystem* runner = memnew(GDScriptRunnerSystem);
-runner->init(world_rid, world);
-```
-
-**2. Use CommandQueue for thread-safe operations:**
-```cpp
-Ref<CommandHandler> handler = memnew(CommandHandler);
-handler->enqueue_command([](){ /* deferred work */ });
-handler->process_commands();
-```
-
-**3. Use PipelineManager for better control:**
-```cpp
-PipelineManager pipeline(world_rid);
-pipeline.create_custom_phase("LateUpdate", "OnUpdate");
-pipeline.add_to_pipeline(my_system, late_update);
-```
+1. **Add Networking** - Use NetworkServer for multiplayer support
+2. **Multi-Instance Awareness** - Check InstanceManager for editor conflicts
+3. **Enhanced Profiling** - Use new troubleshooting guide for issues
 
 ---
 
 ## ⚠️ Known Issues
 
-- Godot 4.5 beta compatibility is untested
-- Some pre-existing diagnostics in utility files (not from this release)
-- SIMD optimizations require compatible CPU (SSE2 for x86, NEON for ARM)
+- Networking is in beta - expect API refinements in future releases
+- NetworkServer detailed timing not yet integrated with profiler
+- Some network edge cases may need additional testing
+- Multi-instance detection assumes processes don't die unexpectedly
 
 ---
 
-## 📝 Documentation Links
+## ✅ Test Coverage
 
-- **[README.md](README.md)** - Main module documentation
-- **[CHANGELOG.md](CHANGELOG.md)** - Detailed version history
-- **[SYSTEMS_DOCUMENTATION.md](ecs/systems/SYSTEMS_DOCUMENTATION.md)** - Complete systems reference
-- **[Testing Guide](ecs/systems/tests/README.md)** - How to run and write tests
-- **[Components README](ecs/components/README.md)** - Component system overview
-- **[Utilities README](ecs/utility/README.md)** - Utility functions reference
+| Area | Status |
+|------|--------|
+| NetworkServer API | ✅ Manual testing |
+| Network Components | ✅ Struct validation |
+| InstanceManager | ✅ Multi-instance scenarios |
+| Profiler Integration | ✅ Instance status display |
+| Editor Plugin | ✅ Dock creation/naming |
+
+---
+
+## 🔜 What's Next
+
+### Version 1.2.0 (Stable)
+- Network system stabilization
+- Additional network examples
+- Performance profiling for network systems
+- Comprehensive multiplayer testing
+- API documentation refinements
+
+### Version 2.0.0 (Future)
+- Godot 4.5+ full support
+- Advanced Flecs features (observers, queries)
+- Enhanced reflection system
+- Breaking API improvements based on feedback
+- Removal of deprecated methods
 
 ---
 
 ## 🙏 Credits
 
 **Contributors:**
-- [@callmefloof](https://github.com/callmefloof) - Module development and optimization
+- [@callmefloof](https://github.com/callmefloof) - Module development
 
 **Third-Party Libraries:**
 - [Flecs](https://github.com/SanderMertens/flecs) by Sander Mertens - ECS library
-- [moodycamel::ConcurrentQueue](https://github.com/cameron314/concurrentqueue) by Cameron Desrochers - Lock-free queue
+- [ENet](http://enet.bespin.org/) - Network transport (optional)
+- [moodycamel::ConcurrentQueue](https://github.com/cameron314/concurrentqueue) - Lock-free queue
 - [Godot Engine](https://godotengine.org) - Game engine
 
 ---
@@ -297,26 +344,12 @@ pipeline.add_to_pipeline(my_system, late_update);
 
 ---
 
-## 🔜 What's Next
-
-### Planned for v1.2.0
-- Additional example systems
-- Performance profiling tools
-- Extended GDScript API
-- More utility functions
-
-### Future (v2.0.0)
-- Godot 4.5+ full support
-- Advanced Flecs features (observers, queries)
-- Enhanced reflection system
-- API improvements based on community feedback
-
----
-
-**Download:** [GitHub Releases](https://github.com/callmefloof/godot-turbo/releases/tag/v1.1.0-a.1)  
-**Tagged Commit:** v1.1.0-a.1  
-**Previous Version:** 1.0.x (retroactive tags)
+**Download:** [GitHub Releases](https://github.com/callmefloof/godot-turbo/releases/tag/v1.2.0-beta.1)  
+**Tagged Commit:** v1.2.0-beta.1  
+**Previous Version:** v1.1.2-a.1
 
 ---
 
 Thank you for using Godot Turbo ECS! 🚀
+
+*This is a beta release. Please report any issues you encounter.*

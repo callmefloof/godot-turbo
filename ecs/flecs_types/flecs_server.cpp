@@ -5,8 +5,10 @@
 #include "core/object/class_db.h"
 #include "core/object/object.h"
 #include "core/object/ref_counted.h"
+#include "core/os/os.h"
 #include "core/string/node_path.h"
 #include "core/string/print_string.h"
+#include "core/templates/hash_set.h"
 #include "core/string/string_name.h"
 #include "core/error/error_macros.h"
 #include "core/templates/a_hash_map.h"
@@ -26,8 +28,23 @@
 #include <cstdint>
 #include <cstdio>
 
+// Maximum recursion depth for cursor serialization to prevent stack overflow
+static constexpr int MAX_CURSOR_DEPTH = 32;
+
 // Helper function to recursively convert flecs cursor data to Godot Variant
+static Variant cursor_to_variant_impl(flecs::cursor& cur, int depth);
+
 static Variant cursor_to_variant(flecs::cursor& cur) {
+	return cursor_to_variant_impl(cur, 0);
+}
+
+static Variant cursor_to_variant_impl(flecs::cursor& cur, int depth) {
+	// Prevent stack overflow from deeply nested or circular structures
+	if (depth > MAX_CURSOR_DEPTH) {
+		WARN_PRINT("cursor_to_variant: Maximum recursion depth exceeded, truncating");
+		return Variant();
+	}
+
 	flecs::entity type = cur.get_type();
 
 	// Check if type entity is valid (non-zero ID)
@@ -36,7 +53,9 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 		return Variant();
 	}
 
-	const char* type_name = type.name().c_str();
+	// Keep string_view alive while we use the pointer
+	flecs::string_view name_view = type.name();
+	const char* type_name = name_view.c_str();
 
 	// Check if type name is valid
 	if (!type_name || strlen(type_name) == 0) {
@@ -226,7 +245,7 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 				do {
 					const char* member_name = cur.get_member();
 					if (member_name && strlen(member_name) > 0) {
-						Variant value = cursor_to_variant(cur);
+						Variant value = cursor_to_variant_impl(cur, depth + 1);
 						dict[String(member_name)] = value;
 					}
 				} while (cur.next() == 0);
@@ -248,17 +267,40 @@ static Variant cursor_to_variant(flecs::cursor& cur) {
 }
 
 // Helper function to convert component data to Dictionary using flecs cursor
+// Maximum number of struct members to iterate to prevent infinite loops
+static constexpr int MAX_STRUCT_MEMBERS = 64;
+
 static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t comp_type_id) {
+	// Validate entity is still valid and alive before accessing
+	if (!entity.is_valid() || !entity.is_alive()) {
+		ERR_PRINT("component_to_dict_cursor: entity is not valid or not alive");
+		return Dictionary();
+	}
+
+	// Validate component type ID
+	if (comp_type_id == 0) {
+		ERR_PRINT("component_to_dict_cursor: comp_type_id is 0");
+		return Dictionary();
+	}
+
 	if (!entity.has(comp_type_id)) {
 		return Dictionary();
 	}
 
 	const void* comp_ptr = entity.get(comp_type_id);
 	if (!comp_ptr) {
+		ERR_PRINT("component_to_dict_cursor: entity.get() returned null pointer");
 		return Dictionary();
 	}
 
-	flecs::cursor cur = entity.world().cursor(comp_type_id, const_cast<void*>(comp_ptr));
+	// Validate world before creating cursor
+	flecs::world world = entity.world();
+	if (!world.c_ptr()) {
+		ERR_PRINT("component_to_dict_cursor: entity.world() returned invalid world");
+		return Dictionary();
+	}
+
+	flecs::cursor cur = world.cursor(comp_type_id, const_cast<void*>(comp_ptr));
 
 	// Get the type to check if it's a struct
 	flecs::entity type = cur.get_type();
@@ -270,12 +312,19 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 			// It's a struct, convert members to dictionary
 			Dictionary dict;
 			if (cur.push() == 0) {
+				int member_count = 0;
 				do {
+					// Prevent infinite loops on corrupted data
+					if (member_count >= MAX_STRUCT_MEMBERS) {
+						WARN_PRINT("component_to_dict_cursor: Maximum struct member count exceeded, truncating");
+						break;
+					}
 					const char* member_name = cur.get_member();
 					if (member_name && strlen(member_name) > 0) {
 						Variant value = cursor_to_variant(cur);
 						dict[String(member_name)] = value;
 					}
+					member_count++;
 				} while (cur.next() == 0);
 				cur.pop();
 			}
@@ -302,7 +351,9 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 	// For opaque types, get the type name directly from the component entity
 	// instead of relying on cursor (which may not have type info for opaque types)
 	flecs::entity comp_entity(entity.world().c_ptr(), comp_type_id);
-	const char* type_name = comp_entity.name().c_str();
+	// Keep string_view alive while we use the pointer
+	flecs::string_view type_name_view = comp_entity.name();
+	const char* type_name = type_name_view.c_str();
 
 	if (!type_name || strlen(type_name) == 0) {
 		ERR_PRINT("component_from_dict_cursor: Component type has no name");
@@ -389,7 +440,9 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 
 			if (cur.member(key.utf8().get_data()) == 0) {
 				flecs::entity member_type = cur.get_type();
-				const char* member_type_name = member_type.name().c_str();
+				// Keep string_view alive while we use the pointer
+				flecs::string_view member_name_view = member_type.name();
+				const char* member_type_name = member_name_view.c_str();
 
 				// Set value based on type
 				if (strcmp(member_type_name, "Variant") == 0) {
@@ -624,6 +677,7 @@ RID FlecsServer::_create_rid_for_query(const RID &world_id, const FlecsQuery &qu
 
 void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("create_world"), &FlecsServer::create_world);
+	ClassDB::bind_method(D_METHOD("get_world_list"), &FlecsServer::get_world_list);
 	ClassDB::bind_method(D_METHOD("init_world", "world_id"), &FlecsServer::init_world);
 	ClassDB::bind_method(D_METHOD("progress_world", "world_id", "delta"), &FlecsServer::progress_world);
 	ClassDB::bind_method(D_METHOD("create_entity", "world_id"), &FlecsServer::create_entity);
@@ -678,6 +732,7 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resume_all_systems", "world_id"), &FlecsServer::resume_all_systems);
 	ClassDB::bind_method(D_METHOD("reset_script_system_instrumentation_action", "world_id", "script_system_id"), &FlecsServer::reset_script_system_instrumentation_action);
 	ClassDB::bind_method(D_METHOD("get_world_distribution_summary", "world_id"), &FlecsServer::get_world_distribution_summary);
+	ClassDB::bind_method(D_METHOD("get_system_metrics", "world_id"), &FlecsServer::get_system_metrics);
 	ClassDB::bind_method(D_METHOD("set_script_system_auto_reset", "world_id", "script_system_id", "auto_reset"), &FlecsServer::set_script_system_auto_reset);
 	ClassDB::bind_method(D_METHOD("get_script_system_auto_reset", "world_id", "script_system_id"), &FlecsServer::get_script_system_auto_reset);
 	ClassDB::bind_method(D_METHOD("get_world_frame_summary", "world_id"), &FlecsServer::get_world_frame_summary);
@@ -870,12 +925,6 @@ RID FlecsServer::create_world() {
 	pipeline_manager.set_world(flecs_world);
 	pipeline_managers.insert(flecs_world, pipeline_manager);
 
-	// Print the created RID so we can compare it with values later passed from GDScript.
-	uint64_t created_id_u64 = flecs_world.get_id();
-	char hexbuf[32];
-	snprintf(hexbuf, sizeof(hexbuf), "%llx", (unsigned long long)created_id_u64);
-	print_line("FlecsServer::create_world: created world_id=" + itos(created_id_u64) + " (hex=0x" + String(hexbuf) + ", local_index=" + itos(flecs_world.get_local_index()) + ")");
-
 	unlock();
 
 	return flecs_world;
@@ -900,14 +949,40 @@ void FlecsServer::debug_check_rid(const RID &rid) {
 	}
 }
 
+int8_t FlecsServer::get_world_count() const {
+	return counter;
+}
+
+TypedArray<RID> FlecsServer::get_world_list() const {
+	TypedArray<RID> result;
+	
+	// Iterate through the worlds vector and collect valid RIDs
+	for (int i = 0; i < worlds.size(); ++i) {
+		const RID &world_rid = worlds[i];
+		if (world_rid != RID() && flecs_world_owners.owns(world_rid)) {
+			result.append(world_rid);
+		}
+	}
+	
+	return result;
+}
+
 void FlecsServer::init_world(const RID& world_id) {
 	CHECK_WORLD_VALIDITY(world_id, init_world);
 	flecs::world &world = world_variant->get_world();
 	world.import<flecs::stats>();
 
-	// Configure REST API with default port for explorer access
-	world.set<flecs::Rest>({.port = 27750});
-	print_line("Flecs REST explorer available at http://localhost:27750");
+	int rest_port = 27750;
+	String rest_env = OS::get_singleton()->get_environment("GODOT_FLECS_REST_PORT");
+	if (!rest_env.is_empty()) {
+		rest_port = rest_env.to_int();
+	}
+	if (rest_port <= 0) {
+		print_line("Flecs REST explorer disabled (GODOT_FLECS_REST_PORT<=0)");
+	} else {
+		world.set<flecs::Rest>({.port = (uint16_t)rest_port});
+		print_line(vformat("Flecs REST explorer available at http://localhost:%d", rest_port));
+	}
 
 	print_line("World initialized: " + itos((uint64_t)world.c_ptr()));
 
@@ -994,7 +1069,11 @@ RID FlecsServer::create_entity(const RID &world_id) {
 	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_entity);
 	flecs::world &world = world_variant->get_world();
 	flecs::entity entity = world.entity();
-	return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+	RID rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+	// Add to reverse lookup map for O(1) lookups
+	flecs_variant_owners.get(world_id).entity_id_to_rid[entity.id()] = rid;
+
+	return rid;
 }
 
 RID FlecsServer::create_entity_with_name(const RID &world_id, const String &p_name) {
@@ -1284,14 +1363,30 @@ void FlecsServer::remove_all_components_from_entity(const RID &entity_id) {
 
 Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String &component_type)  {
 	Dictionary component_data;
+	
+	// Skip pair/relationship format strings - they can't be looked up by name
+	// These are formatted as "(First, Second)" from get_component_types_as_name
+	if (component_type.begins_with("(")) {
+		// Pairs don't have serializable component data in the same way
+		return component_data;
+	}
+	
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_by_name: world_id is not valid");
 		return component_data;
 	}
+	
 	FlecsEntityVariant *entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		
+		// Validate entity is still valid and alive in Flecs world
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::get_component_by_name: entity is no longer valid/alive in Flecs world");
+			return component_data;
+		}
+		
 		flecs::entity component = entity.world().lookup(component_type.ascii().get_data());
 		if (!component.is_valid()) {
 			ERR_PRINT("FlecsServer::get_component_by_name: component type not found: " + component_type);
@@ -1299,7 +1394,8 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 		}
 
 		// Use cursor-based conversion for all types
-		return component_to_dict_cursor(entity, component.id());
+		Dictionary result = component_to_dict_cursor(entity, component.id());
+		return result;
 	}
 	ERR_PRINT("FlecsServer::get_component_by_name: entity_id is not a valid entity");
 	return component_data;
@@ -1328,13 +1424,105 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 		return PackedStringArray();
 	}
 	flecs::world *world = _get_world(world_id);
+	if (!world) {
+		ERR_PRINT("FlecsServer::get_component_types_as_name: world is null");
+		return PackedStringArray();
+	}
+	
+	// Validate world pointer is usable
+	ecs_world_t *raw_world = const_cast<ecs_world_t *>(world->c_ptr());
+	if (!raw_world) {
+		ERR_PRINT("FlecsServer::get_component_types_as_name: raw_world is null");
+		return PackedStringArray();
+	}
+	
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		// Validate entity is still alive in Flecs world before iterating
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::get_component_types_as_name: entity is no longer valid/alive in Flecs world");
+			return PackedStringArray();
+		}
+		
+		// Double-check with raw Flecs API
+		ecs_entity_t raw_entity = entity.id();
+		if (!ecs_is_alive(raw_world, raw_entity)) {
+			ERR_PRINT("FlecsServer::get_component_types_as_name: entity not alive according to ecs_is_alive");
+			return PackedStringArray();
+		}
+		
 		PackedStringArray component_types;
+		
+		// Use try-catch style safety with a flag to detect issues
+		bool iteration_error = false;
+		
+		// Enter readonly mode to safely iterate over entity components
+		const bool multi_threaded = ecs_get_stage_count(raw_world) > 1;
+		ecs_readonly_begin(raw_world, multi_threaded);
+		
 		entity.each([&](flecs::id type) {
-			component_types.push_back(String(world->component(type).name().c_str()));
+			// Early exit if we've already had an error
+			if (iteration_error) {
+				return;
+			}
+			
+			// Defensive: check type validity
+			ecs_id_t raw_id = type.raw_id();
+			if (raw_id == 0) {
+				return; // Skip invalid IDs
+			}
+			
+			// Skip pairs and relationships - they can cause issues with component()
+			if (type.is_pair()) {
+				// For pairs, try to get a readable name safely
+				ecs_entity_t first_id = ecs_pair_first(raw_world, raw_id);
+				ecs_entity_t second_id = ecs_pair_second(raw_world, raw_id);
+				
+				// Validate both parts of the pair exist
+				if (first_id == 0 || second_id == 0) {
+					return;
+				}
+				
+				if (!ecs_is_alive(raw_world, first_id) || !ecs_is_alive(raw_world, second_id)) {
+					return;
+				}
+				
+				flecs::entity first = type.first();
+				flecs::entity second = type.second();
+				if (first.is_valid() && second.is_valid()) {
+					flecs::string_view first_name = first.name();
+					flecs::string_view second_name = second.name();
+					const char* first_cstr = first_name.c_str();
+					const char* second_cstr = second_name.c_str();
+					if (first_cstr && second_cstr && first_cstr[0] != '\0' && second_cstr[0] != '\0') {
+						String pair_name = String("(") + String(first_cstr) + ", " + String(second_cstr) + ")";
+						component_types.push_back(pair_name);
+					}
+				}
+				return;
+			}
+			
+			// For regular components, validate the entity ID first
+			if (!ecs_is_alive(raw_world, raw_id)) {
+				return; // Skip IDs that don't correspond to alive entities
+			}
+			
+			// For regular components, get the entity directly
+			flecs::entity comp = world->entity(raw_id);
+			if (!comp.is_valid()) {
+				return; // Skip invalid component entities
+			}
+			
+			flecs::string_view name_view = comp.name();
+			const char* name = name_view.c_str();
+			if (name && name[0] != '\0') {
+				component_types.push_back(String(name));
+			}
 		});
+		
+		ecs_readonly_end(raw_world);
+		
 		return component_types;
 	}
 	ERR_PRINT("FlecsServer::get_component_types_as_name: entity_id is not a valid entity");
@@ -1351,8 +1539,15 @@ TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		// Validate entity is still alive in Flecs world before iterating
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::get_component_types_as_id: entity is no longer valid/alive in Flecs world");
+			return TypedArray<RID>();
+		}
 		entity.each([&](flecs::id type) {
-			component_ids.push_back(flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(type)));
+			if (type.raw_id() != 0) {
+				component_ids.push_back(flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(type)));
+			}
 		});
 		return component_ids;
 	}
@@ -1366,10 +1561,50 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 		ERR_PRINT("FlecsServer::get_entity_name: world_id is not valid");
 		return String();
 	}
+	
+	// Get world and validate raw pointer
+	flecs::world *world = _get_world(world_id);
+	if (!world) {
+		ERR_PRINT("FlecsServer::get_entity_name: world is null");
+		return String();
+	}
+	
+	ecs_world_t *raw_world = const_cast<ecs_world_t *>(world->c_ptr());
+	if (!raw_world) {
+		ERR_PRINT("FlecsServer::get_entity_name: raw_world is null");
+		return String();
+	}
+	
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		return String(entity.name().c_str());
+		// Validate entity is still alive before accessing name
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::get_entity_name: entity is no longer valid/alive in Flecs world");
+			return String();
+		}
+		
+		// Double-check with raw Flecs API
+		ecs_entity_t raw_entity = entity.id();
+		if (!ecs_is_alive(raw_world, raw_entity)) {
+			ERR_PRINT("FlecsServer::get_entity_name: entity not alive according to ecs_is_alive");
+			return String();
+		}
+		
+		// Enter readonly mode to safely access entity name
+		const bool multi_threaded = ecs_get_stage_count(raw_world) > 1;
+		ecs_readonly_begin(raw_world, multi_threaded);
+		
+		// Keep string_view alive while we use the pointer
+		flecs::string_view name_view = entity.name();
+		const char* name = name_view.c_str();
+		String result;
+		if (name && name[0] != '\0') {
+			result = String(name);
+		}
+		
+		ecs_readonly_end(raw_world);
+		return result;
 	}
 	ERR_PRINT("FlecsServer::get_entity_name: entity_id is not a valid entity");
 	return "ERROR";
@@ -1659,7 +1894,6 @@ TypedArray<RID> FlecsServer::get_children(const RID &parent_id) {
 	FlecsEntityVariant *parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
-		print_line(itos(parent.id()));
 		parent.children([&](flecs::entity child) {
 			child_array.push_back(flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(child)).get_id());
 		});
@@ -1866,13 +2100,18 @@ void FlecsServer::free_script_system(const RID& world_id, const RID& script_syst
 
 void FlecsServer::free_entity(const RID& world_id, const RID& entity_id, bool include_flecs_world) {
 	if (flecs_variant_owners.has(world_id)) {
-		if (include_flecs_world) {
-			FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
-			if (entity_variant) {
-				entity_variant->get_entity().destruct();
-			} else {
-				ERR_PRINT("FlecsServer::free_entity: entity_id is not a valid entity");
+		FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
+		if (entity_variant) {
+			// Remove from reverse lookup map before freeing
+			flecs::entity entity = entity_variant->get_entity();
+			if (entity.is_valid()) {
+				flecs_variant_owners.get(world_id).entity_id_to_rid.erase(entity.id());
 			}
+			if (include_flecs_world) {
+				entity.destruct();
+			}
+		} else {
+			ERR_PRINT("FlecsServer::free_entity: entity_id is not a valid entity");
 		}
 		flecs_variant_owners.get(world_id).entity_owner.free(entity_id);
 	} else {
@@ -1951,20 +2190,35 @@ Node* FlecsServer::get_node_from_node_storage(const int64_t node_id, const RID &
 }
 
 RID FlecsServer::_get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity) {
+	// Early validation of entity
+	if (!entity.is_valid() || !entity.is_alive()) {
+		ERR_PRINT("FlecsServer::_get_or_create_rid_for_entity: entity is not valid or not alive");
+		return RID();
+	}
+	
 	if (flecs_variant_owners.has(world_id)) {
-		flecs_variant_owners.get(world_id).entity_owner.get_owned_list();
-			for (const RID& owned : flecs_variant_owners.get(world_id).entity_owner.get_owned_list()) {
-				FlecsEntityVariant* owned_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(owned);
-				if (owned_entity && owned_entity->get_entity().id() == entity.id()) {
-					return owned;
+		uint64_t entity_id = entity.id();
+		
+		// O(1) lookup using reverse map
+		if (flecs_variant_owners.get(world_id).entity_id_to_rid.has(entity_id)) {
+			RID existing_rid = flecs_variant_owners.get(world_id).entity_id_to_rid[entity_id];
+			// Verify the RID is still valid
+			FlecsEntityVariant* owned_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(existing_rid);
+			if (owned_entity) {
+				flecs::entity owned_flecs_entity = owned_entity->get_entity();
+				if (owned_flecs_entity.is_valid() && owned_flecs_entity.id() == entity_id) {
+					return existing_rid;
 				}
 			}
-		if(entity.is_valid()) {
-			return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+			// RID was stale, remove from map
+			flecs_variant_owners.get(world_id).entity_id_to_rid.erase(entity_id);
 		}
-		ERR_PRINT("FlecsServer::_get_or_create_rid_for_entity: entity is not valid");
-		return RID();
-
+		
+		// Entity not found in existing RIDs, create new one
+		RID new_rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+		// Add to reverse lookup map
+		flecs_variant_owners.get(world_id).entity_id_to_rid[entity_id] = new_rid;
+		return new_rid;
 	} else {
 		ERR_PRINT("FlecsServer::_get_or_create_rid_for_entity: world_id is not a valid world");
 		return RID();
@@ -2272,7 +2526,9 @@ Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_i
 	if (!e.is_valid()) { ERR_PRINT("get_system_info: invalid system entity"); return Dictionary(); }
 	Dictionary d;
 	d["id"] = (int64_t)system_id.get_id();
-	d["name"] = String(e.name().c_str());
+	// Keep string_view alive while we use the pointer
+	flecs::string_view name_view = e.name();
+	d["name"] = String(name_view.c_str());
 	// Regular system pause via Disabled tag
 	flecs::entity disabled = w.lookup("flecs.core.Disabled");
 	bool paused_state = disabled.is_valid() ? e.has(disabled) : false;
@@ -2405,6 +2661,240 @@ Dictionary FlecsServer::get_world_distribution_summary(const RID &world_id) {
 	result["samples_used"] = merged.size();
 	result["total_invocations"] = total_invocations;
 	result["approximation_cap"] = MERGE_CAP;
+	return result;
+}
+
+Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
+	// Silent check - world may be destroyed during shutdown while profiler is still running
+	FlecsWorldVariant* world_variant = flecs_world_owners.get_or_null(world_id);
+	if (!world_variant) {
+		return Dictionary();
+	}
+	
+	Dictionary result;
+	Array systems_array;
+	uint64_t total_time_usec = 0;
+	
+	// Track which system entity IDs we've already added (to avoid duplicates)
+	HashSet<uint64_t> added_system_ids;
+	
+	// Collect metrics for script systems
+	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
+		if (!ss) { continue; }
+		
+		// Track this system's entity ID if it has one
+		if (ss->get_system_id() != 0) {
+			added_system_ids.insert(ss->get_system_id());
+		}
+		
+		Dictionary sys_metric;
+		sys_metric["rid"] = ss_rid;
+		sys_metric["name"] = ss->get_system_name().is_empty() ? 
+			String("ScriptSystem#") + itos(ss->get_system_id()) : 
+			ss->get_system_name();
+		sys_metric["type"] = "script";
+		
+		// Timing metrics
+		uint64_t last_usec = ss->get_last_frame_dispatch_usec();
+		uint64_t invocations = ss->get_frame_dispatch_invocations();
+		uint64_t accum_usec = ss->get_frame_dispatch_accum_usec();
+		
+		sys_metric["time_usec"] = (int64_t)last_usec;
+		sys_metric["call_count"] = (int64_t)invocations;
+		sys_metric["total_time_usec"] = (int64_t)accum_usec;
+		sys_metric["avg_time_usec"] = invocations > 0 ? (int64_t)(accum_usec / invocations) : 0;
+		sys_metric["min_time_usec"] = (int64_t)ss->get_frame_dispatch_min_usec();
+		sys_metric["max_time_usec"] = (int64_t)ss->get_frame_dispatch_max_usec();
+		
+		total_time_usec += last_usec;
+		
+		// Entity metrics
+		sys_metric["entity_count"] = (int64_t)ss->get_last_frame_entity_count();
+		
+		// Detailed timing if enabled
+		if (ss->get_detailed_timing_enabled() && invocations > 0) {
+			sys_metric["median_usec"] = ss->get_frame_dispatch_median_usec();
+			sys_metric["p99_usec"] = ss->get_frame_dispatch_percentile_usec(99.0);
+			sys_metric["stddev_usec"] = ss->get_frame_dispatch_stddev_usec();
+		}
+		
+		// Event counts
+		sys_metric["onadd_count"] = (int64_t)ss->get_last_frame_onadd();
+		sys_metric["onset_count"] = (int64_t)ss->get_last_frame_onset();
+		sys_metric["onremove_count"] = (int64_t)ss->get_last_frame_onremove();
+		
+		// State flags
+		sys_metric["paused"] = ss->get_is_paused();
+		sys_metric["dispatch_mode"] = (int64_t)ss->get_dispatch_mode();
+		
+		// Lifetime stats
+		sys_metric["total_callbacks"] = (int64_t)ss->get_total_callbacks_invoked();
+		sys_metric["total_entities_processed"] = (int64_t)ss->get_total_entities_processed();
+		
+		systems_array.push_back(sys_metric);
+	}
+	
+	// Collect metrics for registered C++ systems
+	// Get world pointer for stats queries
+	flecs::world* world_ptr = &world_variant->get_world();
+	
+	for (RID sys_rid : flecs_variant_owners.get(world_id).system_owner.get_owned_list()) {
+		FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(sys_rid);
+		if (!sv) { continue; }
+		
+		flecs::system sys = sv->get_system();
+		if (!sys.is_valid()) { continue; }
+		
+		// Track this system's entity ID
+		added_system_ids.insert(sys.id());
+		
+		Dictionary sys_metric;
+		sys_metric["rid"] = sys_rid;
+		
+		// Get system name - keep string_view alive while we use the pointer
+		flecs::string_view name_view = sys.name();
+		const char* name = name_view.c_str();
+		sys_metric["name"] = name ? String(name) : String("cpp_system_") + itos((int64_t)sys.id());
+		sys_metric["type"] = "cpp";
+		
+		// Try to get raw system data first (more reliable than stats API for cumulative time)
+		const ecs_system_t* sys_ptr = ecs_system_get(world_ptr->c_ptr(), sys.id());
+		if (sys_ptr) {
+			// time_spent on ecs_system_t is cumulative time in seconds
+			double raw_time_sec = sys_ptr->time_spent;
+			uint64_t raw_time_usec = (uint64_t)(raw_time_sec * 1000000.0);
+			sys_metric["time_usec"] = (int64_t)raw_time_usec;
+			sys_metric["total_time_usec"] = (int64_t)raw_time_usec; // Cumulative
+			
+			// Also try to get stats for min/max/entity count
+			ecs_system_stats_t stats = {};
+			bool has_stats = ecs_system_stats_get(world_ptr->c_ptr(), sys.id(), &stats);
+			
+			if (has_stats) {
+				int32_t t = stats.query.t;
+				if (t < 0 || t >= ECS_STAT_WINDOW) {
+					t = 0;
+				}
+				sys_metric["min_time_usec"] = (int64_t)(stats.time_spent.gauge.min[t] * 1000000.0);
+				sys_metric["max_time_usec"] = (int64_t)(stats.time_spent.gauge.max[t] * 1000000.0);
+				sys_metric["entity_count"] = (int64_t)stats.query.matched_entity_count.gauge.avg[t];
+			} else {
+				sys_metric["min_time_usec"] = 0;
+				sys_metric["max_time_usec"] = 0;
+				sys_metric["entity_count"] = 0;
+			}
+			
+			total_time_usec += raw_time_usec;
+		} else {
+			sys_metric["time_usec"] = 0;
+			sys_metric["total_time_usec"] = 0;
+			sys_metric["min_time_usec"] = 0;
+			sys_metric["max_time_usec"] = 0;
+			sys_metric["entity_count"] = 0;
+		}
+		
+		sys_metric["call_count"] = 0; // Not directly available from ecs_system_stats_t
+		
+		// State flags
+		bool paused_state = false;
+		if (regular_system_paused.has(sys_rid)) {
+			paused_state = regular_system_paused[sys_rid];
+		}
+		sys_metric["paused"] = paused_state;
+		
+		systems_array.push_back(sys_metric);
+	}
+	
+	// Query Flecs directly for ALL system entities (including those not registered with system_owner)
+	// This catches systems created directly via world->system<>() like BadAppleSystem's systems
+	// Note: world_variant and world_ptr are already defined above
+	if (world_ptr) {
+		{
+			// Query for all entities with EcsSystem component (the System tag)
+			world_ptr->each([&](flecs::entity e) {
+				// Check if this entity is a system (has System component)
+				if (!e.has(flecs::System)) {
+					return;
+				}
+				
+				// Skip if we've already added this system
+				if (added_system_ids.has(e.id())) {
+					return;
+				}
+				
+				// Skip built-in Flecs systems (timer systems, etc.) - they have ChildOf relationship to flecs modules
+				// We only want user-created systems. Check if it's a child of flecs.* modules
+				flecs::string path_str_flecs = e.path(); // flecs::string is owned, keep it alive
+				const char* path = path_str_flecs.c_str();
+				if (path) {
+					String path_str(path);
+					// Skip internal flecs systems (flecs.timer.*, flecs.pipeline.*, etc.)
+					if (path_str.begins_with("::flecs.")) {
+						return;
+					}
+				}
+			
+				Dictionary sys_metric;
+				sys_metric["rid"] = RID(); // No RID for unregistered systems
+				sys_metric["entity_id"] = (int64_t)e.id(); // Provide entity ID for reference
+				
+				// Get system name
+				flecs::string_view name_view = e.name();
+				const char* name = name_view.c_str();
+				sys_metric["name"] = name ? String(name) : String("system_") + itos((int64_t)e.id());
+				sys_metric["type"] = "native"; // Distinguish from "cpp" (registered) and "script"
+				
+				// Try to get raw system data first (more reliable than stats API for cumulative time)
+				const ecs_system_t* sys_ptr = ecs_system_get(world_ptr->c_ptr(), e.id());
+				if (sys_ptr) {
+					// time_spent on ecs_system_t is cumulative time in seconds
+					double raw_time_sec = sys_ptr->time_spent;
+					uint64_t raw_time_usec = (uint64_t)(raw_time_sec * 1000000.0);
+					sys_metric["time_usec"] = (int64_t)raw_time_usec;
+					sys_metric["total_time_usec"] = (int64_t)raw_time_usec; // Cumulative
+					
+					// Also try to get stats for min/max/entity count
+					ecs_system_stats_t stats = {};
+					bool has_stats = ecs_system_stats_get(world_ptr->c_ptr(), e.id(), &stats);
+					
+					if (has_stats) {
+						int32_t t = stats.query.t;
+						if (t < 0 || t >= ECS_STAT_WINDOW) {
+							t = 0;
+						}
+						sys_metric["min_time_usec"] = (int64_t)(stats.time_spent.gauge.min[t] * 1000000.0);
+						sys_metric["max_time_usec"] = (int64_t)(stats.time_spent.gauge.max[t] * 1000000.0);
+						sys_metric["entity_count"] = (int64_t)stats.query.matched_entity_count.gauge.avg[t];
+					} else {
+						sys_metric["min_time_usec"] = 0;
+						sys_metric["max_time_usec"] = 0;
+						sys_metric["entity_count"] = 0;
+					}
+					
+					total_time_usec += raw_time_usec;
+				} else {
+					sys_metric["time_usec"] = 0;
+					sys_metric["total_time_usec"] = 0;
+					sys_metric["min_time_usec"] = 0;
+					sys_metric["max_time_usec"] = 0;
+					sys_metric["entity_count"] = 0;
+				}
+				
+				sys_metric["call_count"] = 0; // Not directly available from ecs_system_stats_t
+				sys_metric["paused"] = false;
+			
+				systems_array.push_back(sys_metric);
+				added_system_ids.insert(e.id());
+			});
+		}
+	}
+	
+	result["systems"] = systems_array;
+	result["system_count"] = (int64_t)systems_array.size();
+	result["total_time_usec"] = (int64_t)total_time_usec;
+	result["frame_count"] = Engine::get_singleton()->get_frames_drawn();
+	
 	return result;
 }
 

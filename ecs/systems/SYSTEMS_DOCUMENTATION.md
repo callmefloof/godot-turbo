@@ -32,7 +32,7 @@ The ECS systems module provides core infrastructure for managing entity-componen
 ✅ **Lock-free concurrency** - Thread-safe command queues  
 ✅ **Flexible pipeline** - Custom phases and execution order  
 ✅ **Script bridge** - Call GDScript/C# methods from ECS  
-✅ **High performance** - SIMD optimizations, pooling, batching  
+✅ **High performance** - Template optimizations, pooling, batching  
 ✅ **Comprehensive tests** - 90+ unit tests across all systems  
 
 ---
@@ -361,15 +361,15 @@ The system checks for methods in this order:
 #### Features
 
 - **Multi-threaded** - Parallel pixel processing with WorkerThreadPool
-- **SIMD optimized** - SSE2/NEON vectorization (4 pixels at a time)
-- **Format-specific** - Optimized loops per image format
+- **Template optimized** - Format-specific processing with zero overhead
+- **Row-based** - Eliminates per-pixel modulo/division operations
 - **Configurable** - Threading threshold, max threads, display modes
 
 #### Performance Optimizations
 
 1. **Format-specific processing** - RGBA8, RGB8, fallback paths
 2. **Fast luminance** - Integer arithmetic instead of float
-3. **SIMD vectorization** - 4x speedup on supported platforms
+3. **Row-based processing** - Eliminates expensive per-pixel division
 4. **Multi-threading** - Near-linear scaling with cores
 5. **Batch rendering** - Single RenderingServer command per frame
 
@@ -398,7 +398,7 @@ bad_apple->set_display_mode(BadAppleSystem::DISPLAY_MODE_REGULAR);
 |--------------|-----|---------|
 | Baseline | 5 FPS | 1x |
 | Format-specific | 12 FPS | 2.4x |
-| + SIMD | 23 FPS | 4.6x |
+| + Row-based | 18 FPS | 3.6x |
 | + 4 threads | 60+ FPS | 12+x |
 
 See `demo/docs/OPTIMIZATION_COMPLETE.md` for full details.
@@ -561,10 +561,10 @@ See `tests/README.md` for detailed testing documentation.
 
 ### BadAppleSystem
 
-- ✅ SIMD: 4x speedup on x86/ARM
+- ✅ Template optimizations: 2-3x speedup
 - ✅ Multi-threading: near-linear scaling
 - ⚠️ Enable threading only for 1000+ instances
-- ⚠️ SIMD requires aligned data for best performance
+- ⚠️ Row-based processing requires contiguous pixel data
 
 ---
 
@@ -616,7 +616,7 @@ See `tests/README.md` for detailed testing documentation.
 
 **✅ Do:**
 - Profile before optimizing
-- Use SIMD for pixel/batch processing
+- Use template-based processing for pixel/batch operations
 - Enable threading for large workloads
 - Write unit tests for new systems
 
