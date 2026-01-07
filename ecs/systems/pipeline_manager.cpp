@@ -57,8 +57,14 @@ flecs::system *PipelineManager::try_get_system(const String &name) {
 void PipelineManager::add_to_pipeline(flecs::system system) {
     // Store the system in the systems vector for future reference
     systems.push_back({system, flecs::OnUpdate});
+    
+    // Register with FlecsServer's system_owner for proper tracking in profiler/inspector
+    FlecsServer::get_singleton()->_create_rid_for_system(world_rid, system);
+    
     // Debug: Confirm system added to pipeline
-    print_line("System added to pipeline with phase: " + String::num_int64(flecs::OnUpdate));
+    flecs::string_view name_view = system.name();
+    const char* name = name_view.c_str();
+    print_line("System added to pipeline: " + (name ? String(name) : String("unnamed")) + " with phase: " + String::num_int64(flecs::OnUpdate));
 }
 
 void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phase) {
@@ -77,8 +83,12 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
         return;
     }
 
-    // Debug: Print the number of entities in the world
-    print_line("Number of entities in the world: " + String::num_int64(world->count<flecs::entity>()));
+    	// Debug: Print the number of entities in the world (iterate to include all)
+    	int64_t entity_count = 0;
+    	world->each([&entity_count](flecs::entity e) {
+    		entity_count++;
+    	});
+    	print_line("Number of entities in the world: " + String::num_int64(entity_count));
 
     // Debug: Print the pipeline name if available
     if (pipeline.is_valid()) {
@@ -96,9 +106,14 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
 
     // Store the system in the systems vector for future reference
     systems.push_back({system, phase});
+    
+    // Register with FlecsServer's system_owner for proper tracking in profiler/inspector
+    FlecsServer::get_singleton()->_create_rid_for_system(world_rid, system);
 
     // Debug: Confirm system added to pipeline
-    print_line("System added to pipeline with phase: " + String::num_int64(phase));
+    flecs::string_view name_view = system.name();
+    const char* name = name_view.c_str();
+    print_line("System added to pipeline: " + (name ? String(name) : String("unnamed")) + " with phase: " + String::num_int64(phase));
 }
 
 flecs::entity PipelineManager::create_custom_phase(const String &phase_name, const String &depends_on) {

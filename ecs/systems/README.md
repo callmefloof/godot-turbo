@@ -104,7 +104,8 @@ runner->init(world_rid, world);
 
 - **BadAppleSystem** - Optimized video renderer demo
   - Multi-threaded pixel processing
-  - SIMD vectorization (SSE2/NEON)
+  - Template-based format-specific optimizations
+  - Row-based processing (eliminates per-pixel division)
   - 12x+ performance improvement
 
 ---
@@ -161,7 +162,7 @@ scons tests=yes target=editor dev_build=yes
 
 - **Baseline:** 5 FPS (6400 instances)
 - **Optimized:** 60+ FPS (12x improvement)
-- **SIMD:** 4x speedup
+- **Template optimizations:** 2-3x speedup
 - **Multi-threading:** Near-linear scaling
 
 ---

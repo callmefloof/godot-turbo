@@ -229,6 +229,7 @@ public:
 	~FlecsServer();
 	RID create_world();
 	int8_t get_world_count() const;
+	TypedArray<RID> get_world_list() const;
 	void init_world(const RID& world_id);
 
 	bool progress_world(const RID& world_id, const double delta);
@@ -341,6 +342,7 @@ public:
 	Dictionary get_world_frame_summary(const RID &world_id); // aggregated per-frame summary
 	void reset_world_frame_summary(const RID &world_id);
 	Dictionary get_world_distribution_summary(const RID &world_id); // approximate aggregated distribution stats
+	Dictionary get_system_metrics(const RID &world_id); // returns per-system profiling metrics for EditorProfiler
 	// Enable/disable collection of per-invocation timing samples (used for min/max & potential percentile calculations)
 	void set_script_system_detailed_timing(const RID &world_id, const RID &script_system_id, bool enabled);
 	// Returns whether detailed timing samples are currently being recorded
@@ -450,6 +452,8 @@ private:
 		RID_Owner<FlecsScriptSystem, true> script_system_owner;
 		RID_Owner<FlecsQuery, true> query_owner;
 		HashMap<String, Ref<CommandHandler>> command_handlers;
+		// Reverse lookup map: Flecs entity ID -> Godot RID (for O(1) lookups)
+		HashMap<uint64_t, RID> entity_id_to_rid;
 		RID_Owner_Wrapper() = default;
 		RID_Owner_Wrapper(RID world_id) : world_id(world_id),
 			entity_owner(ENTITY_OWNER_CHUNK_SIZE, MAX_ENTITY_COUNT),
@@ -463,7 +467,11 @@ private:
 			// Initialize world_id first to ensure lookups use the correct world
 			world_id = other.world_id;
 			for (RID rid : other.entity_owner.get_owned_list()) {
-					entity_owner.make_rid(FlecsEntityVariant(FlecsServer::get_singleton()->_get_entity(rid, world_id)));
+					flecs::entity e = FlecsServer::get_singleton()->_get_entity(rid, world_id);
+					RID new_rid = entity_owner.make_rid(FlecsEntityVariant(e));
+					if (e.is_valid()) {
+						entity_id_to_rid[e.id()] = new_rid;
+					}
 			}
 			LocalVector<RID> other_type_ids = other.type_id_owner.get_owned_list();
 
@@ -503,7 +511,11 @@ private:
 				}
 
 				for (RID rid : other.entity_owner.get_owned_list()) {
-					entity_owner.make_rid(FlecsEntityVariant(get_singleton()->_get_entity(rid, world_id)));
+					flecs::entity e = get_singleton()->_get_entity(rid, world_id);
+					RID new_rid = entity_owner.make_rid(FlecsEntityVariant(e));
+					if (e.is_valid()) {
+						entity_id_to_rid[e.id()] = new_rid;
+					}
 				}
 
 				for (RID rid : other.type_id_owner.get_owned_list()) {

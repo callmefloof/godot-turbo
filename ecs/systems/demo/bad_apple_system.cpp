@@ -61,6 +61,7 @@ static inline void process_pixels_impl(uint32_t start_idx, uint32_t end_idx, int
 				uint32_t x = idx - row_start_idx;
 				uint32_t pixel_offset = pixel_row_base + x * BytesPerPixel;
 				Color c = read_pixel(pixel_offset);
+				// Swap black and white: black (0,0,0) becomes white (1,1,1) and vice versa
 				output[idx] = Color(1.0f - c.r, 1.0f - c.g, 1.0f - c.b, c.a);
 			}
 		} else { // BASMode::RANDOM
@@ -68,9 +69,17 @@ static inline void process_pixels_impl(uint32_t start_idx, uint32_t end_idx, int
 				uint32_t x = idx - row_start_idx;
 				uint32_t pixel_offset = pixel_row_base + x * BytesPerPixel;
 				Color c = read_pixel(pixel_offset);
-				if (Math::half_to_float(idx + time_seed) > 0.5f) {
-					output[idx] = Color(1.0f - c.r, 1.0f - c.g, 1.0f - c.b, c.a);
+				// Check if pixel is white (or close to white) - brightness > 0.5
+				float brightness = (c.r + c.g + c.b) / 3.0f;
+				if (brightness > 0.5f) {
+					// Replace white with random color based on pixel position
+					uint32_t hash = (idx * 2654435761u) ^ (time_seed * 2246822519u);
+					float r = ((hash >> 0) & 0xFF) / 255.0f;
+					float g = ((hash >> 8) & 0xFF) / 255.0f;
+					float b = ((hash >> 16) & 0xFF) / 255.0f;
+					output[idx] = Color(r, g, b, c.a);
 				} else {
+					// Keep black pixels as black
 					output[idx] = c;
 				}
 			}
@@ -291,11 +300,21 @@ void BadAppleSystem::start() {
 							case BASMode::INVERTED:
 								result = Color(1.0f - result.r, 1.0f - result.g, 1.0f - result.b, result.a);
 								break;
-							case BASMode::RANDOM:
-								if (BadAppleSystem::hash_to_float(idx + OS::get_singleton()->get_ticks_msec()) > 0.5f) {
-									result = Color(1.0f - result.r, 1.0f - result.g, 1.0f - result.b, result.a);
+							case BASMode::RANDOM: {
+								// Check if pixel is white (or close to white) - brightness > 0.5
+								float brightness = (result.r + result.g + result.b) / 3.0f;
+								if (brightness > 0.5f) {
+									// Replace white with random color based on pixel position
+									uint32_t time_seed = OS::get_singleton()->get_ticks_msec();
+									uint32_t hash = (idx * 2654435761u) ^ (time_seed * 2246822519u);
+									float r = ((hash >> 0) & 0xFF) / 255.0f;
+									float g = ((hash >> 8) & 0xFF) / 255.0f;
+									float b = ((hash >> 16) & 0xFF) / 255.0f;
+									result = Color(r, g, b, result.a);
 								}
+								// Keep black pixels as black (no change needed)
 								break;
+							}
 							default:
 								break;
 						}

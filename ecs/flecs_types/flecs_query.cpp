@@ -8,6 +8,8 @@
 #include "core/variant/dictionary.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "modules/godot_turbo/ecs/components/component_reflection.h"
+#include <utility>
+#include <vector>
 
 
 FlecsQuery::~FlecsQuery() {
@@ -77,14 +79,21 @@ void FlecsQuery::build_query() {
     // Build query with required components
     flecs::query_builder<> builder = world->query_builder<>();
 
-    for (int i = 0; i < required_components.size(); ++i) {
-        String cname = required_components[i];
-        flecs::entity ce = world->component(cname.ascii().get_data());
-        if (!ce.is_valid()) {
-            ERR_PRINT(vformat("FlecsQuery::build_query - Invalid component name: %s", cname));
-            continue;
+    if (required_components.size() == 0) {
+        // When no components are specified, leave the query empty to match all entities
+        // (adding Wildcard here filters out built-in entities in Flecs 3.x)
+        // This includes user entities and internal Flecs entities (systems, components, etc.)
+        // No terms added -> matches everything
+    } else {
+        for (int i = 0; i < required_components.size(); ++i) {
+            String cname = required_components[i];
+            flecs::entity ce = world->component(cname.ascii().get_data());
+            if (!ce.is_valid()) {
+                ERR_PRINT(vformat("FlecsQuery::build_query - Invalid component name: %s", cname));
+                continue;
+            }
+            builder.term().id(ce.id());
         }
-        builder.term().id(ce.id());
     }
 
     query = builder.build();
@@ -163,7 +172,12 @@ Array FlecsQuery::fetch_entities_internal(FetchMode mode) {
     uint64_t entity_count = 0;
 
     // Iterate query and collect entities
-    query.each([&](flecs::entity e) {
+    auto process_entity = [&](flecs::entity e) {
+        // Validate entity before processing
+        if (!e.is_valid() || !e.is_alive()) {
+            return;
+        }
+
         // Apply name filter if enabled
         if (filter_enabled && !filter_name_pattern.is_empty()) {
             const char *entity_name = e.name();
@@ -184,6 +198,9 @@ Array FlecsQuery::fetch_entities_internal(FetchMode mode) {
         }
 
         RID entity_rid = server->_get_or_create_rid_for_entity(world_id, e);
+        if (!entity_rid.is_valid()) {
+            return; // Skip if RID creation failed
+        }
 
         if (mode == FETCH_RID_ONLY) {
             result.push_back(entity_rid);
@@ -211,7 +228,34 @@ Array FlecsQuery::fetch_entities_internal(FetchMode mode) {
         }
 
         entity_count++;
-    });
+    };
+
+    if (required_components.size() == 0) {
+        ecs_world_t *raw_world = const_cast<ecs_world_t *>(world->c_ptr());
+        if (!raw_world) {
+            ERR_PRINT("FlecsQuery::fetch_entities_internal - raw_world is null");
+            return Array();
+        }
+        
+        const bool multi_threaded = ecs_get_stage_count(raw_world) > 1;
+        ecs_readonly_begin(raw_world, multi_threaded);
+        ecs_entities_t entities = ecs_get_entities(raw_world);
+        
+        // Validate entities structure
+        if (entities.ids != nullptr && entities.alive_count > 0) {
+            for (int i = 0; i < entities.alive_count; i++) {
+                ecs_entity_t eid = entities.ids[i];
+                if (eid == 0) {
+                    continue;
+                }
+                flecs::entity e(*world, eid);
+                process_entity(e);
+            }
+        }
+        ecs_readonly_end(raw_world);
+    } else {
+        query.each(process_entity);
+    }
 
     // Update instrumentation
     if (instrumentation_enabled) {
@@ -272,9 +316,32 @@ int FlecsQuery::get_entity_count() {
         return 0;
     }
 
+    // For an empty query (no required components), iterate the world directly so
+    // we count every entity (including those not matched by an empty query handle).
+    if (required_components.size() == 0) {
+        int count = 0;
+        ecs_world_t *raw_world = const_cast<ecs_world_t *>(world->c_ptr());
+        if (!raw_world) {
+            return 0;
+        }
+        
+        const bool multi_threaded = ecs_get_stage_count(raw_world) > 1;
+        ecs_readonly_begin(raw_world, multi_threaded);
+        ecs_entities_t entities = ecs_get_entities(raw_world);
+        
+        // Just return alive_count directly - it's already the count we need
+        if (entities.ids != nullptr) {
+            count = entities.alive_count;
+        }
+        ecs_readonly_end(raw_world);
+        return count;
+    }
+
     int count = 0;
     query.each([&count](flecs::entity e) {
-        count++;
+        if (e.is_valid() && e.is_alive()) {
+            count++;
+        }
     });
 
     return count;
@@ -282,11 +349,13 @@ int FlecsQuery::get_entity_count() {
 
 Array FlecsQuery::get_entities_limited(int max_count, int offset) {
     if (!world) {
+        ERR_PRINT("FlecsQuery::get_entities_limited - world is null");
         return Array();
     }
 
     FlecsServer *server = FlecsServer::get_singleton();
     if (!server) {
+        ERR_PRINT("FlecsQuery::get_entities_limited - FlecsServer singleton is null");
         return Array();
     }
 
@@ -294,22 +363,88 @@ Array FlecsQuery::get_entities_limited(int max_count, int offset) {
     int current_index = 0;
     int collected = 0;
 
-    query.each([&](flecs::entity e) {
-        if (current_index < offset) {
+    if (required_components.size() == 0) {
+        ecs_world_t *raw_world = const_cast<ecs_world_t *>(world->c_ptr());
+        if (!raw_world) {
+            ERR_PRINT("FlecsQuery::get_entities_limited - raw_world is null");
+            return Array();
+        }
+        
+        // First pass: collect entity IDs within readonly block
+        std::vector<ecs_entity_t> entity_ids;
+        entity_ids.reserve(max_count);
+        
+        const bool multi_threaded = ecs_get_stage_count(raw_world) > 1;
+        ecs_readonly_begin(raw_world, multi_threaded);
+        ecs_entities_t entities = ecs_get_entities(raw_world);
+        
+        // Validate entities structure
+        if (entities.ids != nullptr && entities.alive_count > 0) {
+            for (int i = 0; i < entities.alive_count && collected < max_count; i++) {
+                ecs_entity_t eid = entities.ids[i];
+                // Skip invalid entity IDs
+                if (eid == 0) {
+                    continue;
+                }
+                
+                if (current_index < offset) {
+                    current_index++;
+                    continue;
+                }
+                
+                // Check entity is alive within readonly context
+                if (ecs_is_alive(raw_world, eid)) {
+                    entity_ids.push_back(eid);
+                    collected++;
+                }
+                current_index++;
+            }
+        }
+        ecs_readonly_end(raw_world);
+        
+        // Second pass: create RIDs outside readonly block (safe to modify internal structures)
+        for (ecs_entity_t eid : entity_ids) {
+            // Re-validate entity is still alive after exiting readonly
+            if (!ecs_is_alive(raw_world, eid)) {
+                continue;
+            }
+            flecs::entity e(*world, eid);
+            if (e.is_valid() && e.is_alive()) {
+                RID entity_rid = server->_get_or_create_rid_for_entity(world_id, e);
+                if (entity_rid.is_valid()) {
+                    result.push_back(entity_rid);
+                }
+            }
+        }
+    } else {
+        // For queries with required components, use query iteration
+        auto process_entity = [&](flecs::entity e) {
+            if (current_index < offset) {
+                current_index++;
+                return;
+            }
+
+            if (collected >= max_count) {
+                return;
+            }
+
+            // Validate entity before creating RID
+            if (!e.is_valid() || !e.is_alive()) {
+                current_index++;
+                return;
+            }
+
+            RID entity_rid = server->_get_or_create_rid_for_entity(world_id, e);
+            if (entity_rid.is_valid()) {
+                result.push_back(entity_rid);
+                collected++;
+            }
+
             current_index++;
-            return;
-        }
-
-        if (collected >= max_count) {
-            return;
-        }
-
-        RID entity_rid = server->_get_or_create_rid_for_entity(world_id, e);
-        result.push_back(entity_rid);
-
-        current_index++;
-        collected++;
-    });
+        };
+        
+        query.each(process_entity);
+    }
 
     return result;
 }
@@ -328,7 +463,7 @@ Array FlecsQuery::get_entities_with_components_limited(int max_count, int offset
     int current_index = 0;
     int collected = 0;
 
-    query.each([&](flecs::entity e) {
+    auto process_entity = [&](flecs::entity e) {
         if (current_index < offset) {
             current_index++;
             return;
@@ -363,7 +498,21 @@ Array FlecsQuery::get_entities_with_components_limited(int max_count, int offset
 
         current_index++;
         collected++;
-    });
+    };
+
+    if (required_components.size() == 0) {
+        ecs_world_t *raw_world = const_cast<ecs_world_t *>(world->c_ptr());
+        const bool multi_threaded = ecs_get_stage_count(raw_world) > 1;
+        ecs_readonly_begin(raw_world, multi_threaded);
+        ecs_entities_t entities = ecs_get_entities(raw_world);
+        for (int i = 0; i < entities.alive_count; i++) {
+            flecs::entity e(*world, entities.ids[i]);
+            process_entity(e);
+        }
+        ecs_readonly_end(raw_world);
+    } else {
+        query.each(process_entity);
+    }
 
     return result;
 }

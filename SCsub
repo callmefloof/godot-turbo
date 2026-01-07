@@ -2,8 +2,8 @@ Import('env')
 
 module_env = env.Clone()
 
-# Add your module's source files
-module_env.add_source_files(env.modules_sources, [
+# Base source files that always compile
+base_sources = [
     "register_types.cpp",
     "thirdparty/flecs/distr/flecs.c",
     "ecs/flecs_types/flecs_query.cpp",
@@ -19,8 +19,24 @@ module_env.add_source_files(env.modules_sources, [
     "ecs/systems/utility/scene_object_utility.cpp",
     "ecs/systems/utility/world_utility.cpp",
     "ecs/systems/demo/bad_apple_system.cpp",
-    "ecs/flecs_types/flecs_server.cpp"
-])
+    "ecs/flecs_types/flecs_server.cpp",
+    "runtime/flecs_runtime_debugger.cpp",
+    # Network module
+    "network/network_server.cpp",
+]
+
+# Editor-only source files (only compile when building the editor)
+if env.editor_build:
+    base_sources.extend([
+        "editor/flecs_editor_plugin.cpp",
+        "editor/flecs_entity_inspector.cpp",
+        "editor/flecs_profiler.cpp",
+        "editor/flecs_profiler_plugin.cpp",
+        "editor/world_info.cpp",
+        "editor/network_editor_plugin.cpp",
+    ])
+
+module_env.add_source_files(env.modules_sources, base_sources)
 
 # Use env.GetModulePath() for the module's root, or env.Dir('.')
 # Based on common Godot SCons practices, env.GetModulePath() is often available
@@ -34,6 +50,8 @@ module_env.Append(CPPPATH=[
     env.Dir('thirdparty/flecs/distr'),
     env.Dir('thirdparty/concurrentqueue/'),
 
+    # Editor subdirectory
+    env.Dir('editor'),
 
     # Main ECS subdirectories relative to module root
     env.Dir('ecs'),
@@ -42,6 +60,12 @@ module_env.Append(CPPPATH=[
     env.Dir('ecs/utility'),
     env.Dir('ecs/systems'),
     env.Dir('ecs/systems/utility'),
+    env.Dir('runtime'),
+
+    # Network module
+    env.Dir('network'),
+    env.Dir('network/components'),
+    env.Dir('network/systems'),
 ])
 
 # NOTE: No build-level override for concurrentqueue is applied by default here.

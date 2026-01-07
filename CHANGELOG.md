@@ -7,6 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0-beta.1] - 2025-01-29
+
+### Added
+
+#### Networking System (Major Feature)
+- **NetworkServer Singleton** - Complete multiplayer networking layer built on top of ECS
+  - Host/join game support with configurable tick rate
+  - Automatic entity spawning and despawning across network
+  - Component replication with multiple modes (continuous, on-change, reliable, once)
+  - Authority management (server, client, transferable, shared modes)
+  - Input prediction and reconciliation system
+  - Transform interpolation for smooth networked movement
+  - RPC queue system for remote method calls
+  - Network statistics tracking (bytes sent/received, update counts)
+  - Relevancy system for bandwidth optimization
+  - ENet transport integration (optional/abstracted)
+
+- **Network Components** - Full suite of ECS components for multiplayer
+  - `NetworkIdentity` - Unique network ID, spawn tracking, scene path
+  - `NetworkAuthority` - Authority mode, owner/authority peer IDs
+  - `NetworkReplicated` - Per-component replication configuration
+  - `NetworkDirty` - Change tracking for delta updates
+  - `NetworkPendingSpawn` / `NetworkPendingDestroy` - Spawn queue management
+  - `NetworkInterpolation` - Generic state interpolation buffer
+  - `NetworkTransformInterpolation3D` / `NetworkTransformInterpolation2D` - Transform-specific interpolation
+  - `NetworkPrediction` - Client-side prediction state buffer
+  - `NetworkInput` - Input frame buffer with acknowledgment tracking
+  - `NetworkStats` - Per-entity network statistics
+  - `NetworkRelevancy` - Distance-based relevancy and peer filtering
+  - `NetworkRPCQueue` - Queued RPC calls for batched sending
+
+- **Network Editor Plugin** - New "Network Inspector" dock for debugging multiplayer
+  - Connection status display
+  - Entity replication monitoring
+  - Network statistics visualization
+
+#### Editor Improvements
+- **InstanceManager** - Multi-editor-instance coordination system
+  - Detects and manages multiple Godot editor instances
+  - Lock file-based resource coordination
+  - Primary/secondary instance election
+  - Graceful degradation for secondary instances
+  - Prevents debugger/profiler conflicts between instances
+
+- **Profiler Enhancements**
+  - Instance status display in profiler UI (primary/secondary)
+  - Clear documentation that profiler is for local editor use only
+  - Improved error messaging for multi-instance scenarios
+  - Resource locking integration
+
+#### Documentation
+- **Network module documentation** (`network/README.md`) - Comprehensive networking guide
+  - Quick start examples for server/client setup
+  - Architecture overview and data flow diagrams
+  - Complete API reference for NetworkServer
+  - Component documentation with struct definitions
+  - Configuration options (tick rate, interpolation, debug logging)
+  - Best practices for authority, bandwidth, and error handling
+  - Troubleshooting guide
+
+- **Remote Debugging Guide** (`REMOTE_DEBUGGING_GUIDE.md`) - Complete remote debugging documentation
+  - Architecture overview (runtime debugger, editor plugin, profiler)
+  - Usage instructions for remote inspection
+  - API reference for FlecsRuntimeDebugger
+  - Message protocol specification
+  - Troubleshooting section
+
+- **Debugger Plugin Documentation** (`DEBUGGER_PLUGIN_DOCUMENTATION.md`)
+  - Component architecture (FlecsDebuggerPlugin, FlecsWorldEditorPlugin)
+  - Message protocol (request/response formats)
+  - Data flow diagrams
+  - Session management details
+  - Future enhancement plans
+
+- **Profiler Documentation** - Enhanced troubleshooting and usage guides
+  - `docs/PROFILER_README.md` - Quick start guide
+  - `docs/PROFILER_TROUBLESHOOTING.md` - Common issues and solutions
+  - `docs/PROFILER_API.md` - Complete API reference
+
+### Changed
+
+- **NetworkServer API** - Changed bound method signatures to use `int` instead of namespaced enums
+  - `NetworkTypes::DisconnectReason` → `int` in public bindings
+  - Internal casting preserves type safety
+  - Fixes Godot Variant binding compatibility issues
+
+- **Profiler Plugin** - Updated to integrate with InstanceManager
+  - Shows instance status in info panel
+  - Falls back gracefully when not primary instance
+  - Clearer messaging about local-only profiling
+
+- **Editor Plugin** - InstanceManager lifecycle integration
+  - Initialize on ENTER_TREE
+  - Shutdown on EXIT_TREE
+  - Proper resource cleanup
+
+### Fixed
+
+- **Enum Binding Errors** - Resolved compilation errors with namespaced enums in Godot bindings
+  - `NetworkTypes::DisconnectReason` caused Variant binder errors
+  - Solution: Use `int` in bound signatures with internal casting
+
+- **Network Editor Plugin Name** - Fixed missing dock name in TabContainer
+  - Dock now properly labeled "Network Inspector" in editor UI
+
+- **Multi-Instance Conflicts** - Resolved profiler/debugger issues when multiple editors running
+  - Profiler data not appearing due to resource conflicts
+  - Remote debugging messages going to wrong instance
+  - InstanceManager now coordinates access
+
+---
+
 ## [1.1.2-a.1] - 2025-01-28
 
 ### Changed
@@ -23,7 +135,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All optimizations preserved:
     - Row-based processing (no per-pixel modulo/division)
     - Fast inner loops (only additions)
-    - SIMD support unchanged
     - Multi-threading support unchanged
     - Y-flip support unchanged
 
@@ -198,9 +309,9 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
   - Support for both GDScript and C# naming conventions
   - Separate process and physics process phases
 - **BadAppleSystem optimizations** - Demo system with major performance improvements
-  - SIMD vectorization (SSE2 for x86/x64, NEON for ARM)
   - Multi-threaded pixel processing with WorkerThreadPool
-  - Format-specific optimized loops
+  - Format-specific optimized loops (template-based, zero overhead)
+  - Row-based processing (eliminates per-pixel modulo/division)
   - 12x+ overall performance improvement
 - **Lock-free CommandQueue** - Thread-safe command queue with object pooling
   - Multi-producer safe enqueueing
@@ -244,7 +355,6 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 - **BadAppleSystem**: 5 FPS → 60+ FPS (12x improvement)
   - Baseline: 5 FPS
   - Format-specific loops: 12 FPS (2.4x)
-  - + SIMD: 23 FPS (4.6x)
   - + Multi-threading: 60+ FPS (12+x)
 - **CommandQueue**: 10,000+ commands/frame throughput
 - **GDScriptRunnerSystem**: ~10ns cache lookup per entity
@@ -280,11 +390,37 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 
 **Examples:**
 - `1.1.0-a.1` - Version 1.1.0, alpha stage, build 1
-- `1.1.0` - Version 1.1.0, stable release
+- `1.2.0-beta.1` - Version 1.2.0, beta stage, build 1
+- `1.2.0` - Version 1.2.0, stable release
 
 ---
 
 ## Migration Guide
+
+### From 1.1.x to 1.2.0-beta.1
+
+**No breaking changes** - This release is fully backward compatible.
+
+**New Features to Adopt:**
+
+1. **Networking** - Add multiplayer support to your game:
+   ```gdscript
+   # Host a game
+   NetworkServer.host_game(7777, 16)
+   
+   # Join a game  
+   NetworkServer.join_game("127.0.0.1", 7777)
+   
+   # Register entity for replication
+   NetworkServer.register_networked_entity(entity_rid, "res://player.tscn")
+   ```
+
+2. **Multi-Instance Awareness** - Check for instance conflicts:
+   ```cpp
+   if (InstanceManager::get_singleton()->is_primary_instance()) {
+       // Safe to use remote debugging
+   }
+   ```
 
 ### From 1.0.x to 1.1.0-a.1
 
@@ -298,24 +434,25 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 
 **Performance Improvements:**
 - Existing code will benefit from internal optimizations
-- Consider adopting SIMD-optimized patterns for pixel/batch processing
+- Consider adopting template-based optimized patterns for pixel/batch processing
 - Use object pooling patterns from CommandQueue for your systems
 
 ---
 
 ## Future Plans
 
-### Version 1.2.0 (Future)
-- Enhanced runtime component features (arrays, nested structs)
-- Additional utility systems
-- More comprehensive examples
-- Performance profiling tools
+### Version 1.2.0 (Stable)
+- Networking system stabilization
+- Additional network examples
+- Performance profiling for network systems
+- Comprehensive multiplayer testing
 
 ### Version 2.0.0 (Future)
 - Godot 4.5+ compatibility
 - Advanced Flecs features (pipelines, observers)
 - Enhanced reflection system
 - Breaking API improvements based on feedback
+- Removal of deprecated `register_component_type()`
 
 ---
 
