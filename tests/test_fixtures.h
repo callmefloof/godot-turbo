@@ -78,7 +78,7 @@ namespace TestFixtures {
  * and provides helper methods for world management.
  */
 class FlecsServerFixture {
-protected:
+public:
 	RID world_id;
 	FlecsServer *server = nullptr;
 
@@ -123,7 +123,7 @@ protected:
 	 */
 	flecs::entity get_entity(const RID &entity_rid) {
 		if (server && world_id.is_valid()) {
-			return server->_get_entity(world_id, entity_rid);
+			return server->_get_entity(entity_rid, world_id);
 		}
 		return flecs::entity();
 	}

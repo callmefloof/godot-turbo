@@ -194,41 +194,38 @@ RID Navigation2DUtility::create_sg_parser_with_callable(const RID &world_id, con
 
 
 void Navigation2DUtility::_bind_methods() {
-    
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_agent", "world_id", "name"),
+            &Navigation2DUtility::create_nav_agent);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_agent_with_id", "world_id", "agent_id", "name"),
+            &Navigation2DUtility::create_nav_agent_with_id);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_agent_with_object", "world_id", "nav_agent"),
+            &Navigation2DUtility::create_nav_agent_with_object);
 
-    ClassDB::bind_static_method(get_class_static(), "create_nav_agent",
-            &Navigation2DUtility::create_nav_agent, "world", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_agent_with_id",
-            &Navigation2DUtility::create_nav_agent_with_id, "world", "agent_id", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_agent_with_object",
-            &Navigation2DUtility::create_nav_agent_with_object, "world", "nav_agent");
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_link", "world_id", "name"),
+            &Navigation2DUtility::create_nav_link);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_link_with_id", "world_id", "link_id", "name"),
+            &Navigation2DUtility::create_nav_link_with_id);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_link_with_object", "world_id", "nav_link"),
+            &Navigation2DUtility::create_nav_link_with_object);
 
-    ClassDB::bind_static_method(get_class_static(), "create_nav_link",
-            &Navigation2DUtility::create_nav_link, "world", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_link_with_id",
-            &Navigation2DUtility::create_nav_link_with_id, "world", "link_id", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_link_with_object",
-            &Navigation2DUtility::create_nav_link_with_object, "world", "nav_link");
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_obstacle", "world_id", "name"),
+            &Navigation2DUtility::create_nav_obstacle);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_obstacle_with_id", "world_id", "obstacle_id", "name"),
+            &Navigation2DUtility::create_nav_obstacle_with_id);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_obstacle_with_object", "world_id", "nav_obstacle"),
+            &Navigation2DUtility::create_nav_obstacle_with_object);
 
-    ClassDB::bind_static_method(get_class_static(), "create_nav_obstacle",
-            &Navigation2DUtility::create_nav_obstacle, "world", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_obstacle_with_id",
-            &Navigation2DUtility::create_nav_obstacle_with_id, "world", "obstacle_id", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_obstacle_with_object",
-            &Navigation2DUtility::create_nav_obstacle_with_object, "world", "nav_obstacle");
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_region", "world_id", "name"),
+            &Navigation2DUtility::create_nav_region);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_region_with_id", "world_id", "region_id", "name"),
+            &Navigation2DUtility::create_nav_region_with_id);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_nav_region_with_object", "world_id", "nav_region"),
+            &Navigation2DUtility::create_nav_region_with_object);
 
-    ClassDB::bind_static_method(get_class_static(), "create_nav_region",
-            &Navigation2DUtility::create_nav_region, "world", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_region_with_id",
-            &Navigation2DUtility::create_nav_region_with_id, "world", "region_id", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_nav_region_with_object",
-            &Navigation2DUtility::create_nav_region_with_object, "world", "nav_region");
-
-    ClassDB::bind_static_method(get_class_static(), "create_source_geometry_parser",
-            &Navigation2DUtility::create_source_geometry_parser, "world", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_sg_parser_with_callable",
-        &Navigation2DUtility::create_sg_parser_with_callable, "world", "callable", "name");
-    ClassDB::bind_static_method(get_class_static(), "create_sg_parser_with_id",
-        &Navigation2DUtility::create_sg_parser_with_id, "world", "name");
-
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_source_geometry_parser", "world_id", "name"),
+            &Navigation2DUtility::create_source_geometry_parser);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_sg_parser_with_callable", "world_id", "callable", "name"),
+            &Navigation2DUtility::create_sg_parser_with_callable);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_sg_parser_with_id", "world_id", "source_geometry_parser_id", "name"),
+            &Navigation2DUtility::create_sg_parser_with_id);
 }

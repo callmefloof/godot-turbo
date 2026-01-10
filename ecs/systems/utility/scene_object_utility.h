@@ -138,5 +138,9 @@ public:
 	 * @note Not thread-safe - should only be called from main thread.
 	 */
 	static SceneObjectUtility* get_singleton();
-};
 
+	/**
+	 * @brief Destroys the singleton instance if it exists.
+	 */
+	static void cleanup_singleton();
+};

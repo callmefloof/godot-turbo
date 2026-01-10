@@ -182,18 +182,18 @@ RID Physics3DUtility::create_soft_body_with_object(const RID &world_id, SoftBody
 
 
 void Physics3DUtility::_bind_methods() {
-    ClassDB::bind_static_method(get_class_static(), "create_area_with_object",
-            &Physics3DUtility::create_area_with_object, "world", "area_3d");
-    ClassDB::bind_static_method(get_class_static(), "create_rigid_body_with_object",
-            &Physics3DUtility::create_rigid_body_with_object, "world", "rigid_body_3d");
-    ClassDB::bind_static_method(get_class_static(), "create_physics_body_with_object",
-            &Physics3DUtility::create_physics_body_with_object, "world", "physics_body_3d");
-    ClassDB::bind_static_method(get_class_static(), "create_joint_with_object",
-            &Physics3DUtility::create_joint_with_object, "world", "joint_3d");
-    ClassDB::bind_static_method(get_class_static(), "create_soft_body_with_object",
-            &Physics3DUtility::create_soft_body_with_object, "world", "soft_body_3d");
-    ClassDB::bind_static_method(get_class_static(), "create_area",
-            &Physics3DUtility::create_area, "world", "name", "space_id");
-    ClassDB::bind_static_method(get_class_static(), "create_body",
-            &Physics3DUtility::create_body, "world", "name", "space_id");
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_area_with_object", "world_id", "area_3d"),
+            &Physics3DUtility::create_area_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_rigid_body_with_object", "world_id", "rigid_body_3d"),
+            &Physics3DUtility::create_rigid_body_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_physics_body_with_object", "world_id", "physics_body_3d"),
+            &Physics3DUtility::create_physics_body_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_joint_with_object", "world_id", "joint_3d"),
+            &Physics3DUtility::create_joint_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_soft_body_with_object", "world_id", "soft_body_3d"),
+            &Physics3DUtility::create_soft_body_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_area", "world_id", "name", "space_id"),
+            &Physics3DUtility::create_area);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_body", "world_id", "name", "space_id"),
+            &Physics3DUtility::create_body);
 }

@@ -31,6 +31,11 @@ void GDScriptRunnerSystem::init(const RID& p_world_rid, flecs::world* p_world) {
 					PROCESS_METHOD_GDSCRIPT,
 					PROCESS_METHOD_CSHARP
 				);
+				cache.has_physics_process = check_and_cache_method(
+					script_comp.instance_type,
+					PHYSICS_PROCESS_METHOD_GDSCRIPT,
+					PHYSICS_PROCESS_METHOD_CSHARP
+				);
 				cache.checked = true;
 			}
 			
@@ -39,7 +44,7 @@ void GDScriptRunnerSystem::init(const RID& p_world_rid, flecs::world* p_world) {
 				FlecsServer* server = FlecsServer::get_singleton();
 				ERR_FAIL_NULL(server);
 				
-				RID entity_rid = server->_get_or_create_rid_for_entity(world_rid, e.id());
+				RID entity_rid = server->_get_or_create_rid_for_entity(world_rid, e);
 				float delta = static_cast<float>(world->delta_time());
 				
 				execute_script_method(
@@ -61,11 +66,17 @@ void GDScriptRunnerSystem::init(const RID& p_world_rid, flecs::world* p_world) {
 			
 			// Check if script has _flecs_physics_process method
 			if (!cache.checked) {
+				cache.has_process = check_and_cache_method(
+					script_comp.instance_type,
+					PROCESS_METHOD_GDSCRIPT,
+					PROCESS_METHOD_CSHARP
+				);
 				cache.has_physics_process = check_and_cache_method(
 					script_comp.instance_type,
 					PHYSICS_PROCESS_METHOD_GDSCRIPT,
 					PHYSICS_PROCESS_METHOD_CSHARP
 				);
+				cache.checked = true;
 			}
 			
 			// Execute if method exists
@@ -73,7 +84,7 @@ void GDScriptRunnerSystem::init(const RID& p_world_rid, flecs::world* p_world) {
 				FlecsServer* server = FlecsServer::get_singleton();
 				ERR_FAIL_NULL(server);
 				
-				RID entity_rid = server->_get_or_create_rid_for_entity(world_rid, e.id());
+				RID entity_rid = server->_get_or_create_rid_for_entity(world_rid, e);
 				
 				// For physics, use fixed physics delta
 				// Note: Flecs doesn't have built-in physics timing, so we use delta_time
@@ -139,11 +150,10 @@ void GDScriptRunnerSystem::execute_script_method(flecs::entity entity,
 		return;
 	}
 	
-	const SceneNodeComponent* node_comp = entity.get<SceneNodeComponent>();
-	ERR_FAIL_NULL(node_comp);
+	const SceneNodeComponent& node_comp = entity.get<SceneNodeComponent>();
 	
 	// Get the Node from storage
-	Node* node = server->get_node_from_node_storage(entity_rid);
+	Node* node = server->get_node_from_node_storage(node_comp.node_id, world_rid);
 	if (!node) {
 		// Node not in storage or has been freed
 		return;
@@ -232,6 +242,18 @@ void GDScriptRunnerSystem::set_process_enabled(bool enabled) {
 			process_system.disable();
 		}
 	}
+
+	if (physics_process_system.is_valid() && flecs::OnPhysicsUpdate == flecs::OnUpdate) {
+		if (!enabled) {
+			if (physics_process_system.enabled()) {
+				physics_process_system.disable();
+				physics_process_suspended_by_process = true;
+			}
+		} else if (physics_process_suspended_by_process) {
+			physics_process_system.enable();
+			physics_process_suspended_by_process = false;
+		}
+	}
 }
 
 void GDScriptRunnerSystem::set_physics_process_enabled(bool enabled) {
@@ -242,6 +264,7 @@ void GDScriptRunnerSystem::set_physics_process_enabled(bool enabled) {
 			physics_process_system.disable();
 		}
 	}
+	physics_process_suspended_by_process = false;
 }
 
 bool GDScriptRunnerSystem::is_process_enabled() const {

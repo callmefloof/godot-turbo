@@ -91,10 +91,18 @@ private:
 			return;
 		}
 
+		RenderingServer *rs = RenderingServer::get_singleton();
+		NavigationServer2D *ns2d = NavigationServer2D::get_singleton();
+		PhysicsServer2D *ps2d = PhysicsServer2D::get_singleton();
+		if (!rs || !ns2d || !ps2d) {
+			ERR_FAIL_MSG("World2DUtility: Required servers are not initialized");
+			return;
+		}
+
 		World2DComponent w2c;
-		w2c.canvas_id = RS::get_singleton()->canvas_create();
-		w2c.navigation_map_id = NavigationServer2D::get_singleton()->map_create();
-		w2c.space_id = PhysicsServer2D::get_singleton()->space_create();
+		w2c.canvas_id = rs->canvas_create();
+		w2c.navigation_map_id = ns2d->map_create();
+		w2c.space_id = ps2d->space_create();
 		world->set<World2DComponent>(w2c);
 	}
 
@@ -212,7 +220,13 @@ public:
 			return;
 		}
 
-		flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
+		FlecsServer *server = FlecsServer::get_singleton();
+		if (!server) {
+			ERR_FAIL_MSG("World2DUtility: FlecsServer singleton not available");
+			return;
+		}
+
+		flecs::world *world = server->_get_world(world_id);
 		if (!world) {
 			ERR_FAIL_MSG("World2DUtility: Failed to get Flecs world from RID");
 			return;
@@ -305,13 +319,21 @@ private:
 			return;
 		}
 
+		RenderingServer *rs = RenderingServer::get_singleton();
+		NavigationServer3D *ns3d = NavigationServer3D::get_singleton();
+		PhysicsServer3D *ps3d = PhysicsServer3D::get_singleton();
+		if (!rs || !ns3d || !ps3d) {
+			ERR_FAIL_MSG("World3DUtility: Required servers are not initialized");
+			return;
+		}
+
 		World3DComponent w3c;
-		w3c.camera_attributes_id = RS::get_singleton()->camera_attributes_create();
-		w3c.environment_id = RS::get_singleton()->environment_create();
-		w3c.fallback_environment_id = RS::get_singleton()->environment_create();
-		w3c.navigation_map_id = NavigationServer3D::get_singleton()->map_create();
-		w3c.scenario_id = RS::get_singleton()->scenario_create();
-		w3c.space_id = PhysicsServer3D::get_singleton()->space_create();
+		w3c.camera_attributes_id = rs->camera_attributes_create();
+		w3c.environment_id = rs->environment_create();
+		w3c.fallback_environment_id = rs->environment_create();
+		w3c.navigation_map_id = ns3d->map_create();
+		w3c.scenario_id = rs->scenario_create();
+		w3c.space_id = ps3d->space_create();
 		world->set<World3DComponent>(w3c);
 	}
 
@@ -435,7 +457,13 @@ public:
 			return;
 		}
 
-		flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
+		FlecsServer *server = FlecsServer::get_singleton();
+		if (!server) {
+			ERR_FAIL_MSG("World3DUtility: FlecsServer singleton not available");
+			return;
+		}
+
+		flecs::world *world = server->_get_world(world_id);
 		if (!world) {
 			ERR_FAIL_MSG("World3DUtility: Failed to get Flecs world from RID");
 			return;

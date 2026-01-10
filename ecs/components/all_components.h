@@ -619,76 +619,80 @@ inline void deserialize_world_3d(void* data, const Dictionary& dict) {
 } // namespace ComponentSerialization
 
 // ============================================================================
-// COMPONENT REGISTRATION
-// ============================================================================
-
-// Register components WITHOUT serialization (lightweight)
-FLECS_COMPONENT(Transform2DComponent)
-FLECS_COMPONENT(Transform3DComponent)
-FLECS_COMPONENT(DirtyTransform)
-FLECS_COMPONENT(VisibilityComponent)
-FLECS_COMPONENT(SceneNodeComponent)
-FLECS_COMPONENT(ObjectInstanceComponent)
-FLECS_COMPONENT(GameScriptComponent)
-FLECS_COMPONENT(ResourceComponent)
-FLECS_COMPONENT(World2DComponent)
-FLECS_COMPONENT(World3DComponent)
-FLECS_COMPONENT(MeshComponent)
-FLECS_COMPONENT(MultiMeshComponent)
-FLECS_COMPONENT(MultiMeshInstanceComponent)
-FLECS_COMPONENT(MultiMeshInstanceDataComponent)
-FLECS_COMPONENT(ParticlesComponent)
-FLECS_COMPONENT(ReflectionProbeComponent)
-FLECS_COMPONENT(VoxelGIComponent)
-FLECS_COMPONENT(SkeletonComponent)
-FLECS_COMPONENT(EnvironmentComponent)
-FLECS_COMPONENT(CameraComponent)
-FLECS_COMPONENT(MainCamera)
-FLECS_COMPONENT(CompositorComponent)
-FLECS_COMPONENT(ViewportComponent)
-FLECS_COMPONENT(DirectionalLight3DComponent)
-FLECS_COMPONENT(DirectionalLight2DComponent)
-FLECS_COMPONENT(PointLightComponent)
-FLECS_COMPONENT(OmniLightComponent)
-FLECS_COMPONENT(SpotLightComponent)
-FLECS_COMPONENT(LightOccluderComponent)
-FLECS_COMPONENT(ScenarioComponent)
-FLECS_COMPONENT(RenderInstanceComponent)
-FLECS_COMPONENT(CanvasItemComponent)
-
-// Physics components
-FLECS_COMPONENT(Area2DComponent)
-FLECS_COMPONENT(Body2DComponent)
-FLECS_COMPONENT(Joint2DComponent)
-FLECS_COMPONENT(Area3DComponent)
-FLECS_COMPONENT(Body3DComponent)
-FLECS_COMPONENT(Joint3DComponent)
-FLECS_COMPONENT(SoftBody3DComponent)
-
-// Navigation components
-FLECS_COMPONENT(NavAgent2DComponent)
-FLECS_COMPONENT(NavLink2DComponent)
-FLECS_COMPONENT(NavObstacle2DComponent)
-FLECS_COMPONENT(NavRegion2DComponent)
-FLECS_COMPONENT(SourceGeometryParser2DComponent)
-FLECS_COMPONENT(NavAgent3DComponent)
-FLECS_COMPONENT(NavLink3DComponent)
-FLECS_COMPONENT(NavObstacle3DComponent)
-FLECS_COMPONENT(NavRegion3DComponent)
-FLECS_COMPONENT(SourceGeometryParser3DComponent)
-
-
-// ============================================================================
 // WORLD REGISTRATION HELPER
 // ============================================================================
 
 namespace AllComponents {
+
+inline void register_reflection_components() {
+	static bool registered = false;
+	if (registered) {
+		return;
+	}
+	registered = true;
+
+	FlecsReflection::ComponentRegistrar<Transform2DComponent>::register_type("Transform2DComponent");
+	FlecsReflection::ComponentRegistrar<Transform3DComponent>::register_type("Transform3DComponent");
+	FlecsReflection::ComponentRegistrar<DirtyTransform>::register_type("DirtyTransform");
+	FlecsReflection::ComponentRegistrar<VisibilityComponent>::register_type("VisibilityComponent");
+	FlecsReflection::ComponentRegistrar<SceneNodeComponent>::register_type("SceneNodeComponent");
+	FlecsReflection::ComponentRegistrar<ObjectInstanceComponent>::register_type("ObjectInstanceComponent");
+	FlecsReflection::ComponentRegistrar<GameScriptComponent>::register_type("GameScriptComponent");
+	FlecsReflection::ComponentRegistrar<ResourceComponent>::register_type("ResourceComponent");
+	FlecsReflection::ComponentRegistrar<World2DComponent>::register_type("World2DComponent");
+	FlecsReflection::ComponentRegistrar<World3DComponent>::register_type("World3DComponent");
+	FlecsReflection::ComponentRegistrar<MeshComponent>::register_type("MeshComponent");
+	FlecsReflection::ComponentRegistrar<MultiMeshComponent>::register_type("MultiMeshComponent");
+	FlecsReflection::ComponentRegistrar<MultiMeshInstanceComponent>::register_type("MultiMeshInstanceComponent");
+	FlecsReflection::ComponentRegistrar<MultiMeshInstanceDataComponent>::register_type("MultiMeshInstanceDataComponent");
+	FlecsReflection::ComponentRegistrar<ParticlesComponent>::register_type("ParticlesComponent");
+	FlecsReflection::ComponentRegistrar<ReflectionProbeComponent>::register_type("ReflectionProbeComponent");
+	FlecsReflection::ComponentRegistrar<VoxelGIComponent>::register_type("VoxelGIComponent");
+	FlecsReflection::ComponentRegistrar<SkeletonComponent>::register_type("SkeletonComponent");
+	FlecsReflection::ComponentRegistrar<EnvironmentComponent>::register_type("EnvironmentComponent");
+	FlecsReflection::ComponentRegistrar<CameraComponent>::register_type("CameraComponent");
+	FlecsReflection::ComponentRegistrar<MainCamera>::register_type("MainCamera");
+	FlecsReflection::ComponentRegistrar<CompositorComponent>::register_type("CompositorComponent");
+	FlecsReflection::ComponentRegistrar<ViewportComponent>::register_type("ViewportComponent");
+	FlecsReflection::ComponentRegistrar<DirectionalLight3DComponent>::register_type("DirectionalLight3DComponent");
+	FlecsReflection::ComponentRegistrar<DirectionalLight2DComponent>::register_type("DirectionalLight2DComponent");
+	FlecsReflection::ComponentRegistrar<PointLightComponent>::register_type("PointLightComponent");
+	FlecsReflection::ComponentRegistrar<OmniLightComponent>::register_type("OmniLightComponent");
+	FlecsReflection::ComponentRegistrar<SpotLightComponent>::register_type("SpotLightComponent");
+	FlecsReflection::ComponentRegistrar<LightOccluderComponent>::register_type("LightOccluderComponent");
+	FlecsReflection::ComponentRegistrar<ScenarioComponent>::register_type("ScenarioComponent");
+	FlecsReflection::ComponentRegistrar<RenderInstanceComponent>::register_type("RenderInstanceComponent");
+	FlecsReflection::ComponentRegistrar<CanvasItemComponent>::register_type("CanvasItemComponent");
+
+	// Physics components
+	FlecsReflection::ComponentRegistrar<Area2DComponent>::register_type("Area2DComponent");
+	FlecsReflection::ComponentRegistrar<Body2DComponent>::register_type("Body2DComponent");
+	FlecsReflection::ComponentRegistrar<Joint2DComponent>::register_type("Joint2DComponent");
+	FlecsReflection::ComponentRegistrar<Area3DComponent>::register_type("Area3DComponent");
+	FlecsReflection::ComponentRegistrar<Body3DComponent>::register_type("Body3DComponent");
+	FlecsReflection::ComponentRegistrar<Joint3DComponent>::register_type("Joint3DComponent");
+	FlecsReflection::ComponentRegistrar<SoftBody3DComponent>::register_type("SoftBody3DComponent");
+
+	// Navigation components
+	FlecsReflection::ComponentRegistrar<NavAgent2DComponent>::register_type("NavAgent2DComponent");
+	FlecsReflection::ComponentRegistrar<NavLink2DComponent>::register_type("NavLink2DComponent");
+	FlecsReflection::ComponentRegistrar<NavObstacle2DComponent>::register_type("NavObstacle2DComponent");
+	FlecsReflection::ComponentRegistrar<NavRegion2DComponent>::register_type("NavRegion2DComponent");
+	FlecsReflection::ComponentRegistrar<SourceGeometryParser2DComponent>::register_type("SourceGeometryParser2DComponent");
+	FlecsReflection::ComponentRegistrar<NavAgent3DComponent>::register_type("NavAgent3DComponent");
+	FlecsReflection::ComponentRegistrar<NavLink3DComponent>::register_type("NavLink3DComponent");
+	FlecsReflection::ComponentRegistrar<NavObstacle3DComponent>::register_type("NavObstacle3DComponent");
+	FlecsReflection::ComponentRegistrar<NavRegion3DComponent>::register_type("NavRegion3DComponent");
+	FlecsReflection::ComponentRegistrar<SourceGeometryParser3DComponent>::register_type("SourceGeometryParser3DComponent");
+}
 
 /**
  * Register all components with a Flecs world
  * Call this once during world initialization
  */
 inline void register_all(flecs::world& world, bool enable_serialization = false) {
+	register_reflection_components();
+
 	// First, register Godot's opaque types
 	FlecsOpaqueTypes::register_opaque_types(world);
 	

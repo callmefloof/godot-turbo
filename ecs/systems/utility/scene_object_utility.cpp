@@ -60,44 +60,42 @@ TypedArray<RID> SceneObjectUtility::create_entities_from_scene(const RID &world_
         if (node == nullptr) {
             continue;
         }
-        entities.append_array(create_entities(world_id, node, entities));
+        entities = create_entities(world_id, node, entities);
     }
     return entities;
 }
 
 TypedArray<RID> SceneObjectUtility::create_entities(const RID &world_id, const Node *base_node, const TypedArray<RID> &entities, int current_depth, const int max_depth)  {
-current_depth++;
-if (base_node == nullptr) {
-    ERR_FAIL_COND_V(base_node == nullptr,entities);
-}
-if (current_depth > max_depth) {
-    ERR_FAIL_COND_V(current_depth > max_depth,entities);
-}
-TypedArray<RID> result_entities = TypedArray<RID>(entities);
-//get the children of Node
-auto children = base_node->get_children();
-for (Variant &variant : children ) {
-    // for each node check to see if it is an object
-    Node *child_node = Object::cast_to<Node>(variant);
-    if (child_node == nullptr) {
-        continue;
+    if (base_node == nullptr) {
+        ERR_FAIL_COND_V(base_node == nullptr, entities);
     }
-    //gather resulting entities from entity creation
-    TypedArray<RID> child_entity_result = create_entity(world_id, child_node);
-    // BUG FIX: append the created entities to the result (was missing in original)
-    result_entities.append_array(child_entity_result);
-
-    //check to see if the node has children
-    TypedArray<Node> node_children = child_node->get_children();
-    if (node_children.size() > 0) {
-        //recursively check each child
-        //repeat until we hit our search limit
-        result_entities.append_array(create_entities(world_id, child_node, result_entities, current_depth, max_depth));
+    if (!world_id.is_valid()) {
+        ERR_FAIL_COND_V(!world_id.is_valid(), entities);
     }
-}
+    if (!FlecsServer::get_singleton()) {
+        ERR_FAIL_COND_V(!FlecsServer::get_singleton(), entities);
+    }
 
-//return resulting entities
-return result_entities;
+    TypedArray<RID> result_entities = TypedArray<RID>(entities);
+    // Include the base node itself.
+    result_entities.append_array(create_entity(world_id, const_cast<Node *>(base_node)));
+
+    if (current_depth >= max_depth) {
+        return result_entities;
+    }
+
+    // Get the children of Node.
+    auto children = base_node->get_children();
+    for (Variant &variant : children) {
+        Node *child_node = Object::cast_to<Node>(variant);
+        if (child_node == nullptr) {
+            continue;
+        }
+
+        result_entities = create_entities(world_id, child_node, result_entities, current_depth + 1, max_depth);
+    }
+
+    return result_entities;
 }
 
 
@@ -105,6 +103,13 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     TypedArray<RID> result;
     if (node == nullptr) {
         ERR_FAIL_COND_V(node == nullptr,result);
+    }
+    FlecsServer *server = FlecsServer::get_singleton();
+    if (!server) {
+        ERR_FAIL_COND_V(!server, result);
+    }
+    if (!world_id.is_valid()) {
+        ERR_FAIL_COND_V(!world_id.is_valid(), result);
     }
 
     // 3D navigation
@@ -403,7 +408,10 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
         return result;
     }
     // Fallback: create generic entity with SceneNodeComponent
-    flecs::world *flecs_world = FlecsServer::get_singleton()->_get_world(world_id);
+    flecs::world *flecs_world = server->_get_world(world_id);
+    if (!flecs_world) {
+        ERR_FAIL_V(result);
+    }
     String name = node->get_name();
     name = name + "_" + itos(Math::rand());
     flecs::entity e = flecs_world->entity();
@@ -412,7 +420,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     scene_node_component.node_id = node->get_instance_id();
     scene_node_component.class_name = node->get_class();
     e.set<SceneNodeComponent>(scene_node_component);
-    const RID entity = FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
+    const RID entity = server->_create_rid_for_entity(world_id, e);
 
     RID script_entity = get_node_script(world_id, node, entity);
     if(script_entity.is_valid()){
@@ -424,12 +432,22 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
 }
 
 RID SceneObjectUtility::get_node_script(const RID &world_id, const Node *node, const RID& entity_id) {
+    if (!node) {
+        return RID();
+    }
+    FlecsServer *server = FlecsServer::get_singleton();
+    if (!server || !world_id.is_valid() || !entity_id.is_valid()) {
+        return RID();
+    }
     const Variant variant = node->get_script();
     const Ref<Script> node_script = Ref<Script>(VariantCaster<Script*>::cast(variant));
     if ( node_script.is_valid()) {
         const RID child_resource_entity = ResourceObjectUtility::create_resource_entity(world_id, node_script);
-        flecs::entity child_resource_flecs_entity = FlecsServer::get_singleton()->_get_entity(child_resource_entity, world_id);
-        flecs::entity flecs_entity = FlecsServer::get_singleton()->_get_entity(entity_id, world_id);
+        if (!child_resource_entity.is_valid()) {
+            return RID();
+        }
+        flecs::entity child_resource_flecs_entity = server->_get_entity(child_resource_entity, world_id);
+        flecs::entity flecs_entity = server->_get_entity(entity_id, world_id);
         child_resource_flecs_entity.add(flecs::ChildOf, flecs_entity);
         return child_resource_entity;
     }
@@ -451,4 +469,11 @@ SceneObjectUtility* SceneObjectUtility::get_singleton() {
         instance = memnew(SceneObjectUtility);
     }
     return instance;
+}
+
+void SceneObjectUtility::cleanup_singleton() {
+    if (instance) {
+        memdelete(instance);
+        instance = nullptr;
+    }
 }

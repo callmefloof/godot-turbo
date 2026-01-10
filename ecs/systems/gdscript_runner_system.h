@@ -5,7 +5,7 @@
 #include "core/templates/rid.h"
 #include "core/variant/variant.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
-#include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_phases.h"
 
 /**
  * @class GDScriptRunnerSystem
@@ -75,6 +75,7 @@ private:
     flecs::entity physics_process_system;      ///< System running during OnPhysicsUpdate phase
     flecs::world* world = nullptr;             ///< Pointer to Flecs world
     RID world_rid;                             ///< RID of the Flecs world
+    bool physics_process_suspended_by_process = false; ///< Tracks auto-suspend when phases overlap
     
     // Method cache: maps script instance_type to method availability
     HashMap<StringName, ScriptMethodCache> method_cache;

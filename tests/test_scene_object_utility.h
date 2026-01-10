@@ -91,7 +91,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from basic Node") {
 	CHECK(entity_rid.is_valid());
 	
 	// Verify entity exists and has SceneNodeComponent
-	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	flecs::entity entity = server->_get_entity(entity_rid, world_id);
 	CHECK(entity.is_valid());
 	CHECK(entity.has<SceneNodeComponent>());
 	
@@ -113,7 +113,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from Node3D") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	CHECK(entity.has<SceneNodeComponent>());
 	
@@ -122,7 +122,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from Node3D") {
 }
 
 TEST_CASE("[SceneObjectUtility] Create entity from Node2D") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -135,7 +135,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from Node2D") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	CHECK(entity.has<SceneNodeComponent>());
 	
@@ -144,6 +144,8 @@ TEST_CASE("[SceneObjectUtility] Create entity from Node2D") {
 }
 
 TEST_CASE("[SceneObjectUtility] Create entity from MeshInstance3D") {
+	REQUIRE_BOTH_SERVERS();
+
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
 	
@@ -155,7 +157,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from MeshInstance3D") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	
 	memdelete(node);
@@ -163,6 +165,8 @@ TEST_CASE("[SceneObjectUtility] Create entity from MeshInstance3D") {
 }
 
 TEST_CASE("[SceneObjectUtility] Create entity from Camera3D") {
+	REQUIRE_BOTH_SERVERS();
+
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
 	
@@ -174,7 +178,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from Camera3D") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	
 	memdelete(node);
@@ -182,6 +186,8 @@ TEST_CASE("[SceneObjectUtility] Create entity from Camera3D") {
 }
 
 TEST_CASE("[SceneObjectUtility] Create entity from DirectionalLight3D") {
+	REQUIRE_BOTH_SERVERS();
+
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
 	
@@ -193,7 +199,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from DirectionalLight3D") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	
 	memdelete(node);
@@ -201,6 +207,8 @@ TEST_CASE("[SceneObjectUtility] Create entity from DirectionalLight3D") {
 }
 
 TEST_CASE("[SceneObjectUtility] Create entity from Area3D") {
+	REQUIRE_BOTH_SERVERS();
+
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
 	
@@ -212,7 +220,7 @@ TEST_CASE("[SceneObjectUtility] Create entity from Area3D") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	
 	memdelete(node);
@@ -247,7 +255,7 @@ TEST_CASE("[SceneObjectUtility] Recursive entity creation - simple hierarchy") {
 		RID entity_rid = entities[i];
 		CHECK(entity_rid.is_valid());
 		
-		flecs::entity entity = server->_get_entity(world_id, entity_rid);
+		flecs::entity entity = server->_get_entity(entity_rid, world_id);
 		CHECK(entity.is_valid());
 	}
 	
@@ -285,6 +293,8 @@ TEST_CASE("[SceneObjectUtility] Recursive entity creation - max depth limit") {
 }
 
 TEST_CASE("[SceneObjectUtility] Recursive entity creation - mixed node types") {
+	REQUIRE_BOTH_SERVERS();
+
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
 	
@@ -460,7 +470,7 @@ TEST_CASE("[SceneObjectUtility] Node class name stored") {
 	
 	CHECK(entities.size() >= 1);
 	
-	flecs::entity entity = server->_get_entity(world_id, entities[0]);
+	flecs::entity entity = server->_get_entity(entities[0], world_id);
 	CHECK(entity.is_valid());
 	
 	const SceneNodeComponent& snc = entity.get<SceneNodeComponent>();
@@ -471,7 +481,7 @@ TEST_CASE("[SceneObjectUtility] Node class name stored") {
 }
 
 TEST_CASE("[SceneObjectUtility] Multiple node types in single conversion") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -507,7 +517,7 @@ TEST_CASE("[SceneObjectUtility] Multiple node types in single conversion") {
 	
 	// Verify all entities are valid
 	for (int i = 0; i < entities.size(); i++) {
-		flecs::entity entity = server->_get_entity(world_id, entities[i]);
+		flecs::entity entity = server->_get_entity(entities[i], world_id);
 		CHECK(entity.is_valid());
 	}
 	

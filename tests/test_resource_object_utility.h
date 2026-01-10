@@ -74,7 +74,7 @@ static void thread_create_resources(void *p_userdata) {
 #endif // DISABLE_THREADED_TESTS
 
 TEST_CASE("[ResourceObjectUtility] Basic resource entity creation") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	CHECK(server != nullptr);
@@ -83,8 +83,8 @@ TEST_CASE("[ResourceObjectUtility] Basic resource entity creation") {
 	CHECK(world_id.is_valid());
 
 	// Create a simple resource
-	Ref<Resource> resource = memnew(Resource);
-	resource->set_name("TestResource");
+	Ref<StandardMaterial3D> resource = memnew(StandardMaterial3D);
+	resource->set_name("TestMaterial");
 
 	RID entity_rid = ResourceObjectUtility::create_resource_entity(world_id, resource);
 	CHECK(entity_rid.is_valid());
@@ -93,14 +93,14 @@ TEST_CASE("[ResourceObjectUtility] Basic resource entity creation") {
 	flecs::world *world = server->_get_world(world_id);
 	CHECK(world != nullptr);
 
-	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	flecs::entity entity = server->_get_entity(entity_rid, world_id);
 	CHECK(entity.is_valid());
 	CHECK(entity.has<ResourceComponent>());
 
 	// Verify component data
 	const ResourceComponent& rc = entity.get<ResourceComponent>();
-	CHECK(rc.resource_type == "Resource");
-	CHECK(rc.resource_name == "TestResource");
+	CHECK(rc.resource_type == "StandardMaterial3D");
+	CHECK(rc.resource_name == "TestMaterial");
 
 	server->free_world(world_id);
 }
@@ -141,7 +141,7 @@ TEST_CASE("[ResourceObjectUtility] Resource without RID") {
 }
 
 TEST_CASE("[ResourceObjectUtility] Material resource") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -152,7 +152,7 @@ TEST_CASE("[ResourceObjectUtility] Material resource") {
 	RID entity_rid = ResourceObjectUtility::create_resource_entity(world_id, material);
 	CHECK(entity_rid.is_valid());
 
-	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	flecs::entity entity = server->_get_entity(entity_rid, world_id);
 	CHECK(entity.is_valid());
 	CHECK(entity.has<ResourceComponent>());
 
@@ -165,7 +165,7 @@ TEST_CASE("[ResourceObjectUtility] Material resource") {
 }
 
 TEST_CASE("[ResourceObjectUtility] Resource with empty name") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -176,7 +176,7 @@ TEST_CASE("[ResourceObjectUtility] Resource with empty name") {
 	RID entity_rid = ResourceObjectUtility::create_resource_entity(world_id, material);
 	CHECK(entity_rid.is_valid());
 
-	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	flecs::entity entity = server->_get_entity(entity_rid, world_id);
 	CHECK(entity.is_valid());
 
 	const ResourceComponent& rc = entity.get<ResourceComponent>();
@@ -187,7 +187,7 @@ TEST_CASE("[ResourceObjectUtility] Resource with empty name") {
 }
 
 TEST_CASE("[ResourceObjectUtility] Multiple resources with names") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -210,9 +210,9 @@ TEST_CASE("[ResourceObjectUtility] Multiple resources with names") {
 	CHECK(entity3.is_valid());
 
 	// Verify all entities exist and have correct data
-	flecs::entity e1 = server->_get_entity(world_id, entity1);
-	flecs::entity e2 = server->_get_entity(world_id, entity2);
-	flecs::entity e3 = server->_get_entity(world_id, entity3);
+	flecs::entity e1 = server->_get_entity(entity1, world_id);
+	flecs::entity e2 = server->_get_entity(entity2, world_id);
+	flecs::entity e3 = server->_get_entity(entity3, world_id);
 
 	const ResourceComponent& rc1 = e1.get<ResourceComponent>();
 	const ResourceComponent& rc2 = e2.get<ResourceComponent>();
@@ -226,7 +226,7 @@ TEST_CASE("[ResourceObjectUtility] Multiple resources with names") {
 }
 
 TEST_CASE("[ResourceObjectUtility] Resource with script") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -241,7 +241,7 @@ TEST_CASE("[ResourceObjectUtility] Resource with script") {
 	RID entity_rid = ResourceObjectUtility::create_resource_entity(world_id, material);
 	CHECK(entity_rid.is_valid());
 
-	flecs::entity entity = server->_get_entity(world_id, entity_rid);
+	flecs::entity entity = server->_get_entity(entity_rid, world_id);
 	const ResourceComponent& rc = entity.get<ResourceComponent>();
 	
 	// Without a script attached, is_script_type should be false
@@ -252,7 +252,7 @@ TEST_CASE("[ResourceObjectUtility] Resource with script") {
 
 #ifndef DISABLE_THREADED_TESTS
 TEST_CASE("[ResourceObjectUtility] Thread-safety - concurrent resource creation") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -290,7 +290,7 @@ TEST_CASE("[ResourceObjectUtility] Thread-safety - concurrent resource creation"
 	for (int i = 0; i < entity_rids.size(); i++) {
 		CHECK(entity_rids[i].is_valid());
 		
-		flecs::entity entity = server->_get_entity(world_id, entity_rids[i]);
+		flecs::entity entity = server->_get_entity(entity_rids[i], world_id);
 		CHECK(entity.is_valid());
 		CHECK(entity.has<ResourceComponent>());
 	}
@@ -300,7 +300,7 @@ TEST_CASE("[ResourceObjectUtility] Thread-safety - concurrent resource creation"
 #endif // DISABLE_THREADED_TESTS
 
 TEST_CASE("[ResourceObjectUtility] Different resource types") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -318,8 +318,8 @@ TEST_CASE("[ResourceObjectUtility] Different resource types") {
 	CHECK(mat_entity.is_valid());
 	CHECK(mesh_entity.is_valid());
 
-	flecs::entity mat_e = server->_get_entity(world_id, mat_entity);
-	flecs::entity mesh_e = server->_get_entity(world_id, mesh_entity);
+	flecs::entity mat_e = server->_get_entity(mat_entity, world_id);
+	flecs::entity mesh_e = server->_get_entity(mesh_entity, world_id);
 
 	const ResourceComponent& mat_rc = mat_e.get<ResourceComponent>();
 	const ResourceComponent& mesh_rc = mesh_e.get<ResourceComponent>();
@@ -331,7 +331,7 @@ TEST_CASE("[ResourceObjectUtility] Different resource types") {
 }
 
 TEST_CASE("[ResourceObjectUtility] Stress test - many resources") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_BOTH_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -351,7 +351,7 @@ TEST_CASE("[ResourceObjectUtility] Stress test - many resources") {
 	int valid_count = 0;
 	for (int i = 0; i < RESOURCE_COUNT; i++) {
 		if (entity_rids[i].is_valid()) {
-			flecs::entity entity = server->_get_entity(world_id, entity_rids[i]);
+			flecs::entity entity = server->_get_entity(entity_rids[i], world_id);
 			if (entity.is_valid() && entity.has<ResourceComponent>()) {
 				valid_count++;
 			}

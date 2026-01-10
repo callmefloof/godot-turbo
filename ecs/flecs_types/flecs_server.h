@@ -220,6 +220,11 @@ protected:
 	static void _bind_methods();
 
 public:
+	enum DispatchMode {
+		DISPATCH_PER_ENTITY = FlecsScriptSystem::DISPATCH_PER_ENTITY,
+		DISPATCH_BATCH = FlecsScriptSystem::DISPATCH_BATCH,
+	};
+
 	static FlecsServer *get_singleton();
 	Error init();
 	void lock();
@@ -551,6 +556,8 @@ private:
 	AHashMap<RID, Dictionary> last_frame_summaries = AHashMap<RID, Dictionary>(MAX_WORLD_COUNT);
 
 };
+
+VARIANT_ENUM_CAST(FlecsServer::DispatchMode);
 
 class ScriptSystemInspector : public Resource {
 	GDCLASS(ScriptSystemInspector, Resource);

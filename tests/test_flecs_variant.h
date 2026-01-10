@@ -51,7 +51,7 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		flecs::world &world = world_var.get_world();
 
 		// Verify world is created and valid
-		CHECK(world.is_valid());
+		CHECK(world.entity().is_valid());
 	}
 
 	TEST_CASE("[FlecsWorldVariant] Move constructor from world") {
@@ -63,7 +63,7 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		flecs::world &world = world_var.get_world();
 
 		// Verify world is valid and has the entity
-		CHECK(world.is_valid());
+		CHECK(world.entity().is_valid());
 		auto lookup = world.lookup("TestEntity");
 		CHECK(lookup.is_valid());
 	}
@@ -77,7 +77,7 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		flecs::world &world = world_var.get_world();
 
 		// Verify world is valid
-		CHECK(world.is_valid());
+		CHECK(world.entity().is_valid());
 		
 		// Both worlds should reference the same underlying world
 		auto lookup1 = original_world.lookup("TestEntity");
@@ -95,7 +95,7 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		flecs::world &copy_world = copy_var.get_world();
 
 		// Verify both variants reference same world
-		CHECK(copy_world.is_valid());
+		CHECK(copy_world.entity().is_valid());
 		auto lookup = copy_world.lookup("TestEntity");
 		CHECK(lookup.is_valid());
 	}
@@ -109,7 +109,7 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		flecs::world &moved_world = moved_var.get_world();
 
 		// Verify moved variant has the world
-		CHECK(moved_world.is_valid());
+		CHECK(moved_world.entity().is_valid());
 		auto lookup = moved_world.lookup("TestEntity");
 		CHECK(lookup.is_valid());
 	}
@@ -129,9 +129,8 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		CHECK(entity.is_valid());
 		CHECK(entity.has<TestComponent>());
 		
-		const TestComponent *comp = entity.get<TestComponent>();
-		CHECK(comp != nullptr);
-		CHECK(comp->value == 42);
+		const TestComponent &comp = entity.get<TestComponent>();
+		CHECK(comp.value == 42);
 	}
 
 	TEST_CASE("[FlecsEntityVariant] Construct from entity") {
@@ -221,9 +220,8 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		flecs::entity retrieved = entity_var.get_entity();
 		CHECK(retrieved.has<TestComponent>());
 		
-		const TestComponent *comp = retrieved.get<TestComponent>();
-		CHECK(comp != nullptr);
-		CHECK(comp->value == 123);
+		const TestComponent &comp = retrieved.get<TestComponent>();
+		CHECK(comp.value == 123);
 	}
 
 	TEST_CASE("[FlecsSystemVariant] Construct from system") {
@@ -402,7 +400,7 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		FlecsSystemVariant sys_var(sys);
 
 		// Verify all variants are valid
-		CHECK(world_var.get_world().is_valid());
+		CHECK(world_var.get_world().entity().is_valid());
 		CHECK(entity_var.is_valid());
 		CHECK(sys_var.is_valid());
 
@@ -421,8 +419,8 @@ TEST_SUITE("[Modules][GodotTurbo][FlecsVariant]") {
 		FlecsWorldVariant world_var2 = world_var1; // Copy
 		FlecsWorldVariant world_var3 = std::move(world_var2); // Move
 
-		CHECK(world_var1.get_world().is_valid());
-		CHECK(world_var3.get_world().is_valid());
+		CHECK(world_var1.get_world().entity().is_valid());
+		CHECK(world_var3.get_world().entity().is_valid());
 
 		flecs::world temp_world;
 		flecs::entity entity = temp_world.entity("Test");

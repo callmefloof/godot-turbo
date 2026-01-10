@@ -707,7 +707,7 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_parent", "entity_id"), &FlecsServer::get_parent);
 	ClassDB::bind_method(D_METHOD("set_parent", "entity_id", "parent_id"), &FlecsServer::set_parent);
 	ClassDB::bind_method(D_METHOD("add_child", "parent_id", "child_id"), &FlecsServer::add_child);
-	ClassDB::bind_method(D_METHOD("remove_child", "child"), &FlecsServer::remove_child);
+	ClassDB::bind_method(D_METHOD("remove_child", "parent_id", "child_id"), &FlecsServer::remove_child);
 	ClassDB::bind_method(D_METHOD("get_children", "parent_id"), &FlecsServer::get_children);
 	ClassDB::bind_method(D_METHOD("get_child", "parent_id", "index"), &FlecsServer::get_child);
 	ClassDB::bind_method(D_METHOD("add_script_system", "world_id", "component_types", "callable"), &FlecsServer::add_script_system);
@@ -794,8 +794,8 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("free_query", "world_id", "query_id"), &FlecsServer::free_query);
 
 	// Script system constants (dispatch modes)
-	BIND_CONSTANT(FlecsScriptSystem::DISPATCH_PER_ENTITY);
-	BIND_CONSTANT(FlecsScriptSystem::DISPATCH_BATCH);
+	BIND_ENUM_CONSTANT(DISPATCH_PER_ENTITY);
+	BIND_ENUM_CONSTANT(DISPATCH_BATCH);
 
 
 	ClassDB::bind_method(D_METHOD("set_children", "parent_id", "children"), &FlecsServer::set_children);
@@ -806,7 +806,7 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_relationship", "entity_id", "relationship"), &FlecsServer::add_relationship);
 	ClassDB::bind_method(D_METHOD("remove_relationship", "entity_id", "relationship"), &FlecsServer::remove_relationship);
 	ClassDB::bind_method(D_METHOD("get_relationships", "entity_id"), &FlecsServer::get_relationships);
-	ClassDB::bind_method(D_METHOD("get_relationship", "entity_id", "relationship"), &FlecsServer::get_relationship);
+	ClassDB::bind_method(D_METHOD("get_relationship", "entity_id", "first_entity", "second_entity"), &FlecsServer::get_relationship);
 	ClassDB::bind_method(D_METHOD("free_world", "world_id"), &FlecsServer::free_world);
 	ClassDB::bind_method(D_METHOD("free_system", "world_id", "system_id", "include_flecs_world"), &FlecsServer::free_system);
 	ClassDB::bind_method(D_METHOD("free_script_system", "world_id", "script_system_id"), &FlecsServer::free_script_system);
@@ -818,7 +818,7 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_to_node_storage", "node", "world_id"), &FlecsServer::add_to_node_storage);
 	ClassDB::bind_method(D_METHOD("remove_from_node_storage", "node_id", "world_id"), &FlecsServer::remove_from_node_storage);
 	ClassDB::bind_method(D_METHOD("get_node_from_node_storage", "node_id", "world_id"), &FlecsServer::get_node_from_node_storage);
-	ClassDB::bind_method(D_METHOD("set_world_singleton_with_name", "world_id", "name"), &FlecsServer::set_world_singleton_with_name);
+	ClassDB::bind_method(D_METHOD("set_world_singleton_with_name", "world_id", "component_type", "component_data"), &FlecsServer::set_world_singleton_with_name);
 	ClassDB::bind_method(D_METHOD("set_world_singleton_with_id", "world_id", "comp_type_id", "comp_data"), &FlecsServer::set_world_singleton_with_id);
 	ClassDB::bind_method(D_METHOD("get_world_singleton_with_name", "world_id", "name"), &FlecsServer::get_world_singleton_with_name);
 	ClassDB::bind_method(D_METHOD("get_world_singleton_with_id", "world_id", "comp_type_id"), &FlecsServer::get_world_singleton_with_id);

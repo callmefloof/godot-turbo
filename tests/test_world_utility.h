@@ -44,6 +44,40 @@
 #include "servers/navigation_server_2d.h"
 #include "servers/navigation_server_3d.h"
 
+#define REQUIRE_WORLD2D_SERVERS() \
+	do { \
+		REQUIRE_FLECS_SERVER(); \
+		if (!RenderingServer::get_singleton()) { \
+			MESSAGE("Skipping test - RenderingServer not initialized"); \
+			return; \
+		} \
+		if (!PhysicsServer2D::get_singleton()) { \
+			MESSAGE("Skipping test - PhysicsServer2D not initialized"); \
+			return; \
+		} \
+		if (!NavigationServer2D::get_singleton()) { \
+			MESSAGE("Skipping test - NavigationServer2D not initialized"); \
+			return; \
+		} \
+	} while (0)
+
+#define REQUIRE_WORLD3D_SERVERS() \
+	do { \
+		REQUIRE_FLECS_SERVER(); \
+		if (!RenderingServer::get_singleton()) { \
+			MESSAGE("Skipping test - RenderingServer not initialized"); \
+			return; \
+		} \
+		if (!PhysicsServer3D::get_singleton()) { \
+			MESSAGE("Skipping test - PhysicsServer3D not initialized"); \
+			return; \
+		} \
+		if (!NavigationServer3D::get_singleton()) { \
+			MESSAGE("Skipping test - NavigationServer3D not initialized"); \
+			return; \
+		} \
+	} while (0)
+
 namespace TestWorldUtility {
 
 // ========================================================================
@@ -81,7 +115,7 @@ static void thread_update_world_3d(void *p_userdata) {
 #endif // DISABLE_THREADED_TESTS
 
 TEST_CASE("[World2DUtility] Auto-create world resources") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD2D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	CHECK(server != nullptr);
@@ -109,7 +143,7 @@ TEST_CASE("[World2DUtility] Auto-create world resources") {
 }
 
 TEST_CASE("[World2DUtility] Update existing World2D") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD2D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -135,7 +169,7 @@ TEST_CASE("[World2DUtility] Update existing World2D") {
 }
 
 TEST_CASE("[World2DUtility] Create World2D with null Ref") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD2D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -185,7 +219,7 @@ TEST_CASE("[World2DUtility] Invalid world ID") {
 }
 
 TEST_CASE("[World2DUtility] Multiple calls idempotent") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD2D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -212,7 +246,7 @@ TEST_CASE("[World2DUtility] Multiple calls idempotent") {
 
 #ifndef DISABLE_THREADED_TESTS
 TEST_CASE("[World2DUtility] Thread safety") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD2D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -252,7 +286,7 @@ TEST_CASE("[World2DUtility] Thread safety") {
 // ========================================================================
 
 TEST_CASE("[World3DUtility] Auto-create world resources") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD3D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -278,7 +312,7 @@ TEST_CASE("[World3DUtility] Auto-create world resources") {
 }
 
 TEST_CASE("[World3DUtility] Update existing World3D") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD3D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -310,7 +344,7 @@ TEST_CASE("[World3DUtility] Update existing World3D") {
 }
 
 TEST_CASE("[World3DUtility] Create World3D with null Ref") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD3D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -355,7 +389,7 @@ TEST_CASE("[World3DUtility] Invalid world ID") {
 }
 
 TEST_CASE("[World3DUtility] Multiple calls idempotent") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD3D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -382,7 +416,7 @@ TEST_CASE("[World3DUtility] Multiple calls idempotent") {
 
 #ifndef DISABLE_THREADED_TESTS
 TEST_CASE("[World3DUtility] Thread safety") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD3D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();
@@ -418,7 +452,7 @@ TEST_CASE("[World3DUtility] Thread safety") {
 #endif // DISABLE_THREADED_TESTS
 
 TEST_CASE("[World3DUtility] All server resources valid") {
-	REQUIRE_FLECS_SERVER();
+	REQUIRE_WORLD3D_SERVERS();
 	
 	FlecsServer *server = FlecsServer::get_singleton();
 	RID world_id = server->create_world();

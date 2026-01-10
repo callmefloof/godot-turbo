@@ -121,18 +121,18 @@ RID Physics2DUtility::create_joint_with_object(const RID &world_id, Joint2D *joi
 
 
 void Physics2DUtility::_bind_methods() {
-    ClassDB::bind_static_method(get_class_static(), "create_area_with_object",
-        &Physics2DUtility::create_area_with_object, "world", "area_2d");
-    ClassDB::bind_static_method(get_class_static(), "create_rigid_body_with_object",
-        &Physics2DUtility::create_rigid_body_with_object, "world", "rigid_body");
-    ClassDB::bind_static_method(get_class_static(), "create_physics_body_with_object",
-        &Physics2DUtility::create_physics_body_with_object, "world", "physics_body");
-    ClassDB::bind_static_method(get_class_static(), "create_joint_with_object",
-        &Physics2DUtility::create_joint_with_object, "world", "joint_2d");
-    ClassDB::bind_static_method(get_class_static(), "create_area",
-        &Physics2DUtility::create_area, "world", "name", "space_id");
-    ClassDB::bind_static_method(get_class_static(), "create_body",
-        &Physics2DUtility::create_body, "world", "name", "space_id");
-    ClassDB::bind_static_method(get_class_static(), "create_joint",
-        &Physics2DUtility::create_joint, "world", "name", "space_id");
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_area_with_object", "world_id", "area_2d"),
+            &Physics2DUtility::create_area_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_rigid_body_with_object", "world_id", "rigid_body"),
+            &Physics2DUtility::create_rigid_body_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_physics_body_with_object", "world_id", "physics_body"),
+            &Physics2DUtility::create_physics_body_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_joint_with_object", "world_id", "joint_2d"),
+            &Physics2DUtility::create_joint_with_object);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_area", "world_id", "name", "space_id"),
+            &Physics2DUtility::create_area);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_body", "world_id", "name", "space_id"),
+            &Physics2DUtility::create_body);
+    ClassDB::bind_static_method(get_class_static(), D_METHOD("create_joint", "world_id", "name", "space_id"),
+            &Physics2DUtility::create_joint);
 }

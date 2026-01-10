@@ -16,6 +16,57 @@
 
 std::atomic_uint32_t FlecsScriptSystem::global_system_index = 0; // definition
 
+namespace {
+static flecs::entity resolve_component_entity(flecs::world *world, const String &component_name) {
+	if (!world) {
+		return flecs::entity();
+	}
+
+	const CharString cname = component_name.ascii();
+	const char *cname_ptr = cname.get_data();
+	if (!cname_ptr || cname_ptr[0] == '\0') {
+		return flecs::entity();
+	}
+
+	const ecs_world_t *c_world = world->c_ptr();
+	ecs_entity_t resolved_id = ecs_lookup_symbol(c_world, cname_ptr, true, true);
+	if (resolved_id != 0) {
+		return flecs::entity(c_world, resolved_id);
+	}
+
+	flecs::entity resolved;
+
+	const String suffix_ns = String("::") + component_name;
+	const String suffix_dot = String(".") + component_name;
+	world->each<flecs::Component>([&](flecs::entity e, flecs::Component &) {
+		if (resolved.is_valid()) {
+			return;
+		}
+		const char *name = e.name().c_str();
+		const char *symbol = e.symbol().c_str();
+		if (name) {
+			const String name_str(name);
+			if (name_str == component_name || name_str.ends_with(suffix_ns) || name_str.ends_with(suffix_dot)) {
+				resolved = e;
+				return;
+			}
+		}
+		if (symbol) {
+			const String symbol_str(symbol);
+			if (symbol_str == component_name || symbol_str.ends_with(suffix_ns) || symbol_str.ends_with(suffix_dot)) {
+				resolved = e;
+			}
+		}
+	});
+
+	if (!resolved.is_valid()) {
+		resolved = world->component(cname_ptr);
+	}
+
+	return resolved;
+}
+} // namespace
+
 // ============================================================================
 // Helper Methods for build_system()
 // ============================================================================
@@ -32,7 +83,7 @@ Vector<flecs::entity> FlecsScriptSystem::get_component_terms() {
 	Vector<flecs::entity> comp_terms;
 	for (int i = 0; i < required_components.size(); ++i) {
 		String cname = required_components.get(i);
-		flecs::entity ce = world->component(cname.ascii().get_data());
+		flecs::entity ce = resolve_component_entity(world, cname);
 		if (!ce.is_valid()) {
 			print_line(String("Invalid component name: ") + cname);
 			continue;
@@ -46,7 +97,7 @@ Dictionary FlecsScriptSystem::serialize_entity_components(flecs::entity e) {
 	Dictionary comp_dicts;
 	for (int ci = 0; ci < required_components.size(); ++ci) {
 		String cname = required_components.get(ci);
-		flecs::entity ce = world->component(cname.ascii().get_data());
+		flecs::entity ce = resolve_component_entity(world, cname);
 		if (!ce.is_valid()) { continue; }
 		Dictionary value;
 		if (e.has(ce)) {
@@ -81,12 +132,16 @@ void FlecsScriptSystem::dispatch_callback(const Array& data) {
 
 void FlecsScriptSystem::build_change_observer_system() {
 	Vector<flecs::entity> comp_terms = get_component_terms();
+	if (comp_terms.is_empty()) {
+		ERR_PRINT("FlecsScriptSystem change observer: no valid component terms");
+		return;
+	}
 	
 	auto make_observer = [this, &comp_terms](flecs::entity_t evt, uint64_t &last_counter, uint64_t &total_counter) {
 		flecs::observer_builder<> ob = world->observer();
 		ob.event(evt);
 		for (int i = 0; i < comp_terms.size(); ++i) {
-			ob.term().id(comp_terms[i].id());
+			ob.with(comp_terms[i].id());
 		}
 		return ob.each([this, &last_counter, &total_counter](flecs::entity e) {
 			if (is_paused || !callback.is_valid()) { return; }
@@ -163,12 +218,12 @@ void FlecsScriptSystem::build_entity_iteration_system() {
 	
 	for (int i = 0; i < required_components.size(); ++i) {
 		String cname = required_components.get(i);
-		flecs::entity ce = world->component(cname.ascii().get_data());
+		flecs::entity ce = resolve_component_entity(world, cname);
 		if (!ce.is_valid()) {
 			print_line(String("Invalid component name: ") + cname);
 			continue;
 		}
-		builder.term().id(ce.id());
+		builder.with(ce.id());
 	}
 	
 	// Enable multi-threading for regular entity-iterating systems
@@ -240,9 +295,16 @@ void FlecsScriptSystem::build_entity_iteration_system() {
 		}
 	});
 	
-	script_system.set_name(system_name.is_empty() ?
-		String("ScriptSystem" + itos(id)).ascii().get_data() :
-		system_name.ascii().get_data());
+	String base_name = system_name.is_empty() ? String("ScriptSystem" + itos(id)) : system_name;
+	String unique_name = base_name;
+	if (world) {
+		const CharString base_name_cs = base_name.ascii();
+		flecs::entity existing = world->lookup(base_name_cs.get_data());
+		if (existing.is_valid() && existing != script_system) {
+			unique_name = base_name + "#" + itos(id);
+		}
+	}
+	script_system.set_name(unique_name.ascii().get_data());
 }
 
 void FlecsScriptSystem::build_batch_flush_system() {
@@ -453,12 +515,66 @@ void FlecsScriptSystem::set_world(const RID &p_world_id) {
 
 void FlecsScriptSystem::set_system_dependency(uint32_t p_system_id) {
 	if (p_system_id == id) { ERR_PRINT("FlecsScriptSystem::set_system_dependency: self"); return; }
-	if (p_system_id > global_system_index) { ERR_PRINT("FlecsScriptSystem::set_system_dependency: out of range"); return; }
 	depends_on_system_id = p_system_id;
 }
 
-FlecsScriptSystem::FlecsScriptSystem(const FlecsScriptSystem &other) { callback = other.callback; required_components = other.required_components; world_id = other.world_id; world = other.world; build_system(); }
-FlecsScriptSystem &FlecsScriptSystem::operator=(const FlecsScriptSystem &other) { if (this != &other) { callback = other.callback; required_components = other.required_components; world_id = other.world_id; world = other.world; build_system(); } return *this; }
+FlecsScriptSystem::FlecsScriptSystem(const FlecsScriptSystem &other) {
+	callback = other.callback;
+	required_components = other.required_components;
+	world_id = other.world_id;
+	world = other.world;
+	dispatch_mode = other.dispatch_mode;
+	batch_flush_chunk_size = other.batch_flush_chunk_size;
+	min_flush_interval_usec = other.min_flush_interval_usec;
+	change_only = other.change_only;
+	observe_add_and_set = other.observe_add_and_set;
+	observe_remove = other.observe_remove;
+	auto_reset_per_frame = other.auto_reset_per_frame;
+	is_paused = other.is_paused;
+	multi_threaded = other.multi_threaded;
+	use_deferred_calls = other.use_deferred_calls;
+	instrumentation_enabled = other.instrumentation_enabled;
+	detailed_timing_enabled = other.detailed_timing_enabled;
+	max_sample_count = other.max_sample_count;
+	depends_on_system_id = other.depends_on_system_id;
+	system_name = other.system_name;
+
+	batch_accumulator.clear();
+	batch_dirty = false;
+	last_flush_time_usec = 0;
+	reset_instrumentation();
+	build_system();
+}
+FlecsScriptSystem &FlecsScriptSystem::operator=(const FlecsScriptSystem &other) {
+	if (this != &other) {
+		callback = other.callback;
+		required_components = other.required_components;
+		world_id = other.world_id;
+		world = other.world;
+		dispatch_mode = other.dispatch_mode;
+		batch_flush_chunk_size = other.batch_flush_chunk_size;
+		min_flush_interval_usec = other.min_flush_interval_usec;
+		change_only = other.change_only;
+		observe_add_and_set = other.observe_add_and_set;
+		observe_remove = other.observe_remove;
+		auto_reset_per_frame = other.auto_reset_per_frame;
+		is_paused = other.is_paused;
+		multi_threaded = other.multi_threaded;
+		use_deferred_calls = other.use_deferred_calls;
+		instrumentation_enabled = other.instrumentation_enabled;
+		detailed_timing_enabled = other.detailed_timing_enabled;
+		max_sample_count = other.max_sample_count;
+		depends_on_system_id = other.depends_on_system_id;
+		system_name = other.system_name;
+
+		batch_accumulator.clear();
+		batch_dirty = false;
+		last_flush_time_usec = 0;
+		reset_instrumentation();
+		build_system();
+	}
+	return *this;
+}
 FlecsScriptSystem::~FlecsScriptSystem() {
 	if (script_system.is_alive()) { script_system.destruct(); }
 	if (change_observer.is_alive()) { change_observer.destruct(); }

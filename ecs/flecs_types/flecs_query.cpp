@@ -11,6 +11,42 @@
 #include <utility>
 #include <vector>
 
+namespace {
+static flecs::entity resolve_component_entity(flecs::world *world, const String &name) {
+    if (!world) {
+        return flecs::entity();
+    }
+
+    const CharString utf8 = name.utf8();
+    flecs::entity comp = world->lookup(utf8.get_data());
+    if (comp.is_valid()) {
+        return comp;
+    }
+
+    if (name.find("::") != -1) {
+        return flecs::entity();
+    }
+
+    const String suffix = String("::") + name;
+    flecs::entity match;
+    world->each<flecs::Component>([&](flecs::entity e, flecs::Component &) {
+        if (!e.is_valid()) {
+            return;
+        }
+        const char *ename = e.name();
+        if (!ename) {
+            return;
+        }
+        const String ename_str(ename);
+        if (ename_str == name || ename_str.ends_with(suffix)) {
+            match = e;
+        }
+    });
+
+    return match;
+}
+} // namespace
+
 
 FlecsQuery::~FlecsQuery() {
     if (change_observer_set.is_alive()) {
@@ -87,12 +123,12 @@ void FlecsQuery::build_query() {
     } else {
         for (int i = 0; i < required_components.size(); ++i) {
             String cname = required_components[i];
-            flecs::entity ce = world->component(cname.ascii().get_data());
+            flecs::entity ce = resolve_component_entity(world, cname);
             if (!ce.is_valid()) {
                 ERR_PRINT(vformat("FlecsQuery::build_query - Invalid component name: %s", cname));
                 continue;
             }
-            builder.term().id(ce.id());
+            builder.with(ce.id());
         }
     }
 
@@ -121,7 +157,7 @@ void FlecsQuery::setup_cache_invalidation() {
     Vector<flecs::entity> comp_terms;
     for (int i = 0; i < required_components.size(); ++i) {
         String cname = required_components[i];
-        flecs::entity ce = world->component(cname.ascii().get_data());
+        flecs::entity ce = resolve_component_entity(world, cname);
         if (ce.is_valid()) {
             comp_terms.push_back(ce);
         }
@@ -136,7 +172,7 @@ void FlecsQuery::setup_cache_invalidation() {
         flecs::observer_builder<> ob = world->observer();
         ob.event(evt);
         for (int i = 0; i < comp_terms.size(); ++i) {
-            ob.term().id(comp_terms[i].id());
+            ob.with(comp_terms[i].id());
         }
         return ob.each([this](flecs::entity e) {
             invalidate_cache();
@@ -211,7 +247,7 @@ Array FlecsQuery::fetch_entities_internal(FetchMode mode) {
             Dictionary components;
             for (int i = 0; i < required_components.size(); ++i) {
                 String cname = required_components[i];
-                flecs::entity ce = world->component(cname.ascii().get_data());
+                flecs::entity ce = resolve_component_entity(world, cname);
                 if (!ce.is_valid()) {
                     continue;
                 }
@@ -481,7 +517,7 @@ Array FlecsQuery::get_entities_with_components_limited(int max_count, int offset
         Dictionary components;
         for (int i = 0; i < required_components.size(); ++i) {
             String cname = required_components[i];
-            flecs::entity ce = world->component(cname.ascii().get_data());
+            flecs::entity ce = resolve_component_entity(world, cname);
             if (!ce.is_valid()) {
                 continue;
             }
@@ -535,7 +571,7 @@ bool FlecsQuery::matches_entity(const RID &entity_rid) {
     // Check if entity has all required components
     for (int i = 0; i < required_components.size(); ++i) {
         String cname = required_components[i];
-        flecs::entity ce = world->component(cname.ascii().get_data());
+        flecs::entity ce = resolve_component_entity(world, cname);
         if (!ce.is_valid() || !e.has(ce)) {
             return false;
         }

@@ -1070,64 +1070,89 @@ RID RenderUtility3D::create_scenario(const RID &world_id, const String &name) {
 }
 
 void RenderUtility3D::_bind_methods(){
-	ClassDB::bind_static_method(get_class_static(), "create_particles",
-		&RenderUtility3D::create_particles, "flecs_world", "transform", "scenario_id");
-	ClassDB::bind_static_method(get_class_static(), "create_particles_with_object",
-		&RenderUtility3D::create_particles_with_object, "flecs_world", "gpu_particles_3d");
-	ClassDB::bind_static_method(get_class_static(), "create_mesh_instance",
-		&RenderUtility3D::create_mesh_instance, "flecs_world", "mesh_id", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_mesh_instance_with_id",
-		&RenderUtility3D::create_mesh_instance_with_id, "flecs_world", "mesh_instance_id", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_multi_mesh",
-		&RenderUtility3D::create_multi_mesh, "flecs_world", "transform", "name", "scenario_id");
-	ClassDB::bind_static_method(get_class_static(), "create_camera",
-		&RenderUtility3D::create_camera_with_id, "flecs_world", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_directional_light",
-		&RenderUtility3D::create_directional_light, "flecs_world", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_directional_light_with_id",
-		&RenderUtility3D::create_directional_light_with_id, "flecs_world", "light_id", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_directional_light_with_object",
-		&RenderUtility3D::create_directional_light_with_object, "flecs_world", "directional_light");
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_particles", "world_id", "transform", "particles_id", "particle_count", "scenario_id", "name"),
+			&RenderUtility3D::create_particles);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_particles_with_object", "world_id", "gpu_particles_3d"),
+			&RenderUtility3D::create_particles_with_object);
 
-	ClassDB::bind_static_method(get_class_static(), "create_voxel_gi",
-		&RenderUtility3D::create_voxel_gi, "flecs_world", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_voxel_gi_with_id",
-		&RenderUtility3D::create_voxel_gi_with_id, "flecs_world", "voxel_gi_id", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_spot_light",
-		&RenderUtility3D::create_spot_light, "flecs_world", "transform", "name");
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_mesh_instance", "world_id", "transform", "scenario_id", "name"),
+			&RenderUtility3D::create_mesh_instance);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_mesh_instance_with_id", "world_id", "mesh_id", "transform", "name", "scenario_id"),
+			&RenderUtility3D::create_mesh_instance_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_mesh_instance_with_object", "world_id", "mesh_instance_3d"),
+			&RenderUtility3D::create_mesh_instance_with_object);
 
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_multi_mesh", "world_id", "transform", "size", "mesh_id", "material_ids", "scenario_id", "name", "use_colors", "use_custom_data", "use_indirect"),
+			&RenderUtility3D::create_multi_mesh, DEFVAL(false), DEFVAL(false), DEFVAL(false));
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_multi_mesh_with_object", "world_id", "multi_mesh_instance"),
+			&RenderUtility3D::create_multi_mesh_with_object);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_multi_mesh_instance", "world_id", "transform", "index", "multi_mesh_id", "name"),
+			&RenderUtility3D::create_multi_mesh_instance);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_multi_mesh_instances", "world_id", "transforms", "multi_mesh_entity_id"),
+			&RenderUtility3D::create_multi_mesh_instances);
 
-	ClassDB::bind_static_method(get_class_static(), "create_spot_light_with_id",
-		&RenderUtility3D::create_spot_light_with_id, "flecs_world", "light_id", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_spot_light_with_object",
-		&RenderUtility3D::create_spot_light_with_object, "flecs_world", "spot_light");
-	ClassDB::bind_static_method(get_class_static(), "create_mesh_instance_with_object",
-		&RenderUtility3D::create_mesh_instance_with_object, "flecs_world", "mesh_instance_3d");
-	ClassDB::bind_static_method(get_class_static(), "create_omni_light",
-		&RenderUtility3D::create_omni_light_with_id, "flecs_world","light_id", "transform", "scenario_id");
-	ClassDB::bind_static_method(get_class_static(), "create_omni_light_with_object",
-		&RenderUtility3D::create_omni_light_with_object, "flecs_world", "omni_light");
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_camera_with_id", "world_id", "camera_id", "transform", "name"),
+			&RenderUtility3D::create_camera_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_camera", "world_id", "transform", "name"),
+			&RenderUtility3D::create_camera);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_camera_with_object", "world_id", "camera_3d"),
+			&RenderUtility3D::create_camera_with_object);
 
-	ClassDB::bind_static_method(get_class_static(), "create_reflection_probe",
-		&RenderUtility3D::create_reflection_probe, "flecs_world", "probe_id", "transform", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_scenario",
-		&RenderUtility3D::create_scenario, "flecs_world", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_viewport_with_id",
-		&RenderUtility3D::create_viewport_with_id, "flecs_world", "viewport_id", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_viewport_with_object",
-		&RenderUtility3D::create_viewport_with_object, "flecs_world", "viewport");
-	ClassDB::bind_static_method(get_class_static(), "create_voxel_gi_with_object",
-		&RenderUtility3D::create_voxel_gi_with_object, "flecs_world", "voxel_gi");
-	ClassDB::bind_static_method(get_class_static(), "create_environment",
-		&RenderUtility3D::create_environment, "flecs_world", "environment_id", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_environment_with_object",
-		&RenderUtility3D::create_environment_with_object, "flecs_world", "world_environment");
-	ClassDB::bind_static_method(get_class_static(), "create_skeleton",
-		&RenderUtility3D::create_skeleton, "flecs_world", "skeleton_id", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_skeleton_with_object",
-		&RenderUtility3D::create_skeleton_with_object, "flecs_world", "skeleton_3d");
-	ClassDB::bind_static_method(get_class_static(), "create_compositor",
-		&RenderUtility3D::create_compositor, "flecs_world", "compositor_id", "name");
-	ClassDB::bind_static_method(get_class_static(), "create_compositor_with_object",
-		&RenderUtility3D::create_compositor_with_object, "flecs_world", "compositor");
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_directional_light_with_id", "world_id", "light_id", "transform", "name"),
+			&RenderUtility3D::create_directional_light_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_directional_light", "world_id", "transform", "name"),
+			&RenderUtility3D::create_directional_light);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_directional_light_with_object", "world_id", "directional_light"),
+			&RenderUtility3D::create_directional_light_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_omni_light_with_id", "world_id", "light_id", "transform", "scenario_id", "name"),
+			&RenderUtility3D::create_omni_light_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_omni_light", "world_id", "transform", "scenario_id", "name"),
+			&RenderUtility3D::create_omni_light);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_omni_light_with_object", "world_id", "omni_light"),
+			&RenderUtility3D::create_omni_light_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_spot_light_with_id", "world_id", "light_id", "transform", "name"),
+			&RenderUtility3D::create_spot_light_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_spot_light", "world_id", "transform", "name"),
+			&RenderUtility3D::create_spot_light);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_spot_light_with_object", "world_id", "spot_light"),
+			&RenderUtility3D::create_spot_light_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_reflection_probe", "world_id", "probe_id", "transform", "name"),
+			&RenderUtility3D::create_reflection_probe);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_reflection_probe_with_object", "world_id", "reflection_probe"),
+			&RenderUtility3D::create_reflection_probe_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_voxel_gi_with_id", "world_id", "voxel_gi_id", "transform", "name"),
+			&RenderUtility3D::create_voxel_gi_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_voxel_gi", "world_id", "transform", "name"),
+			&RenderUtility3D::create_voxel_gi);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_voxel_gi_with_object", "world_id", "voxel_gi"),
+			&RenderUtility3D::create_voxel_gi_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_environment", "world_id", "environment_id", "name"),
+			&RenderUtility3D::create_environment);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_environment_with_object", "world_id", "world_environment"),
+			&RenderUtility3D::create_environment_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_skeleton", "world_id", "skeleton_id", "name"),
+			&RenderUtility3D::create_skeleton);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_skeleton_with_object", "world_id", "skeleton_3d"),
+			&RenderUtility3D::create_skeleton_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_scenario_with_id", "world_id", "scenario_id", "name"),
+			&RenderUtility3D::create_scenario_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_scenario", "world_id", "name"),
+			&RenderUtility3D::create_scenario);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_viewport_with_id", "world_id", "viewport_id", "name"),
+			&RenderUtility3D::create_viewport_with_id);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_viewport_with_object", "world_id", "viewport"),
+			&RenderUtility3D::create_viewport_with_object);
+
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_compositor", "world_id", "compositor_id", "name"),
+			&RenderUtility3D::create_compositor);
+	ClassDB::bind_static_method(get_class_static(), D_METHOD("create_compositor_with_object", "world_id", "compositor"),
+			&RenderUtility3D::create_compositor_with_object);
 }

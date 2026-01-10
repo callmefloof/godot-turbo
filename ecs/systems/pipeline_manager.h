@@ -1,5 +1,5 @@
 #pragma once
-#include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_phases.h"
 #include "core/templates/vector.h"
 #include "core/string/ustring.h"
 #include "core/templates/rid.h"

@@ -15,6 +15,7 @@
 #include "modules/godot_turbo/ecs/systems/utility/render_utility_3d.h"
 #include "modules/godot_turbo/ecs/systems/command.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/ecs/components/component_reflection.h"
 
 #include "modules/godot_turbo/ecs/systems/demo/bad_apple_system.h"
 #include "modules/register_module_types.h"
@@ -83,6 +84,8 @@ void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 			memdelete(p_runtime_debugger);
 			p_runtime_debugger = nullptr;
 		}
+
+		SceneObjectUtility::cleanup_singleton();
 		
 		// Clean up NetworkServer
 		if (p_network_server) {
@@ -91,5 +94,6 @@ void uninitialize_godot_turbo_module(ModuleInitializationLevel p_level) {
 		}
 		
 		memdelete(p_fs);
+		FlecsReflection::Registry::get().clear();
 	}
 }

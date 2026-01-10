@@ -9,6 +9,7 @@ base_sources = [
     "ecs/flecs_types/flecs_query.cpp",
     "ecs/flecs_types/flecs_script_system.cpp",
     "ecs/systems/pipeline_manager.cpp",
+    "ecs/systems/gdscript_runner_system.cpp",
     "ecs/systems/utility/navigation2d_utility.cpp",
     "ecs/systems/utility/navigation3d_utility.cpp",
     "ecs/systems/utility/physics2d_utility.cpp",
