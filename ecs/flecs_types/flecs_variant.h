@@ -36,10 +36,10 @@ struct FlecsWorldVariant {
     // Constructors
     
     /** @brief Construct from moved world (efficient, no copy) */
-    FlecsWorldVariant(flecs::world&& world) noexcept : world(std::move(world)) {}
+    FlecsWorldVariant(flecs::world&& p_world) noexcept : world(std::move(p_world)) {}
     
     /** @brief Construct from world reference (creates shared world handle) */
-    FlecsWorldVariant(const flecs::world& world) : world(world) {}
+    FlecsWorldVariant(const flecs::world& p_world) : world(p_world) {}
     
     /** @brief Default constructor - creates new empty world */
     FlecsWorldVariant() = default;
@@ -85,7 +85,7 @@ struct FlecsEntityVariant {
     // Constructors
     
     /** @brief Construct from entity reference */
-    FlecsEntityVariant(const flecs::entity& entity) : entity(entity) {}
+    FlecsEntityVariant(const flecs::entity& p_entity) : entity(p_entity) {}
     
     /** @brief Copy constructor */
     FlecsEntityVariant(const FlecsEntityVariant& other) : entity(other.entity) {}
@@ -94,7 +94,7 @@ struct FlecsEntityVariant {
     FlecsEntityVariant(FlecsEntityVariant&& other) noexcept : entity(std::move(other.entity)) {}
     
     /** @brief Construct from moved entity */
-    FlecsEntityVariant(flecs::entity&& entity) noexcept : entity(std::move(entity)) {}
+    FlecsEntityVariant(flecs::entity&& p_entity) noexcept : entity(std::move(p_entity)) {}
 
     /**
      * @brief Get the wrapped entity handle
@@ -139,7 +139,7 @@ struct FlecsSystemVariant {
     // Constructors
     
     /** @brief Construct from system handle */
-    FlecsSystemVariant(flecs::system system) : system(system) {}
+    FlecsSystemVariant(flecs::system p_system) : system(p_system) {}
 
     /**
      * @brief Get the wrapped system handle
@@ -184,7 +184,7 @@ struct FlecsTypeIDVariant {
     // Constructors
     
     /** @brief Construct from type ID */
-    FlecsTypeIDVariant(flecs::entity_t type) : type(type) {}
+    FlecsTypeIDVariant(flecs::entity_t p_type) : type(p_type) {}
     
     /** @brief Copy constructor */
     FlecsTypeIDVariant(const FlecsTypeIDVariant& other) : type(other.type) {}
@@ -208,4 +208,3 @@ struct FlecsTypeIDVariant {
         return type != 0;
     }
 };
-

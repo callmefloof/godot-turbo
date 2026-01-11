@@ -460,7 +460,7 @@ private:
 		// Reverse lookup map: Flecs entity ID -> Godot RID (for O(1) lookups)
 		HashMap<uint64_t, RID> entity_id_to_rid;
 		RID_Owner_Wrapper() = default;
-		RID_Owner_Wrapper(RID world_id) : world_id(world_id),
+		RID_Owner_Wrapper(RID p_world_id) : world_id(p_world_id),
 			entity_owner(ENTITY_OWNER_CHUNK_SIZE, MAX_ENTITY_COUNT),
 			type_id_owner(TYPE_ID_OWNER_CHUNK_SIZE, MAX_TYPE_ID_COUNT),
 			system_owner(SYSTEM_OWNER_CHUNK_SIZE, MAX_SYSTEM_COUNT),
