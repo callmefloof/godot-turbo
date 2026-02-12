@@ -36,7 +36,7 @@
 #include "core/math/projection.h"
 #include "core/object/object_id.h"
 #include "core/string/string_name.h"
-#include "servers/rendering_server.h"
+#include "servers/rendering/rendering_server.h"
 #include "core/variant/dictionary.h"
 
 // ============================================================================
