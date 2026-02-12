@@ -17,7 +17,7 @@ class Timer;
 /**
  * FlecsRuntimeDebugger handles debugger messages at runtime.
  * It responds to editor requests for world, entity, and component information.
- * 
+ *
  * This class extends Object and uses a Timer to retry debugger registration
  * when running from the editor. The debugger connection is not immediately
  * available during module initialization, so we need to retry until it connects.
@@ -46,7 +46,7 @@ protected:
 
 private:
 	FlecsServer *server = nullptr;
-	Timer *retry_timer = nullptr;
+	ObjectID retry_timer_id;
 	bool initialized = false;
 	bool capture_registered = false;
 	int retry_count = 0;
@@ -57,6 +57,12 @@ private:
 
 	/** Setup the retry timer (called deferred after scene tree is ready) */
 	void _setup_retry_timer();
+
+	/** Resolve retry timer from ObjectDB safely. */
+	Timer *_get_retry_timer() const;
+
+	/** Stop and queue-delete retry timer when still valid. */
+	void _dispose_retry_timer();
 
 	/** Attempt to register the message capture with the debugger */
 	bool _try_register_capture();

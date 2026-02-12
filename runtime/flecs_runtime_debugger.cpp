@@ -5,6 +5,7 @@
 #include "core/string/ustring.h"
 #include "core/string/print_string.h"
 #include "core/config/engine.h"
+#include "core/object/message_queue.h"
 #include "scene/main/timer.h"
 #include "scene/main/scene_tree.h"
 
@@ -17,7 +18,7 @@ void FlecsRuntimeDebugger::_bind_methods() {
 FlecsRuntimeDebugger::FlecsRuntimeDebugger() {
 	singleton = this;
 	server = nullptr;
-	retry_timer = nullptr;
+	retry_timer_id = ObjectID();
 	initialized = false;
 	capture_registered = false;
 	retry_count = 0;
@@ -30,28 +31,39 @@ FlecsRuntimeDebugger::~FlecsRuntimeDebugger() {
 	singleton = nullptr;
 }
 
+Timer *FlecsRuntimeDebugger::_get_retry_timer() const {
+	if (!retry_timer_id.is_valid()) {
+		return nullptr;
+	}
+	return Object::cast_to<Timer>(ObjectDB::get_instance(retry_timer_id));
+}
+
+void FlecsRuntimeDebugger::_dispose_retry_timer() {
+	Timer *timer = _get_retry_timer();
+	if (timer) {
+		timer->stop();
+		if (!timer->is_queued_for_deletion() && SceneTree::get_singleton()) {
+			timer->queue_free();
+		}
+	}
+	retry_timer_id = ObjectID();
+}
+
 void FlecsRuntimeDebugger::_on_retry_timer() {
 	if (capture_registered) {
-		// Already registered, stop the timer
-		if (retry_timer) {
-			retry_timer->stop();
-		}
+		_dispose_retry_timer();
 		return;
 	}
 
 	retry_count++;
-	
+
 	if (retry_count > MAX_RETRY_COUNT) {
-		if (retry_timer) {
-			retry_timer->stop();
-		}
+		_dispose_retry_timer();
 		return;
 	}
 
 	if (_try_register_capture()) {
-		if (retry_timer) {
-			retry_timer->stop();
-		}
+		_dispose_retry_timer();
 	}
 }
 
@@ -79,7 +91,7 @@ bool FlecsRuntimeDebugger::_try_register_capture() {
 	// Register our message capture
 	EngineDebugger::register_message_capture("flecs", EngineDebugger::Capture(this, _capture_message));
 	capture_registered = true;
-	
+
 	return true;
 }
 
@@ -100,27 +112,40 @@ void FlecsRuntimeDebugger::initialize() {
 	// The debugger connection is established after the game starts
 	// We'll use a timer to retry registration
 
-	// Create and start retry timer - we need to wait for the scene tree
-	// Use call_deferred to set up the timer after the scene is ready
-	callable_mp(this, &FlecsRuntimeDebugger::_setup_retry_timer).call_deferred();
-	
+	// Create and start retry timer - we need to wait for the scene tree.
+	// In unit-test setup, MessageQueue may not exist yet, so guard deferred calls.
+	if (MessageQueue::get_singleton()) {
+		callable_mp(this, &FlecsRuntimeDebugger::_setup_retry_timer).call_deferred();
+	} else {
+		_setup_retry_timer();
+	}
+
 	initialized = true;
 }
 
 void FlecsRuntimeDebugger::_setup_retry_timer() {
-	SceneTree *tree = SceneTree::get_singleton();
-	if (!tree) {
+	if (!initialized || capture_registered) {
 		return;
 	}
 
-	retry_timer = memnew(Timer);
-	retry_timer->set_wait_time(0.1); // 100ms between retries
-	retry_timer->set_one_shot(false);
-	retry_timer->connect("timeout", callable_mp(this, &FlecsRuntimeDebugger::_on_retry_timer));
-	
+	if (_get_retry_timer()) {
+		return;
+	}
+
+	SceneTree *tree = SceneTree::get_singleton();
+	if (!tree || !tree->get_root()) {
+		return;
+	}
+
+	Timer *timer = memnew(Timer);
+	timer->set_wait_time(0.1); // 100ms between retries
+	timer->set_one_shot(false);
+	timer->connect("timeout", callable_mp(this, &FlecsRuntimeDebugger::_on_retry_timer));
+
 	// Add timer to the scene tree root
-	tree->get_root()->add_child(retry_timer);
-	retry_timer->start();
+	tree->get_root()->add_child(timer);
+	retry_timer_id = timer->get_instance_id();
+	timer->start();
 }
 
 void FlecsRuntimeDebugger::shutdown() {
@@ -128,22 +153,15 @@ void FlecsRuntimeDebugger::shutdown() {
 		return;
 	}
 
-	// Stop and free retry timer
-	if (retry_timer) {
-		retry_timer->stop();
-		if (retry_timer->is_inside_tree()) {
-			retry_timer->queue_free();
-		} else {
-			memdelete(retry_timer);
-		}
-		retry_timer = nullptr;
-	}
+	_dispose_retry_timer();
 
 	if (capture_registered) {
-		EngineDebugger::unregister_message_capture("flecs");
+		if (EngineDebugger::get_singleton()) {
+			EngineDebugger::unregister_message_capture("flecs");
+		}
 		capture_registered = false;
 	}
-	
+
 	initialized = false;
 }
 
