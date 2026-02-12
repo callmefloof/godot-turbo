@@ -61,10 +61,6 @@ void PipelineManager::add_to_pipeline(flecs::system system) {
     // Register with FlecsServer's system_owner for proper tracking in profiler/inspector
     FlecsServer::get_singleton()->_create_rid_for_system(world_rid, system);
     
-    // Debug: Confirm system added to pipeline
-    flecs::string_view name_view = system.name();
-    const char* name = name_view.c_str();
-    print_line("System added to pipeline: " + (name ? String(name) : String("unnamed")) + " with phase: " + String::num_int64(flecs::OnUpdate));
 }
 
 void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phase) {
@@ -88,11 +84,9 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
     	world->each([&entity_count](flecs::entity e) {
     		entity_count++;
     	});
-    	print_line("Number of entities in the world: " + String::num_int64(entity_count));
 
     // Debug: Print the pipeline name if available
     if (pipeline.is_valid()) {
-        print_line("Pipeline name: " + String(pipeline.name().c_str()));
     } else {
         ERR_PRINT("Pipeline is not valid.");
     }
@@ -110,10 +104,6 @@ void PipelineManager::add_to_pipeline(flecs::system system, flecs::entity_t phas
     // Register with FlecsServer's system_owner for proper tracking in profiler/inspector
     FlecsServer::get_singleton()->_create_rid_for_system(world_rid, system);
 
-    // Debug: Confirm system added to pipeline
-    flecs::string_view name_view = system.name();
-    const char* name = name_view.c_str();
-    print_line("System added to pipeline: " + (name ? String(name) : String("unnamed")) + " with phase: " + String::num_int64(phase));
 }
 
 flecs::entity PipelineManager::create_custom_phase(const String &phase_name, const String &depends_on) {
@@ -131,13 +121,11 @@ flecs::entity PipelineManager::create_custom_phase(const String &phase_name, con
         flecs::entity dependency_phase = world->entity(depends_on.ascii().get_data());
         if (dependency_phase.is_valid()) {
             custom_phase.add(flecs::DependsOn, dependency_phase);
-            print_line("Custom phase '" + phase_name + "' depends on '" + depends_on + "'.");
         } else {
             ERR_PRINT("Dependency phase not found: " + depends_on);
         }
     }
 
-    print_line("Custom phase created: " + phase_name);
     return custom_phase;
 }
 

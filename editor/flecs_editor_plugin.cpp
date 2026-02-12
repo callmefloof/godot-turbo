@@ -3,6 +3,7 @@
 #include "instance_manager.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 
+#include "core/string/print_string.h"
 #include "editor/editor_interface.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/debugger/script_editor_debugger.h"
@@ -53,6 +54,8 @@ TypedArray<RID> FlecsWorldEditorPlugin::get_available_worlds() const {
 	// Also check world_cache
 	if (result.is_empty()) {
 		Array keys = world_cache.keys();
+		if (remote_mode) {
+		}
 		for (int i = 0; i < keys.size(); i++) {
 			result.append(keys[i]);
 		}
@@ -110,6 +113,7 @@ String FlecsWorldEditorPlugin::get_plugin_name() const {
 }
 
 void FlecsWorldEditorPlugin::_on_enter_tree() {
+	
 	// Get FlecsServer singleton
 	if (!Engine::get_singleton()->has_singleton("FlecsServer")) {
 		ERR_PRINT("FlecsWorldEditorPlugin: FlecsServer singleton not found");
@@ -123,6 +127,7 @@ void FlecsWorldEditorPlugin::_on_enter_tree() {
 	}
 
 	_build_dock_ui();
+	
 	_refresh_worlds_tree();
 
 	// Register dock with editor
@@ -151,6 +156,7 @@ void FlecsWorldEditorPlugin::_on_exit_tree() {
 }
 
 void FlecsWorldEditorPlugin::_setup_remote_debugger() {
+	
 	EditorDebuggerNode *debugger_node = EditorDebuggerNode::get_singleton();
 	if (!debugger_node) {
 		return;
@@ -273,6 +279,7 @@ void FlecsWorldEditorPlugin::_on_debugger_session_stopped() {
 }
 
 bool FlecsWorldEditorPlugin::capture_remote_message(const String &p_message, const Array &p_data) {
+	
 	if (p_message == "flecs:worlds") {
 		_handle_remote_worlds(p_data);
 		if (profiler) {
@@ -302,6 +309,7 @@ void FlecsWorldEditorPlugin::_handle_profiler_metrics(const Dictionary &p_data) 
 }
 
 void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
+	
 	if (p_data.is_empty()) {
 		return;
 	}
@@ -364,6 +372,7 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 
 		world_dirty[world_rid] = true;
 	}
+	
 	
 	// Force tree to update display
 	worlds_tree->queue_redraw();
@@ -805,8 +814,6 @@ void FlecsWorldEditorPlugin::_load_entities_batch(RID world_rid, TreeItem *world
 	if (!world_cache.has(world_rid)) {
 		world_cache[world_rid] = Dictionary();
 	}
-
-	int batch_size = int(batch_size_spinbox->get_value());
 
 	// Load entities - placeholder implementation
 	// In production, would use WorldInfo::dump_all_entities()

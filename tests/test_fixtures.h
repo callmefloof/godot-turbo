@@ -31,7 +31,7 @@
 #pragma once
 
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
-#include "servers/rendering_server.h"
+#include "servers/rendering/rendering_server.h"
 #include "tests/test_macros.h"
 
 namespace TestFixtures {

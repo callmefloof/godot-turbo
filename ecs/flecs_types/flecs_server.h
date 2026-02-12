@@ -215,6 +215,7 @@ class FlecsServer : public Object {
 
 	double delta_time = 0.0;
 	HashMap<RID, bool> regular_system_paused; // track pause state for non-script systems
+	HashMap<uint64_t, double> native_system_prev_time_spent; // track previous time_spent for per-frame delta calculation
 
 protected:
 	static void _bind_methods();

@@ -10,6 +10,7 @@
 #include "modules/godot_turbo/ecs/components/component_reflection.h"
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/debug/ecs_trace_bridge.h"
 #include "core/os/os.h"
 
 // Clean refactored implementation below
@@ -85,7 +86,6 @@ Vector<flecs::entity> FlecsScriptSystem::get_component_terms() {
 		String cname = required_components.get(i);
 		flecs::entity ce = resolve_component_entity(world, cname);
 		if (!ce.is_valid()) {
-			print_line(String("Invalid component name: ") + cname);
 			continue;
 		}
 		comp_terms.push_back(ce);
@@ -137,14 +137,20 @@ void FlecsScriptSystem::build_change_observer_system() {
 		return;
 	}
 	
-	auto make_observer = [this, &comp_terms](flecs::entity_t evt, uint64_t &last_counter, uint64_t &total_counter) {
+	// Get the first component ID for tracing
+	uint64_t trace_component_id = comp_terms.size() > 0 ? comp_terms[0].id() : 0;
+	
+	auto make_observer = [this, &comp_terms, trace_component_id](flecs::entity_t evt, uint64_t &last_counter, uint64_t &total_counter) {
 		flecs::observer_builder<> ob = world->observer();
 		ob.event(evt);
 		for (int i = 0; i < comp_terms.size(); ++i) {
 			ob.with(comp_terms[i].id());
 		}
-		return ob.each([this, &last_counter, &total_counter](flecs::entity e) {
+		return ob.each([this, &last_counter, &total_counter, trace_component_id](flecs::entity e) {
 			if (is_paused || !callback.is_valid()) { return; }
+			
+			// Trace query iteration for neural visualizer
+			ECS_TRACE_QUERY(e.id(), trace_component_id);
 			
 			uint64_t t0 = instrumentation_enabled ? OS::get_singleton()->get_ticks_usec() : 0;
 			
@@ -216,14 +222,20 @@ void FlecsScriptSystem::build_task_system() {
 void FlecsScriptSystem::build_entity_iteration_system() {
 	flecs::system_builder<> builder = world->system().kind(flecs::OnUpdate);
 	
+	// Get the first component ID for tracing
+	uint64_t trace_component_id = 0;
+	
 	for (int i = 0; i < required_components.size(); ++i) {
 		String cname = required_components.get(i);
 		flecs::entity ce = resolve_component_entity(world, cname);
 		if (!ce.is_valid()) {
-			print_line(String("Invalid component name: ") + cname);
 			continue;
 		}
 		builder.with(ce.id());
+		// Capture the first valid component ID for tracing
+		if (trace_component_id == 0) {
+			trace_component_id = ce.id();
+		}
 	}
 	
 	// Enable multi-threading for regular entity-iterating systems
@@ -231,8 +243,11 @@ void FlecsScriptSystem::build_entity_iteration_system() {
 		builder.multi_threaded(true);
 	}
 	
-	script_system = builder.each([this](flecs::entity e) {
+	script_system = builder.each([this, trace_component_id](flecs::entity e) {
 		if (is_paused || !callback.is_valid()) { return; }
+		
+		// Trace query iteration for neural visualizer
+		ECS_TRACE_QUERY(e.id(), trace_component_id);
 		
 		uint64_t t0 = instrumentation_enabled ? OS::get_singleton()->get_ticks_usec() : 0;
 		

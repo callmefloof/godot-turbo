@@ -6,11 +6,11 @@
 #include "core/os/mutex.h"
 #include "scene/resources/3d/world_3d.h"
 #include "scene/resources/world_2d.h"
-#include "servers/navigation_server_2d.h"
-#include "servers/navigation_server_3d.h"
-#include "servers/physics_server_2d.h"
-#include "servers/physics_server_3d.h"
-#include "servers/rendering_server.h"
+#include "servers/navigation_2d/navigation_server_2d.h"
+#include "servers/navigation_3d/navigation_server_3d.h"
+#include "servers/physics_3d/physics_server_3d.h"
+#include "servers/physics_2d/physics_server_2d.h"
+#include "servers/rendering/rendering_server.h"
 #include "scene/resources/camera_attributes.h"
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
@@ -19,45 +19,45 @@
 /**
  * @file world_utility.h
  * @brief Thread-safe utilities for creating 2D/3D world components in the ECS.
- * 
+ *
  * This file provides utilities to set up World2DComponent and World3DComponent
  * on Flecs worlds, which hold the server-side resources (canvas, scenario, space,
  * navigation maps) needed for 2D and 3D scenes.
- * 
+ *
  * @note Thread-safe: All public methods are protected by mutexes
  */
 
 /**
  * @class World2DUtility
  * @brief Thread-safe utility for creating 2D world components in the ECS.
- * 
+ *
  * ## Purpose
- * 
+ *
  * World2DUtility sets up the World2DComponent on a Flecs world, which contains:
  * - **Canvas RID**: RenderingServer canvas for 2D rendering
  * - **Navigation Map RID**: NavigationServer2D map for pathfinding
  * - **Space RID**: PhysicsServer2D space for collision/physics
- * 
+ *
  * These server-side resources are required for 2D scenes to function properly.
- * 
+ *
  * ## Usage Modes
- * 
+ *
  * 1. **Auto-create mode**: Pass an invalid/null World2D → utility creates new server resources
  * 2. **Use existing mode**: Pass a valid World2D → utility uses its existing resources
  * 3. **Update mode**: If component already exists → updates RIDs without creating new entity
- * 
+ *
  * ## Thread Safety
- * 
+ *
  * All public methods are protected by an internal mutex, making the utility
  * safe for concurrent access from multiple threads.
- * 
+ *
  * @example
  * ```cpp
  * // C++ example: Auto-create world resources
  * RID world_id = FlecsServer::get_singleton()->create_world();
  * World2DUtility::create_world_2d(world_id, Ref<World2D>());  // Creates new resources
  * ```
- * 
+ *
  * @example
  * ```gdscript
  * # GDScript example: Use existing World2D
@@ -65,7 +65,7 @@
  * var world_2d = get_viewport().find_world_2d()
  * World2DUtility.create_world_2d(world_id, world_2d)
  * ```
- * 
+ *
  * @note This is a static utility class - do not instantiate it directly.
  */
 class World2DUtility : public Object {
@@ -76,12 +76,12 @@ private:
 
 	/**
 	 * @brief Internal implementation - creates World2DComponent with new server resources.
-	 * 
+	 *
 	 * Creates fresh server-side resources:
 	 * - RenderingServer canvas
 	 * - NavigationServer2D map
 	 * - PhysicsServer2D space
-	 * 
+	 *
 	 * @param world The Flecs world to set the component on
 	 * @note Not thread-safe by itself - callers must hold the mutex
 	 * @note Internal use only
@@ -108,11 +108,11 @@ private:
 
 	/**
 	 * @brief Internal implementation - creates/updates World2DComponent from World2D.
-	 * 
+	 *
 	 * If world_2d is valid, uses its existing RIDs.
 	 * If world_2d is invalid, falls back to creating new resources.
 	 * If component already exists, updates it instead of creating new.
-	 * 
+	 *
 	 * @param world The Flecs world to set the component on
 	 * @param world_2d The Godot World2D to get RIDs from (can be null)
 	 * @note Not thread-safe by itself - callers must hold the mutex
@@ -162,50 +162,50 @@ public:
 
 	/**
 	 * @brief Creates or updates the World2DComponent on a Flecs world.
-	 * 
+	 *
 	 * This method sets up the 2D world resources needed for:
 	 * - 2D rendering (canvas)
 	 * - 2D navigation (navigation map)
 	 * - 2D physics (physics space)
-	 * 
+	 *
 	 * ## Behavior
-	 * 
+	 *
 	 * - **If world_2d is valid**: Uses its existing server RIDs
 	 * - **If world_2d is null/invalid**: Creates new server resources
 	 * - **If component already exists**: Updates RIDs instead of creating new
-	 * 
+	 *
 	 * @param world_id The RID of the Flecs world to configure
 	 * @param world_2d The Godot World2D to use (pass null/invalid to auto-create)
-	 * 
+	 *
 	 * @note Thread-safe
 	 * @note Safe to call multiple times - will update existing component
 	 * @warning The world_id must be valid or the function will fail
-	 * 
+	 *
 	 * ## Use Cases
-	 * 
+	 *
 	 * 1. **Auto-create**: When you want the ECS to manage its own 2D world
 	 *    ```cpp
 	 *    World2DUtility::create_world_2d(world_id, Ref<World2D>());
 	 *    ```
-	 * 
+	 *
 	 * 2. **Use viewport world**: When you want to share the viewport's 2D world
 	 *    ```cpp
 	 *    Ref<World2D> viewport_world = viewport->find_world_2d();
 	 *    World2DUtility::create_world_2d(world_id, viewport_world);
 	 *    ```
-	 * 
+	 *
 	 * 3. **Update existing**: When you need to change the world resources
 	 *    ```cpp
 	 *    // Component exists, this will update it
 	 *    World2DUtility::create_world_2d(world_id, new_world_2d);
 	 *    ```
-	 * 
+	 *
 	 * @example
 	 * ```gdscript
 	 * # GDScript: Auto-create world
 	 * var world_id = FlecsServer.create_world()
 	 * World2DUtility.create_world_2d(world_id, null)
-	 * 
+	 *
 	 * # Use viewport's world
 	 * var world_2d = get_viewport().find_world_2d()
 	 * World2DUtility.create_world_2d(world_id, world_2d)
@@ -215,7 +215,7 @@ public:
 		MutexLock lock(mutex);
 
 		if (!world_id.is_valid()) {
-			ERR_FAIL_COND_MSG(!world_id.is_valid(), 
+			ERR_FAIL_COND_MSG(!world_id.is_valid(),
 				"World2DUtility: World RID is invalid");
 			return;
 		}
@@ -237,15 +237,15 @@ public:
 
 	/**
 	 * @brief Binds methods for GDScript/engine reflection.
-	 * 
+	 *
 	 * Exposes the utility to GDScript and the Godot editor.
-	 * 
+	 *
 	 * @note Called automatically during engine initialization
 	 * @note Internal use only
 	 */
 	static void _bind_methods() {
 		ClassDB::bind_static_method(
-			get_class_static(), 
+			get_class_static(),
 			D_METHOD("create_world_2d", "world_id", "world_2d"),
 			&World2DUtility::create_world_2d
 		);
@@ -255,9 +255,9 @@ public:
 /**
  * @class World3DUtility
  * @brief Thread-safe utility for creating 3D world components in the ECS.
- * 
+ *
  * ## Purpose
- * 
+ *
  * World3DUtility sets up the World3DComponent on a Flecs world, which contains:
  * - **Scenario RID**: RenderingServer scenario for 3D rendering
  * - **Camera Attributes RID**: Camera settings (exposure, DOF, etc.)
@@ -265,27 +265,27 @@ public:
  * - **Fallback Environment RID**: Default environment when none specified
  * - **Navigation Map RID**: NavigationServer3D map for pathfinding
  * - **Space RID**: PhysicsServer3D space for collision/physics
- * 
+ *
  * These server-side resources are required for 3D scenes to function properly.
- * 
+ *
  * ## Usage Modes
- * 
+ *
  * 1. **Auto-create mode**: Pass an invalid/null World3D → utility creates new server resources
  * 2. **Use existing mode**: Pass a valid World3D → utility uses its existing resources
  * 3. **Update mode**: If component already exists → updates RIDs without creating new entity
- * 
+ *
  * ## Thread Safety
- * 
+ *
  * All public methods are protected by an internal mutex, making the utility
  * safe for concurrent access from multiple threads.
- * 
+ *
  * @example
  * ```cpp
  * // C++ example: Auto-create world resources
  * RID world_id = FlecsServer::get_singleton()->create_world();
  * World3DUtility::create_world_3d(world_id, Ref<World3D>());  // Creates new resources
  * ```
- * 
+ *
  * @example
  * ```gdscript
  * # GDScript example: Use existing World3D
@@ -293,7 +293,7 @@ public:
  * var world_3d = get_viewport().find_world_3d()
  * World3DUtility.create_world_3d(world_id, world_3d)
  * ```
- * 
+ *
  * @note This is a static utility class - do not instantiate it directly.
  */
 class World3DUtility : public Object {
@@ -304,12 +304,12 @@ private:
 
 	/**
 	 * @brief Internal implementation - creates World3DComponent with new server resources.
-	 * 
+	 *
 	 * Creates fresh server-side resources:
 	 * - RenderingServer scenario, camera attributes, environments
 	 * - NavigationServer3D map
 	 * - PhysicsServer3D space
-	 * 
+	 *
 	 * @param world The Flecs world to set the component on
 	 * @note Not thread-safe by itself - callers must hold the mutex
 	 * @note Internal use only
@@ -339,11 +339,11 @@ private:
 
 	/**
 	 * @brief Internal implementation - creates/updates World3DComponent from World3D.
-	 * 
+	 *
 	 * If world_3d is valid, uses its existing RIDs.
 	 * If world_3d is invalid, falls back to creating new resources.
 	 * If component already exists, updates it instead of creating new.
-	 * 
+	 *
 	 * @param world The Flecs world to set the component on
 	 * @param world_3d The Godot World3D to get RIDs from (can be null)
 	 * @note Not thread-safe by itself - callers must hold the mutex
@@ -399,50 +399,50 @@ public:
 
 	/**
 	 * @brief Creates or updates the World3DComponent on a Flecs world.
-	 * 
+	 *
 	 * This method sets up the 3D world resources needed for:
 	 * - 3D rendering (scenario, camera attributes, environments)
 	 * - 3D navigation (navigation map)
 	 * - 3D physics (physics space)
-	 * 
+	 *
 	 * ## Behavior
-	 * 
+	 *
 	 * - **If world_3d is valid**: Uses its existing server RIDs
 	 * - **If world_3d is null/invalid**: Creates new server resources
 	 * - **If component already exists**: Updates RIDs instead of creating new
-	 * 
+	 *
 	 * @param world_id The RID of the Flecs world to configure
 	 * @param world_3d The Godot World3D to use (pass null/invalid to auto-create)
-	 * 
+	 *
 	 * @note Thread-safe
 	 * @note Safe to call multiple times - will update existing component
 	 * @warning The world_id must be valid or the function will fail
-	 * 
+	 *
 	 * ## Use Cases
-	 * 
+	 *
 	 * 1. **Auto-create**: When you want the ECS to manage its own 3D world
 	 *    ```cpp
 	 *    World3DUtility::create_world_3d(world_id, Ref<World3D>());
 	 *    ```
-	 * 
+	 *
 	 * 2. **Use viewport world**: When you want to share the viewport's 3D world
 	 *    ```cpp
 	 *    Ref<World3D> viewport_world = viewport->find_world_3d();
 	 *    World3DUtility::create_world_3d(world_id, viewport_world);
 	 *    ```
-	 * 
+	 *
 	 * 3. **Update existing**: When you need to change the world resources
 	 *    ```cpp
 	 *    // Component exists, this will update it
 	 *    World3DUtility::create_world_3d(world_id, new_world_3d);
 	 *    ```
-	 * 
+	 *
 	 * @example
 	 * ```gdscript
 	 * # GDScript: Auto-create world
 	 * var world_id = FlecsServer.create_world()
 	 * World3DUtility.create_world_3d(world_id, null)
-	 * 
+	 *
 	 * # Use viewport's world
 	 * var world_3d = get_viewport().find_world_3d()
 	 * World3DUtility.create_world_3d(world_id, world_3d)
@@ -452,7 +452,7 @@ public:
 		MutexLock lock(mutex);
 
 		if (!world_id.is_valid()) {
-			ERR_FAIL_COND_MSG(!world_id.is_valid(), 
+			ERR_FAIL_COND_MSG(!world_id.is_valid(),
 				"World3DUtility: World RID is invalid");
 			return;
 		}
@@ -474,15 +474,15 @@ public:
 
 	/**
 	 * @brief Binds methods for GDScript/engine reflection.
-	 * 
+	 *
 	 * Exposes the utility to GDScript and the Godot editor.
-	 * 
+	 *
 	 * @note Called automatically during engine initialization
 	 * @note Internal use only
 	 */
 	static void _bind_methods() {
 		ClassDB::bind_static_method(
-			get_class_static(), 
+			get_class_static(),
 			D_METHOD("create_world_3d", "world_id", "world_3d"),
 			&World3DUtility::create_world_3d
 		);

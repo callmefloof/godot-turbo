@@ -201,8 +201,8 @@ void FlecsProfiler::_build_profiler_ui() {
 	h_split->add_child(left_panel);
 
 	Label *graph_label = memnew(Label);
-	graph_label->set_text("Frame Timing");
-	graph_label->add_theme_font_size_override("font_size", 12);
+	graph_label->set_text("Frame Timing  |  Legend: [green] <avg  [yellow] >avg  [orange] >1.5x  [red] >2x avg  [white] selected");
+	graph_label->add_theme_font_size_override("font_size", 11);
 	left_panel->add_child(graph_label);
 
 	graph = memnew(TextureRect);
@@ -235,11 +235,11 @@ void FlecsProfiler::_build_profiler_ui() {
 	metrics_tree->set_columns(6);
 	metrics_tree->set_column_titles_visible(true);
 	metrics_tree->set_column_title(0, "System/Query");
-	metrics_tree->set_column_title(1, "Time (µs)");
+	metrics_tree->set_column_title(1, "Time (us)");
 	metrics_tree->set_column_title(2, "Calls");
 	metrics_tree->set_column_title(3, "Entities");
-	metrics_tree->set_column_title(4, "Min (µs)");
-	metrics_tree->set_column_title(5, "Max (µs)");
+	metrics_tree->set_column_title(4, "Min (us)");
+	metrics_tree->set_column_title(5, "Max (us)");
 	metrics_tree->set_column_expand(0, true);
 	for (int i = 1; i < 6; i++) {
 		metrics_tree->set_column_expand(i, false);
@@ -346,31 +346,14 @@ void FlecsProfiler::_refresh_world_list() {
 	available_worlds.clear();
 
 	// Check if we're in remote mode - if so, request worlds independently
+	// Remote mode is determined by whether a debugger session is active, NOT by instance management
+	// The instance management was preventing remote mode from working correctly
 	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
 	bool is_remote = world_plugin && world_plugin->is_remote_mode();
-
-	// Check for multi-instance conflicts
-	InstanceManager *instance_mgr = InstanceManager::get_singleton();
-	if (instance_mgr->has_other_instance() && is_remote) {
-		// In remote mode with multiple instances, only primary should request
-		if (!instance_mgr->is_primary_instance()) {
-			// Try to acquire the profiler resource
-			if (!instance_mgr->try_acquire_resource("profiler_remote")) {
-				// Another instance has the profiler, use local mode only
-				is_remote = false;
-			}
-		}
-	}
 
 	// Debug: Log refresh attempt periodically
 	static int refresh_count = 0;
 	refresh_count++;
-	if (refresh_count % 30 == 1) { // Log every 30th refresh (~1 minute at 2s interval)
-		print_line(vformat("FlecsProfiler: _refresh_world_list (flecs_server=%s, is_remote=%s, instance=%s)", 
-			flecs_server ? "valid" : "null", 
-			is_remote ? "true" : "false",
-			instance_mgr->is_primary_instance() ? "primary" : "secondary"));
-	}
 
 	TypedArray<RID> worlds;
 
@@ -390,22 +373,13 @@ void FlecsProfiler::_refresh_world_list() {
 		}
 	}
 
-	// Only log when we find worlds (to reduce spam)
-	// Removed verbose logging - worlds found
-
 	if (worlds.is_empty()) {
-		if (refresh_count % 30 == 1) {
-			print_line("FlecsProfiler: No worlds available");
-		}
 		world_selector->add_item("No worlds available");
 		world_selector->set_disabled(true);
 		selected_world = RID();
 		return;
 	}
 
-	if (refresh_count % 30 == 1) {
-		print_line(vformat("FlecsProfiler: Found %d worlds", worlds.size()));
-	}
 
 	world_selector->set_disabled(false);
 
@@ -467,12 +441,14 @@ void FlecsProfiler::_on_world_refresh_timer() {
 void FlecsProfiler::handle_remote_worlds(const Array &p_data) {
 	waiting_for_remote_worlds = false;
 	
+	
 	if (p_data.is_empty()) {
 		return;
 	}
 	
 	Dictionary response = p_data[0];
 	Array worlds_array = response.get("worlds", Array());
+	
 	
 	// The worlds will be added to world_dirty in the world plugin's handler
 	// which will be called before or alongside this handler.
@@ -495,31 +471,12 @@ void FlecsProfiler::_on_world_selected(int p_index) {
 void FlecsProfiler::_collect_frame_metrics() {
 	frame_counter++;
 
-	// Check if we're in remote mode
+	// Check if we're in remote mode - determined purely by debugger session state
+	// Not by instance management (which was incorrectly blocking remote mode)
 	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
 	bool is_remote = world_plugin && world_plugin->is_remote_mode();
 
-	// Handle multi-instance conflicts for remote mode
-	InstanceManager *instance_mgr = InstanceManager::get_singleton();
-	if (is_remote && instance_mgr->has_other_instance()) {
-		// Only primary instance should use remote debugging
-		if (!instance_mgr->is_primary_instance() && 
-			!instance_mgr->is_resource_available("profiler_remote")) {
-			// Fall back to local mode
-			is_remote = false;
-		}
-	}
 
-	// Debug logging every 60 frames (~6 seconds at 10Hz)
-	if (frame_counter % 60 == 0) {
-		print_line(vformat("FlecsProfiler: _collect_frame_metrics (frame=%d, is_profiling=%s, flecs_server=%s, selected_world=%s, is_remote=%s, instance=%s)",
-			frame_counter,
-			is_profiling ? "true" : "false",
-			flecs_server ? "valid" : "null",
-			selected_world.is_valid() ? "valid" : "invalid",
-			is_remote ? "true" : "false",
-			instance_mgr->is_primary_instance() ? "primary" : "secondary"));
-	}
 
 	if (!selected_world.is_valid()) {
 		// Try to refresh and select a world if none selected
@@ -528,11 +485,6 @@ void FlecsProfiler::_collect_frame_metrics() {
 		int refresh_interval = is_remote ? 10 : 50;
 		if (frame_counter % refresh_interval == 0) {
 			_refresh_world_list();
-		}
-		// Only log once every 30 seconds to avoid spam
-		// Log only once per minute (600 frames at 10Hz timer)
-		if (frame_counter % 600 == 0) {
-			print_line(vformat("FlecsProfiler: Waiting for world (remote_mode=%s)", is_remote ? "true" : "false"));
 		}
 		return;
 	}
@@ -554,17 +506,10 @@ void FlecsProfiler::_collect_frame_metrics() {
 
 	// Local mode - get metrics directly from FlecsServer
 	if (!flecs_server) {
-		if (frame_counter % 60 == 0) {
-			print_line("FlecsProfiler: flecs_server is null, cannot collect metrics");
-		}
 		return;
 	}
 
 	Dictionary metrics = flecs_server->get_system_metrics(selected_world);
-	if (frame_counter % 60 == 0) {
-		print_line(vformat("FlecsProfiler: Got metrics from FlecsServer, systems count: %d", 
-			metrics.has("systems") ? Array(metrics["systems"]).size() : 0));
-	}
 	_process_metrics_dictionary(metrics);
 }
 
@@ -690,18 +635,18 @@ void FlecsProfiler::_update_metrics_tree() {
 	if (instance_mgr->has_other_instance() && !instance_mgr->is_primary_instance()) {
 		instance_info = " [secondary]";
 	}
-	info_label->set_text(vformat("Frame %d - Total: %.2f ms%s", frame.frame_number, frame.total_frame_time_usec / 1000.0, instance_info));
+	info_label->set_text(vformat("Frame %d - Total: %d us%s", frame.frame_number, frame.total_frame_time_usec, instance_info));
 
 	TreeItem *root = metrics_tree->create_item();
 
 	for (const SystemMetric &sys : frame.system_metrics) {
 		TreeItem *item = metrics_tree->create_item(root);
 		item->set_text(0, sys.name);
-		item->set_text(1, vformat("%.1f", sys.total_time_usec / 1000.0));
+		item->set_text(1, itos(sys.total_time_usec));
 		item->set_text(2, itos(sys.call_count));
-		item->set_text(3, vformat("%d", sys.entity_count));
-		item->set_text(4, vformat("%.1f", sys.min_time_usec / 1000.0));
-		item->set_text(5, vformat("%.1f", sys.max_time_usec / 1000.0));
+		item->set_text(3, itos(sys.entity_count));
+		item->set_text(4, itos(sys.min_time_usec));
+		item->set_text(5, itos(sys.max_time_usec));
 	}
 
 	for (const QueryMetric &qry : frame.query_metrics) {
@@ -736,48 +681,78 @@ void FlecsProfiler::_update_plot() {
 
 	int frame_count = MIN(frame_metrics.size(), width);
 	
-	// Adaptive scaling: find actual max time in recent frames for better visualization
+	// Relative scaling: find actual max and min time in visible frames
 	float actual_max_time = 0.0f;
+	float actual_min_time = FLT_MAX;
 	float total_time = 0.0f;
-	int sample_count = MIN(frame_count, 100); // Sample last 100 frames for scaling
-	int start_sample = MAX(0, frame_count - sample_count);
 	
-	for (int i = start_sample; i < frame_count; i++) {
+	for (int i = 0; i < frame_count; i++) {
 		float frame_time = float(frame_metrics[i].total_frame_time_usec);
 		actual_max_time = MAX(actual_max_time, frame_time);
+		if (frame_time > 0.0f) {
+			actual_min_time = MIN(actual_min_time, frame_time);
+		}
 		total_time += frame_time;
 	}
 	
-	// Use adaptive max: either 1.5x the actual max, or 2x the average, whichever is smaller
-	// This reduces wild swings while still showing peaks
-	float avg_time = sample_count > 0 ? total_time / sample_count : 0.0f;
-	float adaptive_limit = MIN(actual_max_time * 1.5f, avg_time * 3.0f);
+	// Handle edge cases
+	if (actual_max_time <= 0.0f) {
+		actual_max_time = 1.0f;
+	}
+	if (actual_min_time == FLT_MAX || actual_min_time <= 0.0f) {
+		actual_min_time = 0.0f;
+	}
 	
-	// Ensure minimum scale and use user-set limit as ceiling
-	float max_time = CLAMP(adaptive_limit, 1000.0f, graph_limit);
+	// Calculate average for reference
+	float avg_time = frame_count > 0 ? total_time / frame_count : 0.0f;
 	
-	// If actual max is very small, use a smaller scale
-	if (actual_max_time > 0 && actual_max_time < 1000.0f) {
-		max_time = 2000.0f; // 2ms minimum scale for small values
+	// Use relative scaling: max_time is based purely on actual data
+	// Add 20% headroom above the actual max so bars don't always hit the ceiling
+	float max_time = actual_max_time * 1.2f;
+	
+	// Optional: Use a floor based on minimum value to spread out the bars more
+	// This makes small variations more visible
+	float display_floor = 0.0f;
+	float range = actual_max_time - actual_min_time;
+	
+	// If the range is less than 50% of max, use min as a floor to spread bars
+	// This makes the graph more readable when values are clustered
+	if (range > 0.0f && range < actual_max_time * 0.5f && frame_count > 10) {
+		// Use 80% of min as floor to give some bottom margin
+		display_floor = actual_min_time * 0.8f;
+		max_time = actual_max_time * 1.1f; // Less headroom when using floor
 	}
 
 	for (int i = 0; i < frame_count; i++) {
 		int x = (width * i) / frame_count;
 		int bar_width = MAX(1, width / frame_count); // Ensure bars have at least 1px width
 		const FrameMetric &frame = frame_metrics[i];
-		float time_percent = CLAMP(float(frame.total_frame_time_usec) / max_time, 0.0f, 1.0f);
+		float frame_time = float(frame.total_frame_time_usec);
+		// Calculate relative position: (value - floor) / (max - floor)
+		float time_percent;
+		if (max_time > display_floor) {
+			time_percent = CLAMP((frame_time - display_floor) / (max_time - display_floor), 0.0f, 1.0f);
+		} else {
+			time_percent = 0.5f; // Fallback if somehow max <= floor
+		}
 		int bar_height = MAX(1, int(height * time_percent)); // Ensure at least 1px height if non-zero
 
-		// Color based on performance: green = good, yellow = warning, red = bad
+		// Color based on relative performance within the data range
+		// Compare to average: below avg = green, near avg = yellow, above avg = red
 		Color bar_color;
+		float relative_to_avg = avg_time > 0.0f ? frame_time / avg_time : 1.0f;
 		if (i == last_metric) {
-			bar_color = Color(1, 1, 0); // Yellow for selected
-		} else if (time_percent < 0.5f) {
-			bar_color = Color(0.2, 0.8, 0.2); // Green
-		} else if (time_percent < 0.75f) {
-			bar_color = Color(0.8, 0.8, 0.2); // Yellow-ish
+			bar_color = Color(1, 1, 1); // White for selected
+		} else if (relative_to_avg < 0.8f) {
+			bar_color = Color(0.2, 0.8, 0.2); // Green - below average
+		} else if (relative_to_avg < 1.2f) {
+			bar_color = Color(0.4, 0.7, 0.4); // Light green - near average
+		} else if (relative_to_avg < 1.5f) {
+			bar_color = Color(0.8, 0.8, 0.2); // Yellow - above average
+		} else if (relative_to_avg < 2.0f) {
+			bar_color = Color(0.9, 0.5, 0.2); // Orange - significantly above average
 		} else {
-			bar_color = Color(0.8, 0.3, 0.2); // Red-ish
+			bar_color = Color(0.8, 0.3, 0.2); // Red - spike (2x+ average)
 		}
 		
 		// Draw bar with proper width
@@ -804,6 +779,30 @@ void FlecsProfiler::_update_plot() {
 
 	if (graph && graph_texture.is_valid()) {
 		graph->set_texture(graph_texture);
+	}
+
+	// Update info label with scale and statistics
+	if (info_label) {
+		String scale_info;
+		// Format times nicely
+		auto format_time = [](float usec) -> String {
+			if (usec >= 1000.0f) {
+				return String::num(usec / 1000.0f, 2) + "ms";
+			} else {
+				return String::num(usec, 0) + "us";
+			}
+		};
+		
+		scale_info = "Frames: " + itos(frame_count);
+		scale_info += " | Avg: " + format_time(avg_time);
+		scale_info += " | Min: " + format_time(actual_min_time);
+		scale_info += " | Max: " + format_time(actual_max_time);
+		scale_info += " | Scale: 0-" + format_time(max_time);
+		if (display_floor > 0.0f) {
+			scale_info += " (floor: " + format_time(display_floor) + ")";
+		}
+		
+		info_label->set_text(scale_info);
 	}
 }
 
@@ -840,7 +839,7 @@ void FlecsProfiler::_update_button_text() {
 
 String FlecsProfiler::_get_time_as_text(uint64_t p_time_usec) {
 	if (p_time_usec < 1000) {
-		return vformat("%.1f µs", float(p_time_usec));
+		return vformat("%.1f us", float(p_time_usec));
 	} else if (p_time_usec < 1000000) {
 		return vformat("%.2f ms", float(p_time_usec) / 1000.0);
 	} else {
@@ -877,6 +876,9 @@ void FlecsProfiler::clear_metrics() {
 		cursor_metric_edit->set_max(1000);
 		cursor_metric_edit->set_value(0);
 	}
+	if (info_label) {
+		info_label->set_text("No profiling data");
+	}
 	_update_metrics_tree();
 	_update_plot();
 }
@@ -905,9 +907,9 @@ Vector<Vector<String>> FlecsProfiler::_get_metrics_as_csv() const {
 	// Header row
 	Vector<String> header;
 	header.push_back("Frame");
-	header.push_back("Total Time (µs)");
+	header.push_back("Total Time (us)");
 	header.push_back("System Name");
-	header.push_back("System Time (µs)");
+	header.push_back("System Time (us)");
 	header.push_back("Call Count");
 	header.push_back("Entity Count");
 	csv_data.push_back(header);

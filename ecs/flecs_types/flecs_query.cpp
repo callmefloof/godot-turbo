@@ -8,6 +8,7 @@
 #include "core/variant/dictionary.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "modules/godot_turbo/ecs/components/component_reflection.h"
+#include "modules/godot_turbo/debug/ecs_trace_bridge.h"
 #include <utility>
 #include <vector>
 
@@ -207,12 +208,24 @@ Array FlecsQuery::fetch_entities_internal(FetchMode mode) {
     Array result;
     uint64_t entity_count = 0;
 
+    // Get the first component ID for tracing (if we have required components)
+    uint64_t trace_component_id = 0;
+    if (required_components.size() > 0) {
+        flecs::entity first_comp = resolve_component_entity(world, required_components[0]);
+        if (first_comp.is_valid()) {
+            trace_component_id = first_comp.id();
+        }
+    }
+
     // Iterate query and collect entities
-    auto process_entity = [&](flecs::entity e) {
+    auto process_entity = [&, trace_component_id](flecs::entity e) {
         // Validate entity before processing
         if (!e.is_valid() || !e.is_alive()) {
             return;
         }
+
+        // Trace query iteration for neural visualizer
+        ECS_TRACE_QUERY(e.id(), trace_component_id);
 
         // Apply name filter if enabled
         if (filter_enabled && !filter_name_pattern.is_empty()) {

@@ -38,11 +38,11 @@
 #include "modules/godot_turbo/ecs/components/all_components.h"
 #include "scene/resources/world_2d.h"
 #include "scene/resources/3d/world_3d.h"
-#include "servers/rendering_server.h"
-#include "servers/physics_server_2d.h"
-#include "servers/physics_server_3d.h"
-#include "servers/navigation_server_2d.h"
-#include "servers/navigation_server_3d.h"
+#include "servers/rendering/rendering_server.h"
+#include "servers/physics_2d/physics_server_2d.h"
+#include "servers/physics_3d/physics_server_3d.h"
+#include "servers/navigation_2d/navigation_server_2d.h"
+#include "servers/navigation_3d/navigation_server_3d.h"
 
 #define REQUIRE_WORLD2D_SERVERS() \
 	do { \

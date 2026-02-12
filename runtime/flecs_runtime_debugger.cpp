@@ -3,13 +3,24 @@
 #include "core/debugger/engine_debugger.h"
 #include "core/variant/typed_array.h"
 #include "core/string/ustring.h"
+#include "core/string/print_string.h"
+#include "core/config/engine.h"
+#include "scene/main/timer.h"
+#include "scene/main/scene_tree.h"
 
 FlecsRuntimeDebugger *FlecsRuntimeDebugger::singleton = nullptr;
+
+void FlecsRuntimeDebugger::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("_on_retry_timer"), &FlecsRuntimeDebugger::_on_retry_timer);
+}
 
 FlecsRuntimeDebugger::FlecsRuntimeDebugger() {
 	singleton = this;
 	server = nullptr;
+	retry_timer = nullptr;
 	initialized = false;
+	capture_registered = false;
+	retry_count = 0;
 }
 
 FlecsRuntimeDebugger::~FlecsRuntimeDebugger() {
@@ -19,23 +30,97 @@ FlecsRuntimeDebugger::~FlecsRuntimeDebugger() {
 	singleton = nullptr;
 }
 
+void FlecsRuntimeDebugger::_on_retry_timer() {
+	if (capture_registered) {
+		// Already registered, stop the timer
+		if (retry_timer) {
+			retry_timer->stop();
+		}
+		return;
+	}
+
+	retry_count++;
+	
+	if (retry_count > MAX_RETRY_COUNT) {
+		if (retry_timer) {
+			retry_timer->stop();
+		}
+		return;
+	}
+
+	if (_try_register_capture()) {
+		if (retry_timer) {
+			retry_timer->stop();
+		}
+	}
+}
+
+bool FlecsRuntimeDebugger::_try_register_capture() {
+	// Check if debugger is available and active
+	EngineDebugger *debugger = EngineDebugger::get_singleton();
+	if (!debugger) {
+		return false;
+	}
+
+	// Check if debugger is actually connected/active
+	// The debugger may exist but not be connected to a remote session yet
+	if (!debugger->is_active()) {
+		return false;
+	}
+
+	// Check if FlecsServer is available
+	if (!server) {
+		server = FlecsServer::get_singleton();
+		if (!server) {
+			return false;
+		}
+	}
+
+	// Register our message capture
+	EngineDebugger::register_message_capture("flecs", EngineDebugger::Capture(this, _capture_message));
+	capture_registered = true;
+	
+	return true;
+}
+
 void FlecsRuntimeDebugger::initialize() {
 	if (initialized) {
 		return;
 	}
 
 	server = FlecsServer::get_singleton();
-	if (!server) {
+
+	// Try immediate registration
+	if (_try_register_capture()) {
+		initialized = true;
 		return;
 	}
 
-	EngineDebugger *debugger = EngineDebugger::get_singleton();
-	if (!debugger) {
+	// Debugger not ready yet - this is normal when running from editor
+	// The debugger connection is established after the game starts
+	// We'll use a timer to retry registration
+
+	// Create and start retry timer - we need to wait for the scene tree
+	// Use call_deferred to set up the timer after the scene is ready
+	callable_mp(this, &FlecsRuntimeDebugger::_setup_retry_timer).call_deferred();
+	
+	initialized = true;
+}
+
+void FlecsRuntimeDebugger::_setup_retry_timer() {
+	SceneTree *tree = SceneTree::get_singleton();
+	if (!tree) {
 		return;
 	}
+
+	retry_timer = memnew(Timer);
+	retry_timer->set_wait_time(0.1); // 100ms between retries
+	retry_timer->set_one_shot(false);
+	retry_timer->connect("timeout", callable_mp(this, &FlecsRuntimeDebugger::_on_retry_timer));
 	
-	EngineDebugger::register_message_capture("flecs", EngineDebugger::Capture(this, _capture_message));
-	initialized = true;
+	// Add timer to the scene tree root
+	tree->get_root()->add_child(retry_timer);
+	retry_timer->start();
 }
 
 void FlecsRuntimeDebugger::shutdown() {
@@ -43,7 +128,22 @@ void FlecsRuntimeDebugger::shutdown() {
 		return;
 	}
 
-	EngineDebugger::unregister_message_capture("flecs");
+	// Stop and free retry timer
+	if (retry_timer) {
+		retry_timer->stop();
+		if (retry_timer->is_inside_tree()) {
+			retry_timer->queue_free();
+		} else {
+			memdelete(retry_timer);
+		}
+		retry_timer = nullptr;
+	}
+
+	if (capture_registered) {
+		EngineDebugger::unregister_message_capture("flecs");
+		capture_registered = false;
+	}
+	
 	initialized = false;
 }
 
@@ -76,7 +176,10 @@ Error FlecsRuntimeDebugger::_capture_message(void *p_user, const String &p_msg, 
 
 Error FlecsRuntimeDebugger::_handle_request_worlds(const Array &p_args) {
 	if (!server) {
-		return FAILED;
+		server = FlecsServer::get_singleton();
+		if (!server) {
+			return FAILED;
+		}
 	}
 
 	Dictionary response;
@@ -107,7 +210,10 @@ Error FlecsRuntimeDebugger::_handle_request_worlds(const Array &p_args) {
 
 Error FlecsRuntimeDebugger::_handle_request_entities(const Array &p_args) {
 	if (!server) {
-		return FAILED;
+		server = FlecsServer::get_singleton();
+		if (!server) {
+			return FAILED;
+		}
 	}
 
 	if (p_args.size() < 3) {
@@ -175,7 +281,10 @@ Error FlecsRuntimeDebugger::_handle_request_entities(const Array &p_args) {
 
 Error FlecsRuntimeDebugger::_handle_request_components(const Array &p_args) {
 	if (!server) {
-		return FAILED;
+		server = FlecsServer::get_singleton();
+		if (!server) {
+			return FAILED;
+		}
 	}
 
 	if (p_args.size() < 2) {
@@ -211,13 +320,12 @@ Error FlecsRuntimeDebugger::_handle_request_components(const Array &p_args) {
 
 void FlecsRuntimeDebugger::_send_debugger_message(const String &p_msg, const Dictionary &p_data) {
 	EngineDebugger *debugger = EngineDebugger::get_singleton();
-	if (!debugger) {
+	if (!debugger || !debugger->is_active()) {
 		return;
 	}
 
 	Array args;
 	args.push_back(p_data);
-
 	debugger->send_message(p_msg, args);
 }
 
@@ -416,7 +524,10 @@ Array FlecsRuntimeDebugger::_serialize_components(const RID &p_world_rid, uint64
 
 Error FlecsRuntimeDebugger::_handle_request_profiler_metrics(const Array &p_args) {
 	if (!server) {
-		return FAILED;
+		server = FlecsServer::get_singleton();
+		if (!server) {
+			return FAILED;
+		}
 	}
 
 	if (p_args.size() < 1) {

@@ -37,7 +37,7 @@
 #include "core/os/thread.h"
 #include "scene/resources/material.h"
 #include "scene/resources/mesh.h"
-#include "servers/rendering_server.h"
+#include "servers/rendering/rendering_server.h"
 #include "tests/test_macros.h"
 
 namespace TestRefStorage {

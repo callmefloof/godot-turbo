@@ -2,7 +2,7 @@
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "scene/resources/texture.h"
-#include "servers/rendering_server.h"
+#include "servers/rendering/rendering_server.h"
 #include "core/math/vector2i.h"
 #include "modules/godot_turbo/ecs/systems/pipeline_manager.h"
 #include "modules/godot_turbo/ecs/systems/command.h"

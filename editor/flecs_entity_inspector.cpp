@@ -88,25 +88,18 @@ FlecsEntityInspector::~FlecsEntityInspector() {
 }
 
 void FlecsEntityInspector::set_entity(RID p_world_rid, uint64_t p_entity_id) {
-	print_line(vformat("FlecsEntityInspector::set_entity - world_rid=%s, entity_id=%s",
-		String::num_int64(p_world_rid.get_id(), 16), String::num_int64(p_entity_id, 16)));
-	
 	current_world = p_world_rid;
 	current_entity_id = p_entity_id;
 	is_remote_mode = false;
 	remote_components_data.clear();
 	_rebuild_inspector();
 	
-	print_line("FlecsEntityInspector::set_entity - Inspector rebuilt");
 }
 
 void FlecsEntityInspector::set_entity_from_remote_data(uint64_t p_world_id, uint64_t p_entity_id, const Array &p_components) {
-	print_line(vformat("FlecsEntityInspector::set_entity_from_remote_data - world_id=%s, entity_id=%s, components=%d",
-		String::num_int64(p_world_id, 16), String::num_int64(p_entity_id, 16), p_components.size()));
-	
 	// Validate inputs
 	if (p_entity_id == 0) {
-		print_line("FlecsEntityInspector::set_entity_from_remote_data - WARNING: entity_id is 0");
+		return;
 	}
 	
 	current_world = RID::from_uint64(p_world_id);
@@ -115,7 +108,6 @@ void FlecsEntityInspector::set_entity_from_remote_data(uint64_t p_world_id, uint
 	remote_components_data = p_components.duplicate();  // Make a copy to avoid issues with array lifetime
 	_rebuild_inspector();
 	
-	print_line("FlecsEntityInspector::set_entity_from_remote_data - Inspector rebuilt");
 }
 
 void FlecsEntityInspector::clear_inspector() {
@@ -234,7 +226,6 @@ void FlecsEntityInspector::_build_entity_header() {
 }
 
 void FlecsEntityInspector::_build_components_section() {
-	print_line("FlecsEntityInspector::_build_components_section - START");
 	
 	if (!content_container) {
 		ERR_PRINT("FlecsEntityInspector::_build_components_section - content_container is null");
@@ -242,7 +233,6 @@ void FlecsEntityInspector::_build_components_section() {
 	}
 	
 	if (is_remote_mode) {
-		print_line(vformat("FlecsEntityInspector::_build_components_section - Remote mode, %d components", remote_components_data.size()));
 		
 		// Remote mode - use data from remote_components_data
 		if (remote_components_data.is_empty()) {
@@ -256,7 +246,6 @@ void FlecsEntityInspector::_build_components_section() {
 		for (int i = 0; i < remote_components_data.size(); i++) {
 			Variant comp_var = remote_components_data[i];
 			if (comp_var.get_type() != Variant::DICTIONARY) {
-				print_line(vformat("FlecsEntityInspector::_build_components_section - Skipping non-dict component at index %d", i));
 				continue;
 			}
 			
@@ -265,7 +254,6 @@ void FlecsEntityInspector::_build_components_section() {
 			
 			// Skip empty component names
 			if (comp_name.is_empty() || comp_name == "Unknown") {
-				print_line(vformat("FlecsEntityInspector::_build_components_section - Skipping component with empty/unknown name at index %d", i));
 				continue;
 			}
 			
@@ -274,9 +262,6 @@ void FlecsEntityInspector::_build_components_section() {
 			if (data_var.get_type() == Variant::DICTIONARY) {
 				comp_data_dict = data_var;
 			}
-
-			print_line(vformat("FlecsEntityInspector::_build_components_section - Processing component '%s' with %d data fields", 
-				comp_name, comp_data_dict.size()));
 
 			// Check if component matches filter
 			if (!current_component_filter.is_empty()) {
@@ -296,11 +281,9 @@ void FlecsEntityInspector::_build_components_section() {
 			}
 		}
 	} else {
-		print_line("FlecsEntityInspector::_build_components_section - Local mode");
 		
 		// Local mode - query FlecsServer
 		if (!flecs_server) {
-			print_line("FlecsEntityInspector::_build_components_section - flecs_server is null in local mode, cannot display components");
 			Label *no_server = memnew(Label);
 			no_server->set_text("FlecsServer not available");
 			no_server->add_theme_font_size_override("font_size", 10);
@@ -310,12 +293,10 @@ void FlecsEntityInspector::_build_components_section() {
 		
 		RID entity_rid = RID::from_uint64(current_entity_id);
 		if (!entity_rid.is_valid()) {
-			print_line("FlecsEntityInspector::_build_components_section - entity_rid is invalid");
 			return;
 		}
 		
 		PackedStringArray component_names = flecs_server->get_component_types_as_name(entity_rid);
-		print_line(vformat("FlecsEntityInspector::_build_components_section - Found %d components", component_names.size()));
 
 		if (component_names.is_empty()) {
 			Label *no_comps = memnew(Label);
@@ -354,7 +335,6 @@ void FlecsEntityInspector::_build_components_section() {
 		}
 	}
 	
-	print_line("FlecsEntityInspector::_build_components_section - COMPLETE");
 }
 
 Control *FlecsEntityInspector::_build_component_widget(const String &p_component_name, 
@@ -669,7 +649,6 @@ void FlecsEntityInspector::_apply_component_changes(const String &p_component_na
 	Dictionary new_values = component_data[p_component_name];
 
 	flecs_server->set_component(entity_rid, p_component_name, new_values);
-	print_line(vformat("✓ Applied changes to %s", p_component_name));
 }
 
 void FlecsEntityInspector::_revert_component_changes(const String &p_component_name) {
@@ -677,7 +656,6 @@ void FlecsEntityInspector::_revert_component_changes(const String &p_component_n
 		return;
 	}
 
-	print_line(vformat("↺ Reverted component '%s'", p_component_name));
 	refresh_entity();
 }
 

@@ -222,7 +222,7 @@ Error NetworkServer::host_game(int p_port, int p_max_clients, const String &p_bi
 	multiplayer_peer->connect("peer_disconnected", callable_mp(this, &NetworkServer::_on_peer_disconnected));
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Server started on port %d", p_port));
+		print_verbose(vformat("NetworkServer: Server started on port %d", p_port));
 	}
 
 	emit_signal(SNAME("server_started"));
@@ -270,7 +270,7 @@ Error NetworkServer::join_game(const String &p_address, int p_port) {
 	multiplayer_peer->connect("peer_disconnected", callable_mp(this, &NetworkServer::_on_peer_disconnected));
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Connecting to %s:%d...", p_address, p_port));
+		print_verbose(vformat("NetworkServer: Connecting to %s:%d...", p_address, p_port));
 	}
 
 	return OK;
@@ -281,7 +281,7 @@ void NetworkServer::disconnect_game(int p_reason) {
 		return;
 	}
 
-	NetworkTypes::DisconnectReason reason = static_cast<NetworkTypes::DisconnectReason>(p_reason);
+	// p_reason is used directly in disconnect_data below
 	connection_state = STATE_DISCONNECTING;
 
 	// Send disconnect message to all peers
@@ -311,7 +311,7 @@ void NetworkServer::disconnect_game(int p_reason) {
 	server_tick = 0;
 
 	if (debug_logging) {
-		print_line("NetworkServer: Disconnected");
+		print_verbose("NetworkServer: Disconnected");
 	}
 
 	if (was_host) {
@@ -425,7 +425,7 @@ void NetworkServer::register_world(RID p_world) {
 	world_network_data[p_world] = data;
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Registered world %d", p_world.get_id()));
+		print_verbose(vformat("NetworkServer: Registered world %d", p_world.get_id()));
 	}
 }
 
@@ -438,7 +438,7 @@ void NetworkServer::unregister_world(RID p_world) {
 	world_network_data.erase(p_world);
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Unregistered world %d", p_world.get_id()));
+		print_verbose(vformat("NetworkServer: Unregistered world %d", p_world.get_id()));
 	}
 }
 
@@ -536,7 +536,7 @@ uint64_t NetworkServer::register_networked_entity(RID p_world, RID p_entity,
 		}
 
 		if (debug_logging) {
-			print_line(vformat("NetworkServer: Registered entity %d with network ID %d", 
+			print_verbose(vformat("NetworkServer: Registered entity %d with network ID %d", 
 							   p_entity.get_id(), (int)network_id));
 		}
 
@@ -571,7 +571,7 @@ void NetworkServer::unregister_networked_entity(RID p_world, RID p_entity) {
 	world_data.local_to_network.erase(p_entity);
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Unregistered entity with network ID %d", (int)network_id));
+		print_verbose(vformat("NetworkServer: Unregistered entity with network ID %d", (int)network_id));
 	}
 }
 
@@ -1105,7 +1105,7 @@ void NetworkServer::_handle_packet(int32_t p_peer_id, const PackedByteArray &p_d
 	
 	if (data.is_empty()) {
 		if (debug_logging) {
-			print_line(vformat("NetworkServer: Failed to deserialize packet from peer %d", p_peer_id));
+			print_verbose(vformat("NetworkServer: Failed to deserialize packet from peer %d", p_peer_id));
 		}
 		return;
 	}
@@ -1167,7 +1167,7 @@ void NetworkServer::_handle_packet(int32_t p_peer_id, const PackedByteArray &p_d
 			break;
 		default:
 			if (debug_logging) {
-				print_line(vformat("NetworkServer: Unknown packet type %d from peer %d", 
+				print_verbose(vformat("NetworkServer: Unknown packet type %d from peer %d", 
 								   static_cast<int>(type), p_peer_id));
 			}
 			break;
@@ -1219,7 +1219,7 @@ void NetworkServer::_handle_handshake_request(int32_t p_peer_id, const Dictionar
 				  response.to_dict(), NetworkTypes::TransferMode::RELIABLE_ORDERED);
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Peer %d connected: %s", p_peer_id, request.client_name));
+		print_verbose(vformat("NetworkServer: Peer %d connected: %s", p_peer_id, request.client_name));
 	}
 
 	emit_signal(SNAME("peer_connected"), p_peer_id);
@@ -1235,7 +1235,7 @@ void NetworkServer::_handle_handshake_response(const Dictionary &p_data) {
 
 	if (!response.accepted) {
 		if (debug_logging) {
-			print_line(vformat("NetworkServer: Connection rejected: %s", response.reject_message));
+			print_verbose(vformat("NetworkServer: Connection rejected: %s", response.reject_message));
 		}
 		emit_signal(SNAME("connection_failed"), response.reject_message);
 		disconnect_game(static_cast<int>(response.reject_reason));
@@ -1256,7 +1256,7 @@ void NetworkServer::_handle_handshake_response(const Dictionary &p_data) {
 					NetworkTypes::TransferMode::RELIABLE_ORDERED);
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Connected as peer %d", local_peer_id));
+		print_verbose(vformat("NetworkServer: Connected as peer %d", local_peer_id));
 	}
 
 	emit_signal(SNAME("connection_succeeded"));
@@ -1316,7 +1316,7 @@ void NetworkServer::_handle_disconnect(int32_t p_peer_id, const Dictionary &p_da
 	connected_peers.erase(p_peer_id);
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Peer %d disconnected (reason: %d)", p_peer_id, static_cast<int>(reason)));
+		print_verbose(vformat("NetworkServer: Peer %d disconnected (reason: %d)", p_peer_id, static_cast<int>(reason)));
 	}
 
 	emit_signal(SNAME("peer_disconnected"), p_peer_id, static_cast<int>(reason));
@@ -1661,7 +1661,7 @@ Dictionary NetworkServer::_deserialize_packet(const PackedByteArray &p_data,
 	
 	if (!header.is_valid()) {
 		if (debug_logging) {
-			print_line("NetworkServer: Invalid packet header");
+			print_verbose("NetworkServer: Invalid packet header");
 		}
 		return Dictionary();
 	}
@@ -1674,7 +1674,7 @@ Dictionary NetworkServer::_deserialize_packet(const PackedByteArray &p_data,
 	Error err = decode_variant(data, p_data.ptr() + 16, p_data.size() - 16, &len, false, false);
 	if (err != OK) {
 		if (debug_logging) {
-			print_line("NetworkServer: Failed to decode packet data");
+			print_verbose("NetworkServer: Failed to decode packet data");
 		}
 		return Dictionary();
 	}
@@ -1867,7 +1867,7 @@ void NetworkServer::_spawn_remote_entity(RID p_world, const NetworkTypes::Entity
 
 	if (!entity.is_valid()) {
 		if (debug_logging) {
-			print_line(vformat("NetworkServer: Failed to spawn remote entity %d", p_spawn.network_id));
+			print_verbose(vformat("NetworkServer: Failed to spawn remote entity %d", p_spawn.network_id));
 		}
 		return;
 	}
@@ -1905,7 +1905,7 @@ void NetworkServer::_spawn_remote_entity(RID p_world, const NetworkTypes::Entity
 	}
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Spawned remote entity %d as %d", 
+		print_verbose(vformat("NetworkServer: Spawned remote entity %d as %d", 
 						   (int)p_spawn.network_id, entity.get_id()));
 	}
 
@@ -1936,7 +1936,7 @@ void NetworkServer::_despawn_remote_entity(RID p_world, uint64_t p_network_id) {
 	world_data.local_to_network.erase(entity);
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Despawned remote entity %d", (int)p_network_id));
+		print_verbose(vformat("NetworkServer: Despawned remote entity %d", (int)p_network_id));
 	}
 
 	emit_signal(SNAME("entity_despawned_remote"), (int64_t)p_network_id);
@@ -1985,7 +1985,7 @@ void NetworkServer::_on_peer_connected(int32_t p_peer_id) {
 	if (role == ROLE_HOST) {
 		// New client connected, wait for handshake
 		if (debug_logging) {
-			print_line(vformat("NetworkServer: Peer %d connecting...", p_peer_id));
+			print_verbose(vformat("NetworkServer: Peer %d connecting...", p_peer_id));
 		}
 	} else if (role == ROLE_CLIENT && p_peer_id == 1) {
 		// Connected to server, send handshake
@@ -2006,7 +2006,7 @@ void NetworkServer::_on_peer_disconnected(int32_t p_peer_id) {
 	}
 
 	if (debug_logging) {
-		print_line(vformat("NetworkServer: Peer %d disconnected", p_peer_id));
+		print_verbose(vformat("NetworkServer: Peer %d disconnected", p_peer_id));
 	}
 
 	emit_signal(SNAME("peer_disconnected"), p_peer_id, static_cast<int>(NetworkTypes::DisconnectReason::GRACEFUL));

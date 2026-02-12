@@ -1,5 +1,8 @@
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 
+#include "modules/godot_turbo/debug/ecs_trace_bridge.h"
+#include "modules/godot_turbo/debug/flecs_os_api_traced.h"
+
 #include "core/math/quaternion.h"
 #include "core/math/vector4.h"
 #include "core/object/class_db.h"
@@ -839,6 +842,12 @@ FlecsServer::FlecsServer() {
 	if(!singleton) {
 		singleton = this;
 	}
+	
+	// Install traced OS API for Flecs worker thread registration
+	// This must happen before any Flecs world is created so that worker threads
+	// are automatically registered with the ECS trace bridge for neural visualization
+	FLECS_OS_API_TRACED_INSTALL();
+	
 	worlds = Vector<RID>();
 	worlds.resize(MAX_WORLD_COUNT);
 	render_system_command_handler = Ref<CommandHandler>(memnew(CommandHandler));
@@ -933,17 +942,16 @@ RID FlecsServer::create_world() {
 void FlecsServer::debug_check_rid(const RID &rid) {
 	bool owns = flecs_world_owners.owns(rid);
 	uint32_t total = flecs_world_owners.get_rid_count();
+	(void)owns;  // Used for debugging
+	(void)total; // Used for debugging
 	uint64_t id_u64 = rid.get_id();
 	char hexbuf2[32];
 	snprintf(hexbuf2, sizeof(hexbuf2), "%llx", (unsigned long long)id_u64);
-	print_line("debug_check_rid: rid=" + itos(id_u64) + " (hex=0x" + String(hexbuf2) + ", local_index=" + itos(rid.get_local_index()) + "), owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
-	print_line("debug_check_rid: worlds vector size=" + itos(worlds.size()));
 	const int max_print = 64;
 	int printed = 0;
 	for (int i = 0; i < worlds.size() && printed < max_print; ++i) {
 		const RID &r = worlds[i];
 		if (r != RID()) {
-			print_line("debug_check_rid: worlds[" + itos(i) + "] -> rid_id=" + itos(r.get_id()));
 			++printed;
 		}
 	}
@@ -978,17 +986,17 @@ void FlecsServer::init_world(const RID& world_id) {
 		rest_port = rest_env.to_int();
 	}
 	if (rest_port <= 0) {
-		print_line("Flecs REST explorer disabled (GODOT_FLECS_REST_PORT<=0)");
+		print_verbose("Flecs REST explorer disabled (GODOT_FLECS_REST_PORT<=0)");
 	} else {
 		world.set<flecs::Rest>({.port = (uint16_t)rest_port});
-		print_line(vformat("Flecs REST explorer available at http://localhost:%d", rest_port));
+		print_verbose(vformat("Flecs REST explorer available at http://localhost:%d", rest_port));
 	}
 
-	print_line("World initialized: " + itos((uint64_t)world.c_ptr()));
+	print_verbose("World initialized: " + itos((uint64_t)world.c_ptr()));
 
 	// Configure Flecs to use multiple threads for systems marked with multi_threaded()
 	auto threads = std::thread::hardware_concurrency();
-	print_line("Detected hardware concurrency: " + itos(threads));
+	print_verbose("Detected hardware concurrency: " + itos(threads));
 	world.set_threads(threads);
 }
 
@@ -1072,6 +1080,9 @@ RID FlecsServer::create_entity(const RID &world_id) {
 	RID rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
 	// Add to reverse lookup map for O(1) lookups
 	flecs_variant_owners.get(world_id).entity_id_to_rid[entity.id()] = rid;
+
+	// Trace entity creation for neural visualizer
+	ECS_TRACE_ENTITY_CREATE(entity.id());
 
 	return rid;
 }
@@ -1393,6 +1404,9 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 			return component_data;
 		}
 
+		// Trace component read for neural visualizer
+		ECS_TRACE_READ(entity.id(), component.id(), 0);
+
 		// Use cursor-based conversion for all types
 		Dictionary result = component_to_dict_cursor(entity, component.id());
 		return result;
@@ -1635,6 +1649,9 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity comp_type = entity.world().component(component_type.ascii().get_data());
 		if (comp_type.is_valid()) {
+			// Trace component write for neural visualizer
+			ECS_TRACE_WRITE(entity.id(), comp_type.id(), 0);
+			
 			// Use cursor-based conversion for all types
 			component_from_dict_cursor(entity, comp_type.id(), comp_data);
 		} else {
@@ -1656,6 +1673,9 @@ void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, con
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity_t comp_id = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_id)->get_type();
 		if (comp_id) {
+			// Trace component remove for neural visualizer
+			ECS_TRACE_REMOVE(entity.id(), comp_id);
+			
 			entity.remove(comp_id);
 		}
 	} else {
@@ -1674,6 +1694,9 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity_t comp_type = entity.world().component(component_type.ascii().get_data()).id();
 		if (comp_type) {
+			// Trace component remove for neural visualizer
+			ECS_TRACE_REMOVE(entity.id(), comp_type);
+			
 			entity.remove(comp_type);
 		}
 	} else {
@@ -1695,6 +1718,9 @@ Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& com
 		if(comp_variant){
 			flecs::entity_t comp_id = comp_variant->get_type();
 			if (comp_id) {
+				// Trace component read for neural visualizer
+				ECS_TRACE_READ(entity.id(), comp_id, 0);
+				
 				// Use cursor-based conversion for all types
 				return component_to_dict_cursor(entity, comp_id);
 			}
@@ -1909,6 +1935,9 @@ void FlecsServer::add_component(const RID& entity_id, const RID& component_id) {
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity component_type = entity.world().component(type_id_variant->get_type());
 		if (component_type.is_valid()) {
+			// Trace component add for neural visualizer
+			ECS_TRACE_ADD(entity.id(), component_type.id());
+			
 			entity.add(component_type);
 		} else {
 			ERR_PRINT("FlecsServer::add_component: component_type is not valid");
@@ -2105,6 +2134,9 @@ void FlecsServer::free_entity(const RID& world_id, const RID& entity_id, bool in
 			// Remove from reverse lookup map before freeing
 			flecs::entity entity = entity_variant->get_entity();
 			if (entity.is_valid()) {
+				// Trace entity destruction for neural visualizer
+				ECS_TRACE_ENTITY_DESTROY(entity.id());
+				
 				flecs_variant_owners.get(world_id).entity_id_to_rid.erase(entity.id());
 			}
 			if (include_flecs_world) {
@@ -2758,14 +2790,35 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 		sys_metric["name"] = name ? String(name) : String("cpp_system_") + itos((int64_t)sys.id());
 		sys_metric["type"] = "cpp";
 		
-		// Try to get raw system data first (more reliable than stats API for cumulative time)
+		// Try to get raw system data first
 		const ecs_system_t* sys_ptr = ecs_system_get(world_ptr->c_ptr(), sys.id());
 		if (sys_ptr) {
-			// time_spent on ecs_system_t is cumulative time in seconds
-			double raw_time_sec = sys_ptr->time_spent;
-			uint64_t raw_time_usec = (uint64_t)(raw_time_sec * 1000000.0);
-			sys_metric["time_usec"] = (int64_t)raw_time_usec;
-			sys_metric["total_time_usec"] = (int64_t)raw_time_usec; // Cumulative
+			// time_spent on ecs_system_t is cumulative time in seconds since system creation
+			// We need to compute the DELTA (per-frame time) by tracking previous values
+			double current_time_sec = sys_ptr->time_spent;
+			uint64_t system_entity_id = sys.id();
+			
+			// Get previous time and compute delta
+			double prev_time_sec = 0.0;
+			if (native_system_prev_time_spent.has(system_entity_id)) {
+				prev_time_sec = native_system_prev_time_spent[system_entity_id];
+			}
+			
+			// Calculate per-frame delta time
+			double delta_time_sec = current_time_sec - prev_time_sec;
+			if (delta_time_sec < 0.0) {
+				delta_time_sec = 0.0; // Handle reset/overflow
+			}
+			
+			// Update stored previous value for next frame
+			native_system_prev_time_spent[system_entity_id] = current_time_sec;
+			
+			// Convert to microseconds
+			uint64_t delta_time_usec = (uint64_t)(delta_time_sec * 1000000.0);
+			uint64_t cumulative_time_usec = (uint64_t)(current_time_sec * 1000000.0);
+			
+			sys_metric["time_usec"] = (int64_t)delta_time_usec;  // Per-frame time
+			sys_metric["total_time_usec"] = (int64_t)cumulative_time_usec; // Cumulative total
 			
 			// Also try to get stats for min/max/entity count
 			ecs_system_stats_t stats = {};
@@ -2785,7 +2838,7 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 				sys_metric["entity_count"] = 0;
 			}
 			
-			total_time_usec += raw_time_usec;
+			total_time_usec += delta_time_usec;  // Add per-frame time, not cumulative
 		} else {
 			sys_metric["time_usec"] = 0;
 			sys_metric["total_time_usec"] = 0;
@@ -2845,14 +2898,35 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 				sys_metric["name"] = name ? String(name) : String("system_") + itos((int64_t)e.id());
 				sys_metric["type"] = "native"; // Distinguish from "cpp" (registered) and "script"
 				
-				// Try to get raw system data first (more reliable than stats API for cumulative time)
+				// Try to get raw system data first
 				const ecs_system_t* sys_ptr = ecs_system_get(world_ptr->c_ptr(), e.id());
 				if (sys_ptr) {
-					// time_spent on ecs_system_t is cumulative time in seconds
-					double raw_time_sec = sys_ptr->time_spent;
-					uint64_t raw_time_usec = (uint64_t)(raw_time_sec * 1000000.0);
-					sys_metric["time_usec"] = (int64_t)raw_time_usec;
-					sys_metric["total_time_usec"] = (int64_t)raw_time_usec; // Cumulative
+					// time_spent on ecs_system_t is cumulative time in seconds since system creation
+					// We need to compute the DELTA (per-frame time) by tracking previous values
+					double current_time_sec = sys_ptr->time_spent;
+					uint64_t system_entity_id = e.id();
+					
+					// Get previous time and compute delta
+					double prev_time_sec = 0.0;
+					if (native_system_prev_time_spent.has(system_entity_id)) {
+						prev_time_sec = native_system_prev_time_spent[system_entity_id];
+					}
+					
+					// Calculate per-frame delta time
+					double delta_time_sec = current_time_sec - prev_time_sec;
+					if (delta_time_sec < 0.0) {
+						delta_time_sec = 0.0; // Handle reset/overflow
+					}
+					
+					// Update stored previous value for next frame
+					native_system_prev_time_spent[system_entity_id] = current_time_sec;
+					
+					// Convert to microseconds
+					uint64_t delta_time_usec = (uint64_t)(delta_time_sec * 1000000.0);
+					uint64_t cumulative_time_usec = (uint64_t)(current_time_sec * 1000000.0);
+					
+					sys_metric["time_usec"] = (int64_t)delta_time_usec;  // Per-frame time
+					sys_metric["total_time_usec"] = (int64_t)cumulative_time_usec; // Cumulative total
 					
 					// Also try to get stats for min/max/entity count
 					ecs_system_stats_t stats = {};
@@ -2872,7 +2946,7 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 						sys_metric["entity_count"] = 0;
 					}
 					
-					total_time_usec += raw_time_usec;
+					total_time_usec += delta_time_usec;  // Add per-frame time, not cumulative
 				} else {
 					sys_metric["time_usec"] = 0;
 					sys_metric["total_time_usec"] = 0;

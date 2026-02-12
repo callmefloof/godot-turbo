@@ -1,7 +1,7 @@
 #include "navigation3d_utility.h"
 #include "core/object/class_db.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
-#include "servers/navigation_server_3d.h"
+#include "servers/navigation_3d/navigation_server_3d.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 
 RID Navigation3DUtility::create_nav_agent_with_id(const RID &world_id, const RID &agent, const String &name)  {

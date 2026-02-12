@@ -31,7 +31,7 @@
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "core/templates/rid.h"
 #include "scene/main/viewport.h"
-#include "servers/rendering_server.h"
+#include "servers/rendering/rendering_server.h"
 #include <cassert>
 #include "scene/3d/voxel_gi.h"
 #include "core/templates/vector.h"
@@ -372,7 +372,6 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 
 		}, data.data()};
 
-		print_line(itos(mm_entity.id()));
 
 		auto flecs_entities = ecs_bulk_init(world->c_ptr(), &bulk_desc);
 
@@ -398,7 +397,6 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_instances(const RID &world_id
 			ecs_pair(flecs::ChildOf, mm_entity),
 
 		}, data.data()};
-		print_line(itos(mm_entity.id()));
 
 		auto flecs_entities = ecs_bulk_init(world->c_ptr(), &bulk_desc);
 

@@ -6,14 +6,25 @@
 #include "core/variant/array.h"
 #include "core/variant/dictionary.h"
 #include "core/debugger/engine_debugger.h"
+#include "core/templates/rid.h"
+#include "core/object/object.h"
+#include "core/object/class_db.h"
+#include "scene/main/scene_tree.h"
 
 class FlecsServer;
+class Timer;
 
 /**
  * FlecsRuntimeDebugger handles debugger messages at runtime.
  * It responds to editor requests for world, entity, and component information.
+ * 
+ * This class extends Object and uses a Timer to retry debugger registration
+ * when running from the editor. The debugger connection is not immediately
+ * available during module initialization, so we need to retry until it connects.
  */
-class FlecsRuntimeDebugger {
+class FlecsRuntimeDebugger : public Object {
+	GDCLASS(FlecsRuntimeDebugger, Object);
+
 public:
 	FlecsRuntimeDebugger();
 	~FlecsRuntimeDebugger();
@@ -24,12 +35,31 @@ public:
 	/** Shutdown the runtime debugger */
 	void shutdown();
 
+	/** Get singleton instance */
+	static FlecsRuntimeDebugger *get_singleton() { return singleton; }
+
 	/** Message capture callback - static wrapper for C++ function pointers */
 	static Error _capture_message(void *p_user, const String &p_msg, const Array &p_args, bool &r_captured);
 
+protected:
+	static void _bind_methods();
+
 private:
 	FlecsServer *server = nullptr;
+	Timer *retry_timer = nullptr;
 	bool initialized = false;
+	bool capture_registered = false;
+	int retry_count = 0;
+	static constexpr int MAX_RETRY_COUNT = 50; // ~5 seconds at 100ms intervals
+
+	/** Timer callback to retry registration */
+	void _on_retry_timer();
+
+	/** Setup the retry timer (called deferred after scene tree is ready) */
+	void _setup_retry_timer();
+
+	/** Attempt to register the message capture with the debugger */
+	bool _try_register_capture();
 
 	/** Handle the "flecs:request_worlds" message */
 	Error _handle_request_worlds(const Array &p_args);

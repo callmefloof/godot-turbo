@@ -34,6 +34,7 @@
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "core/config/engine.h"
 #include "core/input/shortcut.h"
+#include "core/string/print_string.h"
 
 void FlecsProfilerPlugin::_bind_methods() {
 	// No methods to bind currently
@@ -63,10 +64,12 @@ String FlecsProfilerPlugin::get_plugin_name() const {
 }
 
 void FlecsProfilerPlugin::_on_enter_tree() {
+	
 	// Get FlecsServer singleton
 	if (Engine::get_singleton()->has_singleton("FlecsServer")) {
 		flecs_server = Object::cast_to<FlecsServer>(
 			Engine::get_singleton()->get_singleton_object("FlecsServer"));
+	} else {
 	}
 
 	// Create the profiler widget
@@ -79,16 +82,21 @@ void FlecsProfilerPlugin::_on_enter_tree() {
 	}
 
 	// Add as bottom panel
-	add_control_to_bottom_panel(profiler, "Flecs Profiler");
+	Button *btn = add_control_to_bottom_panel(profiler, "Flecs Profiler");
+	if (btn) {
+	} else {
+	}
 
 	// Connect profiler to world editor plugin for remote metrics
 	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
 	if (world_plugin) {
 		world_plugin->set_profiler(profiler);
+	} else {
 	}
 }
 
 void FlecsProfilerPlugin::_on_exit_tree() {
+	
 	// Disconnect from world editor plugin
 	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
 	if (world_plugin) {
