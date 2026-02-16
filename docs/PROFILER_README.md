@@ -238,5 +238,5 @@ For issues or questions:
 ---
 
 **Status**: ✅ Implemented and Working  
-**Version**: 1.2  
-**Last Updated**: 2025-01-29
+**Version**: 1.2.1  
+**Last Updated**: 2026-02-16

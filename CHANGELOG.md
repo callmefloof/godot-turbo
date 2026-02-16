@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1-beta.1] - 2026-02-16
+
+### Added
+
+#### Component Reflection System
+- **Component Reflection Registration** - `register_reflection_components()` for automatic component type introspection
+- **Component Resolution Helpers** - Added to `FlecsQuery` and `FlecsScriptSystem` for runtime type lookup
+- **DispatchMode Enum** - Exposed in FlecsServer bindings (`DISPATCH_PER_ENTITY`, `DISPATCH_BATCH`)
+- **Flecs Phase Alias** - Added `OnPhysicsUpdate` phase alias in `flecs_phases.h` for compatibility
+
+#### ECS Tracing Integration
+- **Worker Thread Tracking** - Installed traced OS API in FlecsServer to register worker threads
+- **Query/System Tracing** - Added trace markers in queries and systems for performance analysis
+- **Native System Timing** - Added `native_system_prev_time_spent` field for profiler integration
+
+#### FlecsRuntimeDebugger Improvements
+- **Object Inheritance** - `FlecsRuntimeDebugger` now inherits from `Object` for proper Godot integration
+- **Retry Timer Mechanism** - Automatic retry for debugger registration when connection isn't immediately available
+- **Safe Timer Handling** - Proper cleanup and ObjectDB-based timer resolution prevents use-after-free
+- **Maximum Retry Limit** - 50 retries (~5 seconds at 100ms intervals) to prevent infinite loops
+
+### Changed
+
+#### API Consistency
+- **Normalized Parameter Names** - All utility functions now use consistent `world_id` parameter naming
+- **ClassDB Binding Updates** - Switched many bindings to `D_METHOD` macro for better documentation
+- **SceneObjectUtility** - Added `cleanup_singleton()` for proper resource cleanup
+
+#### Godot 4.6+ Compatibility
+- **Updated Include Paths** - Server headers moved to new subdirectories in Godot 4.6:
+  - `servers/rendering/rendering_server.h`
+  - `servers/navigation_2d/navigation_server_2d.h`
+  - `servers/navigation_3d/navigation_server_3d.h`
+  - `servers/physics_2d/physics_server_2d.h`
+  - `servers/physics_3d/physics_server_3d.h`
+
+#### Profiler Enhancements
+- Cleaner profiler label display
+- Reduced noisy debug output
+- Better native system timing tracking
+
+#### Test Infrastructure
+- Updated test fixtures for new API signatures
+- Fixed helper macros for component testing
+- Improved test reliability with proper initialization
+
+### Fixed
+
+- **Test Startup Crash** - Fixed crash in `FlecsRuntimeDebugger` during test initialization
+- **Constructor Parameter Shadowing** - Renamed parameters to avoid compiler warnings
+- **SceneObjectUtility Recursion** - Fixed recursive processing issues
+- **Rendering Server Include Path** - Updated to correct Godot 4.6+ path
+
+---
+
 ## [1.2.0-beta.1] - 2025-01-29
 
 ### Added
@@ -391,7 +446,8 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 **Examples:**
 - `1.1.0-a.1` - Version 1.1.0, alpha stage, build 1
 - `1.2.0-beta.1` - Version 1.2.0, beta stage, build 1
-- `1.2.0` - Version 1.2.0, stable release
+- `1.2.1-beta.1` - Version 1.2.1, beta stage, build 1
+- `1.2.1` - Version 1.2.1, stable release
 
 ---
 
@@ -441,15 +497,16 @@ scons DISABLE_DEPRECATED=yes target=editor dev_build=yes
 
 ## Future Plans
 
-### Version 1.2.0 (Stable)
+### Version 1.2.1 (Stable)
 - Networking system stabilization
 - Additional network examples
 - Performance profiling for network systems
 - Comprehensive multiplayer testing
+- Complete ECS tracing documentation
 
 ### Version 2.0.0 (Future)
-- Godot 4.5+ compatibility
-- Advanced Flecs features (pipelines, observers)
+- Godot 4.6+ exclusive features
+- Advanced Flecs features (pipelines, observers, prefabs)
 - Enhanced reflection system
 - Breaking API improvements based on feedback
 - Removal of deprecated `register_component_type()`

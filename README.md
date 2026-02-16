@@ -2,7 +2,7 @@
 
 # Godot Turbo ECS Module
 
-A high-performance Entity Component System (ECS) module for Godot 4.4+, powered by [Flecs](https://github.com/SanderMertens/flecs).
+A high-performance Entity Component System (ECS) module for Godot 4.6+, powered by [Flecs](https://github.com/SanderMertens/flecs).
 
 ## 🚀 Features
 
@@ -30,7 +30,7 @@ A high-performance Entity Component System (ECS) module for Godot 4.4+, powered 
 
 ### Prerequisites
 
-- **Godot 4.5+**
+- **Godot 4.6+** (4.6 or later required)
 - **SCons** build system
 - **C++17** compatible compiler
 
@@ -40,7 +40,7 @@ A high-performance Entity Component System (ECS) module for Godot 4.4+, powered 
    ```bash
    git clone https://github.com/godotengine/godot.git
    cd godot
-   git checkout 4.4-stable  # or later
+   git checkout 4.6-stable  # or later
    ```
 
 2. Add Godot Turbo as a module:
@@ -519,7 +519,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Version:** 1.2.0-beta.1  
-**Last Updated:** 2025-01-29  
-**Godot Version:** 4.4+  
+**Version:** 1.2.1-beta.1  
+**Last Updated:** 2026-02-16  
+**Godot Version:** 4.6+  
 **Maintainer:** [@callmefloof](https://github.com/callmefloof)

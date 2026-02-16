@@ -1,295 +1,284 @@
-# Release Notes - Godot Turbo ECS v1.2.0-beta.1
+# Release Notes - Godot Turbo ECS v1.2.1-beta.1
 
-**Release Date:** January 29, 2025  
+**Release Date:** February 16, 2026  
 **Status:** Beta Release  
-**Godot Version:** 4.4+
+**Godot Version:** 4.6+
 
 ---
 
 ## 🎉 Overview
 
-This is the first beta release of Godot Turbo ECS version 1.2.0, introducing a **complete multiplayer networking layer** built on top of the ECS foundation. This release also includes significant **editor improvements** for multi-instance coordination and enhanced profiling tools.
+This release of Godot Turbo ECS version 1.2.1 focuses on **stability improvements**, **component reflection**, **ECS tracing integration**, and **Godot 4.6+ compatibility fixes**. This release hardens the networking foundation introduced in 1.2.0-beta.1 and improves debugging capabilities.
 
 ### Highlights
 
-- 🌐 **Full Networking System** - Entity replication, authority, prediction, interpolation
-- 🔧 **Multi-Instance Support** - InstanceManager prevents editor conflicts
-- 📊 **Enhanced Profiler** - Instance status display, clearer local-only messaging
-- 📚 **Comprehensive Documentation** - Network guides, remote debugging, troubleshooting
-- ✨ **Zero Breaking Changes** - Fully backward compatible with 1.1.x
+- 🔍 **Component Reflection System** - Runtime type introspection for ECS components
+- 📊 **ECS Tracing Integration** - Worker thread tracking and performance analysis
+- 🔧 **FlecsRuntimeDebugger Improvements** - Robust retry mechanism and Object inheritance
+- 🛠️ **API Consistency** - Normalized parameter names across all utilities
+- ✅ **Godot 4.6+ Compatibility** - Fixed include paths for new server subdirectories
+- 🐛 **Test Stability** - Fixed startup crashes and improved test reliability
 
 ---
 
-## 🌐 Networking System (Major Feature)
+## 🔍 Component Reflection System
 
-### NetworkServer Singleton
+### New Features
 
-A complete multiplayer networking layer that integrates seamlessly with the Flecs ECS:
+A new component reflection system provides runtime type introspection for all ECS components:
 
 ```gdscript
-# Host a game server
-NetworkServer.host_game(7777, 16)  # port, max_clients
-
-# Join an existing game
-NetworkServer.join_game("192.168.1.100", 7777)
-
-# Register entity for network replication
-var entity = FlecsServer.create_entity(world)
-NetworkServer.register_networked_entity(entity, "res://player.tscn")
-
-# Configure replication
-NetworkServer.set_replicated_component(entity, "Transform3DComponent", NetworkTypes.CONTINUOUS)
-NetworkServer.set_replicated_component(entity, "HealthComponent", NetworkTypes.ON_CHANGE)
+# Components now have full reflection support
+# Allows runtime inspection of component fields and types
+var component_info = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
 ```
 
-### Network Components
+### Implementation Details
 
-Full suite of ECS components for multiplayer:
+- Added `register_reflection_components()` for automatic component registration
+- Component resolution helpers added to `FlecsQuery` and `FlecsScriptSystem`
+- Cached physics process check in `GDScriptRunnerSystem` for improved performance
+- New `DispatchMode` enum exposed in FlecsServer bindings:
 
-| Component | Purpose |
-|-----------|---------|
-| `NetworkIdentity` | Unique network ID, spawn tracking |
-| `NetworkAuthority` | Authority mode, owner peer ID |
-| `NetworkReplicated` | Per-component replication config |
-| `NetworkDirty` | Change tracking for delta updates |
-| `NetworkInterpolation` | Generic state interpolation buffer |
-| `NetworkTransformInterpolation3D/2D` | Transform-specific interpolation |
-| `NetworkPrediction` | Client-side prediction buffer |
-| `NetworkInput` | Input frame buffer with acknowledgment |
-| `NetworkStats` | Per-entity network statistics |
-| `NetworkRelevancy` | Distance-based relevancy filtering |
-| `NetworkRPCQueue` | Batched RPC calls |
-
-### Authority Modes
-
-```cpp
-enum AuthorityMode {
-    SERVER,       // Server has full authority
-    CLIENT,       // Owning client has authority
-    TRANSFERABLE, // Authority can be transferred
-    SHARED        // Multiple peers share authority
-};
+```gdscript
+# Dispatch modes for script systems
+FlecsServer.DISPATCH_PER_ENTITY  # Process each entity individually
+FlecsServer.DISPATCH_BATCH       # Process entities in batches
 ```
 
-### Replication Modes
+---
+
+## 📊 ECS Tracing Integration
+
+### Worker Thread Tracking
+
+The ECS now integrates with Godot's tracing system for comprehensive performance analysis:
+
+- Worker threads are now registered with the traced OS API
+- Query and system execution includes trace markers
+- Native system timing tracked via `native_system_prev_time_spent` field
+
+### Benefits
+
+- Better visibility into multi-threaded ECS execution
+- Improved profiler integration
+- Easier identification of performance bottlenecks in worker threads
+
+---
+
+## 🔧 FlecsRuntimeDebugger Improvements
+
+### Robust Initialization
+
+The `FlecsRuntimeDebugger` has been significantly improved:
 
 ```cpp
-enum ReplicationMode {
-    CONTINUOUS,  // Update every tick
-    ON_CHANGE,   // Update only when changed
-    RELIABLE,    // Guaranteed delivery
-    ONCE,        // Single update at spawn
-    NONE         // No automatic replication
+// Now inherits from Object for proper Godot integration
+class FlecsRuntimeDebugger : public Object {
+    GDCLASS(FlecsRuntimeDebugger, Object);
+    // ...
 };
 ```
 
 ### Features
 
-- ✅ Host/join game with configurable tick rate
-- ✅ Automatic entity spawning/despawning across network
-- ✅ Component replication with multiple modes
-- ✅ Authority management (server, client, transferable, shared)
-- ✅ Input prediction and reconciliation
-- ✅ Transform interpolation for smooth movement
-- ✅ RPC queue for remote method calls
-- ✅ Network statistics tracking
-- ✅ Relevancy system for bandwidth optimization
-- ✅ ENet transport integration
+- **Object Inheritance** - Proper Godot class registration and bindings
+- **Retry Timer Mechanism** - Handles cases where debugger isn't immediately available
+- **Safe Timer Handling** - Proper cleanup prevents use-after-free issues
+- **Maximum Retry Limit** - 50 retries (~5 seconds) prevents infinite loops
 
----
-
-## 🔧 Editor Improvements
-
-### InstanceManager
-
-Manages multiple Godot editor instances to prevent conflicts:
+### Configuration
 
 ```cpp
-// Check if this is the primary instance
-if (InstanceManager::get_singleton()->is_primary_instance()) {
-    // Safe to use shared resources (debugger, profiler)
-} else {
-    // Show warning or use local-only mode
-}
-
-// Try to acquire a named resource lock
-if (InstanceManager::get_singleton()->try_acquire_resource("profiler")) {
-    // We own the profiler resource
-}
+static constexpr int MAX_RETRY_COUNT = 50; // ~5 seconds at 100ms intervals
 ```
-
-**Features:**
-- Instance identification using unique IDs
-- Lock file management for resource coordination
-- Detection of other running instances
-- Graceful degradation when conflicts detected
-- Primary/secondary instance election
-
-### Profiler Enhancements
-
-- **Instance Status Display** - Shows "Primary" or "Secondary" status in profiler UI
-- **Improved Messaging** - Clearer indication that profiler is for local editor use only
-- **Resource Locking** - Integrates with InstanceManager for conflict prevention
-- **Fallback Behavior** - Secondary instances gracefully fall back to local mode
-
-### Network Editor Plugin
-
-New "Network Inspector" dock for debugging multiplayer:
-
-- Connection status display
-- Entity replication monitoring
-- Network statistics visualization
 
 ---
 
-## 📚 Documentation
+## 🛠️ API Consistency Improvements
 
-### New Documentation
+### Normalized Parameter Names
 
-| Document | Description |
-|----------|-------------|
-| `network/README.md` | Complete networking guide with examples |
-| `REMOTE_DEBUGGING_GUIDE.md` | Remote debugging setup and usage |
-| `DEBUGGER_PLUGIN_DOCUMENTATION.md` | Debugger plugin architecture |
-| `docs/PROFILER_TROUBLESHOOTING.md` | Common profiler issues and solutions |
+All utility functions now use consistent parameter naming:
 
-### Network Documentation Highlights
+| Before | After |
+|--------|-------|
+| `p_world` | `world_id` |
+| `world_rid` | `world_id` |
+| Various | Consistent `world_id` |
 
-- Quick start examples for server/client setup
-- Architecture overview with data flow diagrams
-- Complete API reference for NetworkServer
-- Component documentation with struct definitions
-- Configuration options (tick rate, interpolation, debug logging)
-- Best practices for authority, bandwidth, and error handling
+### ClassDB Binding Updates
+
+- Switched many bindings to use `D_METHOD` macro for better documentation
+- Improved method signatures for GDExtension compatibility
+- Consistent naming across navigation, physics, and rendering utilities
+
+### SceneObjectUtility Fixes
+
+- Fixed recursion issues in scene object processing
+- Added `cleanup_singleton()` for proper resource cleanup
+
+---
+
+## ✅ Godot 4.6+ Compatibility
+
+### Updated Include Paths
+
+Server headers have moved to new subdirectories in Godot 4.6+:
+
+```cpp
+// Old paths (Godot 4.5 and earlier)
+#include "servers/rendering_server.h"
+#include "servers/navigation_server_2d.h"
+
+// New paths (Godot 4.6+)
+#include "servers/rendering/rendering_server.h"
+#include "servers/navigation_2d/navigation_server_2d.h"
+#include "servers/navigation_3d/navigation_server_3d.h"
+#include "servers/physics_2d/physics_server_2d.h"
+#include "servers/physics_3d/physics_server_3d.h"
+```
+
+### Affected Files
+
+- `navigation2d_utility.cpp`
+- `navigation3d_utility.cpp`
+- `physics2d_utility.cpp`
+- `physics3d_utility.cpp`
+- `render_utility_3d.cpp`
+- `flecs_opaque_types.h`
+
+---
+
+## 🐛 Bug Fixes
+
+| Issue | Solution |
+|-------|----------|
+| Test startup crash in FlecsRuntimeDebugger | Added safe timer handling and retry logic |
+| Constructor parameter shadowing warnings | Renamed parameters to avoid shadowing |
+| SceneObjectUtility recursion issues | Fixed recursive processing logic |
+| Rendering server include path errors | Updated to new Godot 4.6+ paths |
+| Noisy debug prints in profiler | Removed excessive logging |
 
 ---
 
 ## 🔄 Changes
 
-### API Changes
+### Profiler Enhancements
 
-**NetworkServer Bindings:**
-- Changed bound method signatures to use `int` instead of namespaced enums
-- `NetworkTypes::DisconnectReason` → `int` in public bindings
-- Internal casting preserves type safety
-- Fixes Godot Variant binding compatibility issues
+- Cleaner profiler label display
+- Reduced noisy debug output
+- Better native system timing tracking
 
-### Editor Changes
+### Test Infrastructure
 
-- Profiler plugin now integrates with InstanceManager
-- Shows instance status in info panel
-- Falls back gracefully when not primary instance
-- Editor plugin properly initializes/shuts down InstanceManager
+- Updated test fixtures for new API signatures
+- Fixed helper macros for component testing
+- Improved test reliability with proper initialization
 
----
+### Flecs Phases
 
-## 🐛 Fixes
+Added `OnPhysicsUpdate` phase alias for compatibility:
 
-| Issue | Solution |
-|-------|----------|
-| Enum binding errors | Use `int` in bound signatures with internal casting |
-| Network dock missing name | Set TabContainer name to "Network Inspector" |
-| Multi-instance profiler conflicts | InstanceManager coordinates access |
-| Remote debugging to wrong instance | Lock file coordination |
+```cpp
+// flecs_phases.h
+namespace flecs {
+    inline const flecs::entity_t OnPhysicsUpdate = flecs::OnUpdate;
+}
+```
 
 ---
 
-## 📁 New Files
+## 📁 Modified Files
 
 ```
 godot_turbo/
-├── network/
-│   ├── README.md                    # ✨ Networking guide
-│   ├── network_server.h/cpp         # ✨ NetworkServer singleton
-│   ├── network_types.h              # ✨ Network enums and types
+├── SCsub                                        # Build configuration
+├── register_types.cpp                           # Reflection registration
+├── ecs/
 │   ├── components/
-│   │   └── network_components.h     # ✨ All network components
-│   └── systems/                     # ✨ Network systems (future)
+│   │   ├── all_components.h                     # Reflection includes
+│   │   └── flecs_opaque_types.h                 # Updated includes
+│   ├── flecs_types/
+│   │   ├── flecs_phases.h                       # ✨ NEW: Phase aliases
+│   │   ├── flecs_query.cpp                      # Component resolution
+│   │   ├── flecs_script_system.cpp              # Tracing integration
+│   │   ├── flecs_server.cpp                     # Bindings, tracing
+│   │   ├── flecs_server.h                       # DispatchMode enum
+│   │   └── flecs_variant.h                      # Minor updates
+│   └── systems/
+│       ├── gdscript_runner_system.cpp/h         # Physics cache
+│       ├── pipeline_manager.cpp/h               # Cleanup
+│       └── utility/
+│           ├── navigation2d_utility.cpp         # Include paths
+│           ├── navigation3d_utility.cpp         # Include paths
+│           ├── physics2d_utility.cpp            # Include paths
+│           ├── physics3d_utility.cpp            # Include paths
+│           ├── ref_storage.h                    # Refactoring
+│           ├── render_utility_3d.cpp            # Include paths
+│           ├── scene_object_utility.cpp/h       # Recursion fix
+│           └── world_utility.h                  # Parameter names
 ├── editor/
-│   ├── instance_manager.h           # ✨ Multi-instance coordination
-│   ├── network_editor_plugin.h/cpp  # ✨ Network inspector dock
-│   └── ... (existing files enhanced)
-├── REMOTE_DEBUGGING_GUIDE.md        # ✨ Remote debugging docs
-├── DEBUGGER_PLUGIN_DOCUMENTATION.md # ✨ Debugger architecture
-└── docs/
-    └── PROFILER_TROUBLESHOOTING.md  # ✨ Profiler troubleshooting
+│   ├── flecs_editor_plugin.cpp                  # Minor updates
+│   ├── flecs_entity_inspector.cpp               # Cleanup
+│   ├── flecs_profiler.cpp                       # Label cleanup
+│   └── flecs_profiler_plugin.cpp                # Minor updates
+├── network/
+│   └── network_server.cpp                       # Include updates
+├── runtime/
+│   ├── flecs_runtime_debugger.cpp               # Retry mechanism
+│   └── flecs_runtime_debugger.h                 # Object inheritance
+└── tests/
+    ├── test_fixtures.h                          # API updates
+    ├── test_flecs_variant.h                     # API updates
+    ├── test_ref_storage.h                       # API updates
+    ├── test_resource_object_utility.h           # API updates
+    ├── test_scene_object_utility.h              # API updates
+    └── test_world_utility.h                     # API updates
 ```
 
 ---
 
-## 🚀 Getting Started with Networking
+## 🔄 Migration from 1.2.0-beta.1 / 1.2.0-beta.2
 
-### Server Setup
+### Mostly Backward Compatible
 
-```gdscript
-extends Node
+Most code from beta.1 will work without changes. However:
 
-func _ready():
-    # Connect signals
-    NetworkServer.peer_connected.connect(_on_peer_connected)
-    NetworkServer.peer_disconnected.connect(_on_peer_disconnected)
-    
-    # Start server
-    var result = NetworkServer.host_game(7777, 16)
-    if result == OK:
-        print("Server started on port 7777")
+### Parameter Name Changes (Optional)
 
-func _on_peer_connected(peer_id: int):
-    print("Peer connected: ", peer_id)
-    # Spawn player entity for this peer
-    var player = FlecsServer.create_entity(world)
-    NetworkServer.register_networked_entity(player, "res://player.tscn")
-    NetworkServer.set_authority(player, NetworkServer.CLIENT, peer_id)
-```
-
-### Client Setup
+If you have custom utilities that extend the built-in ones, consider updating parameter names:
 
 ```gdscript
-extends Node
+# Old (still works but inconsistent)
+func my_utility(world_rid: RID):
+    pass
 
-func _ready():
-    NetworkServer.connected_to_server.connect(_on_connected)
-    NetworkServer.connection_failed.connect(_on_failed)
-    
-    var result = NetworkServer.join_game("127.0.0.1", 7777)
-    if result == OK:
-        print("Connecting to server...")
-
-func _on_connected():
-    print("Connected to server!")
-
-func _process(delta):
-    if NetworkServer.is_connected():
-        # Send input to server
-        var input = {
-            "move": Input.get_vector("left", "right", "up", "down"),
-            "jump": Input.is_action_just_pressed("jump")
-        }
-        NetworkServer.send_input(local_player, input)
+# New (recommended for consistency)
+func my_utility(world_id: RID):
+    pass
 ```
 
----
+### DispatchMode Enum (New Feature)
 
-## 🔄 Migration from 1.1.x
+You can now use the enum directly:
 
-**Good news:** This release is **100% backward compatible**!
+```gdscript
+# Before (still works)
+FlecsServer.set_script_system_dispatch_mode(system_rid, 0)  # Per-entity
 
-No code changes required. Existing ECS code continues to work as-is.
-
-### Optional: Adopt New Features
-
-1. **Add Networking** - Use NetworkServer for multiplayer support
-2. **Multi-Instance Awareness** - Check InstanceManager for editor conflicts
-3. **Enhanced Profiling** - Use new troubleshooting guide for issues
+# After (more readable)
+FlecsServer.set_script_system_dispatch_mode(system_rid, FlecsServer.DISPATCH_PER_ENTITY)
+```
 
 ---
 
 ## ⚠️ Known Issues
 
-- Networking is in beta - expect API refinements in future releases
-- NetworkServer detailed timing not yet integrated with profiler
-- Some network edge cases may need additional testing
-- Multi-instance detection assumes processes don't die unexpectedly
+- Networking remains in beta - expect API refinements in future releases
+- NetworkServer detailed timing not yet fully integrated with new tracing system
+- FlecsRuntimeDebugger retry timer assumes scene tree is available (editor/game only)
+- Requires Godot 4.6+ due to include path changes (not compatible with 4.5 or earlier)
 
 ---
 
@@ -297,29 +286,28 @@ No code changes required. Existing ECS code continues to work as-is.
 
 | Area | Status |
 |------|--------|
-| NetworkServer API | ✅ Manual testing |
-| Network Components | ✅ Struct validation |
-| InstanceManager | ✅ Multi-instance scenarios |
-| Profiler Integration | ✅ Instance status display |
-| Editor Plugin | ✅ Dock creation/naming |
+| Component Reflection | ✅ Verified |
+| FlecsRuntimeDebugger | ✅ Startup crash fixed |
+| Godot 4.6+ Includes | ✅ All paths updated |
+| API Parameter Names | ✅ Consistent |
+| SceneObjectUtility | ✅ Recursion fixed |
+| Test Infrastructure | ✅ All tests passing |
 
 ---
 
 ## 🔜 What's Next
 
-### Version 1.2.0 (Stable)
-- Network system stabilization
-- Additional network examples
-- Performance profiling for network systems
+### Version 1.2.1 (Stable)
+- Final networking API stabilization
+- Complete ECS tracing documentation
+- Performance benchmarks with tracing
 - Comprehensive multiplayer testing
-- API documentation refinements
 
 ### Version 2.0.0 (Future)
-- Godot 4.5+ full support
-- Advanced Flecs features (observers, queries)
+- Godot 4.6+ exclusive features
+- Advanced Flecs features (observers, prefabs)
 - Enhanced reflection system
 - Breaking API improvements based on feedback
-- Removal of deprecated methods
 
 ---
 
@@ -344,12 +332,12 @@ No code changes required. Existing ECS code continues to work as-is.
 
 ---
 
-**Download:** [GitHub Releases](https://github.com/callmefloof/godot-turbo/releases/tag/v1.2.0-beta.1)  
-**Tagged Commit:** v1.2.0-beta.1  
-**Previous Version:** v1.1.2-a.1
+**Download:** [GitHub Releases](https://github.com/callmefloof/godot-turbo/releases/tag/v1.2.1-beta.1)  
+**Tagged Commit:** v1.2.1-beta.1  
+**Previous Version:** v1.2.0-beta.1
 
 ---
 
 Thank you for using Godot Turbo ECS! 🚀
 
-*This is a beta release. Please report any issues you encounter.*
+*This is a beta release focused on stability and Godot 4.6+ compatibility. Please report any issues you encounter.*
