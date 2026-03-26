@@ -21,6 +21,15 @@
  */
 
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
+
+// Windows defines `near` and `far` as empty macros in <windef.h> (16-bit legacy).
+// Undef them here so they don't clobber our CameraComponent field names.
+#ifdef near
+#undef near
+#endif
+#ifdef far
+#undef far
+#endif
 #include "component_reflection.h"
 #include "flecs_opaque_types.h"
 

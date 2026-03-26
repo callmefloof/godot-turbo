@@ -988,7 +988,9 @@ void FlecsServer::init_world(const RID& world_id) {
 	if (rest_port <= 0) {
 		print_verbose("Flecs REST explorer disabled (GODOT_FLECS_REST_PORT<=0)");
 	} else {
-		world.set<flecs::Rest>({.port = (uint16_t)rest_port});
+		flecs::Rest rest_config = {};
+		rest_config.port = (uint16_t)rest_port;
+		world.set<flecs::Rest>(rest_config);
 		print_verbose(vformat("Flecs REST explorer available at http://localhost:%d", rest_port));
 	}
 
