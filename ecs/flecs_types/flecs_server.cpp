@@ -1128,34 +1128,14 @@ RID FlecsServer::lookup(const RID &world_id, const String &entity_name) {
 }
 
 flecs::world *FlecsServer::_get_world(const RID &world_id) {
-	// Diagnostic flow: check both the worlds vector and the RID owner so we can
-	// print helpful information when an invalid world_id is observed.
+	// Invalid or stale world handles are used throughout wrapper code as a cheap
+	// liveness probe during teardown and resync. Return nullptr quietly so those
+	// guards stay cheap and do not spam logs.
 	if (!worlds.has(world_id)) {
 		FlecsWorldVariant *world_variant = flecs_world_owners.get_or_null(world_id);
-		bool owns = flecs_world_owners.owns(world_id);
-		uint32_t total = flecs_world_owners.get_rid_count();
-
-		ERR_PRINT("FlecsServer::_get_world: worlds.has returned false for world_id=" + itos(world_id.get_id()) + ", owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
-		ERR_PRINT("FlecsServer::_get_world: worlds vector size=" + itos(worlds.size()));
-
-		// Print a compact listing of currently stored world RIDs (avoid huge logs).
-		const int max_print = 32;
-		int printed = 0;
-		for (int i = 0; i < worlds.size() && printed < max_print; ++i) {
-			const RID &r = worlds[i];
-			if (r != RID()) {
-				ERR_PRINT("FlecsServer::_get_world: worlds[" + itos(i) + "] -> rid_id=" + itos(r.get_id()));
-				++printed;
-			}
-		}
-
 		if (world_variant) {
-			// Strange: the worlds vector doesn't have the entry but the owner does.
-			ERR_PRINT("FlecsServer::_get_world: flecs_world_owners.get_or_null returned a variant despite worlds.has == false; returning its world reference.");
 			return &world_variant->get_world();
 		}
-
-		ERR_PRINT("FlecsServer::_get_world: world_id is not a valid world");
 		return nullptr;
 	}
 
@@ -1165,10 +1145,6 @@ flecs::world *FlecsServer::_get_world(const RID &world_id) {
 		return &world_variant->get_world();
 	}
 
-	bool owns = flecs_world_owners.owns(world_id);
-	uint32_t total = flecs_world_owners.get_rid_count();
-	ERR_PRINT("FlecsServer::_get_world: lookup returned null for world_id=" + itos(world_id.get_id()) + ", owns=" + (owns ? String("true") : String("false")) + ", rid_count=" + itos(total));
-	ERR_PRINT("FlecsServer::_get_world: available worlds (worlds vector size)=" + itos(worlds.size()));
 	return nullptr;
 
 }
@@ -1180,7 +1156,7 @@ RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 			return pair.key;
 		}
 	}
-	ERR_FAIL_V_MSG(RID(), "FlecsServer::get_world_of_entity: entity_id is not a valid entity");
+	return RID();
 }
 
 
