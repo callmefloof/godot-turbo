@@ -34,6 +34,162 @@
 // Maximum recursion depth for cursor serialization to prevent stack overflow
 static constexpr int MAX_CURSOR_DEPTH = 32;
 
+static int _get_struct_member_count(const flecs::entity &p_type) {
+	if (!p_type.is_valid() || !p_type.has<EcsStruct>()) {
+		return 0;
+	}
+
+	const EcsStruct &ecs_struct = p_type.get<EcsStruct>();
+	return ecs_vec_count(&ecs_struct.members);
+}
+
+static bool _assign_variant_to_typed_ptr(const char *p_type_name, void *p_ptr, const Variant &p_value) {
+	if (p_ptr == nullptr || p_type_name == nullptr || p_type_name[0] == '\0') {
+		return false;
+	}
+
+	if (strcmp(p_type_name, "Variant") == 0) {
+		*static_cast<Variant *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Dictionary") == 0) {
+		*static_cast<Dictionary *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Array") == 0) {
+		*static_cast<Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "String") == 0) {
+		*static_cast<String *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "StringName") == 0) {
+		*static_cast<StringName *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "NodePath") == 0) {
+		*static_cast<NodePath *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Callable") == 0) {
+		*static_cast<Callable *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Signal") == 0) {
+		*static_cast<Signal *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "RID") == 0) {
+		*static_cast<RID *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedByteArray") == 0) {
+		*static_cast<PackedByteArray *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedInt32Array") == 0) {
+		*static_cast<PackedInt32Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedInt64Array") == 0) {
+		*static_cast<PackedInt64Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedFloat32Array") == 0) {
+		*static_cast<PackedFloat32Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedFloat64Array") == 0) {
+		*static_cast<PackedFloat64Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedStringArray") == 0) {
+		*static_cast<PackedStringArray *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedVector2Array") == 0) {
+		*static_cast<PackedVector2Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedVector3Array") == 0) {
+		*static_cast<PackedVector3Array *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "PackedColorArray") == 0) {
+		*static_cast<PackedColorArray *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Vector2") == 0) {
+		*static_cast<Vector2 *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Vector2i") == 0) {
+		*static_cast<Vector2i *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Vector3") == 0) {
+		*static_cast<Vector3 *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Vector3i") == 0) {
+		*static_cast<Vector3i *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Vector4") == 0) {
+		*static_cast<Vector4 *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Vector4i") == 0) {
+		*static_cast<Vector4i *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Quaternion") == 0) {
+		*static_cast<Quaternion *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Transform2D") == 0) {
+		*static_cast<Transform2D *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Transform3D") == 0) {
+		*static_cast<Transform3D *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Rect2") == 0) {
+		*static_cast<Rect2 *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Rect2i") == 0) {
+		*static_cast<Rect2i *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "AABB") == 0) {
+		*static_cast<AABB *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Plane") == 0) {
+		*static_cast<Plane *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Basis") == 0) {
+		*static_cast<Basis *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Color") == 0) {
+		*static_cast<Color *>(p_ptr) = p_value;
+		return true;
+	}
+	if (strcmp(p_type_name, "Projection") == 0) {
+		*static_cast<Projection *>(p_ptr) = p_value;
+		return true;
+	}
+
+	return false;
+}
+
+static void _set_cursor_from_variant_impl(flecs::cursor &p_cur, const Variant &p_value, int p_depth);
+
 // Helper function to recursively convert flecs cursor data to Godot Variant
 static Variant cursor_to_variant_impl(flecs::cursor& cur, int depth);
 
@@ -245,13 +401,17 @@ static Variant cursor_to_variant_impl(flecs::cursor& cur, int depth) {
 		if (ecs_type.kind == EcsStructType) {
 			Dictionary dict;
 			if (cur.push() == 0) {
-				do {
+				const int member_count = _get_struct_member_count(type);
+				for (int member_index = 0; member_index < member_count; member_index++) {
 					const char* member_name = cur.get_member();
 					if (member_name && strlen(member_name) > 0) {
 						Variant value = cursor_to_variant_impl(cur, depth + 1);
 						dict[String(member_name)] = value;
 					}
-				} while (cur.next() == 0);
+					if (member_index + 1 < member_count && cur.next() != 0) {
+						break;
+					}
+				}
 				cur.pop();
 			}
 			return dict;
@@ -315,20 +475,17 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 			// It's a struct, convert members to dictionary
 			Dictionary dict;
 			if (cur.push() == 0) {
-				int member_count = 0;
-				do {
-					// Prevent infinite loops on corrupted data
-					if (member_count >= MAX_STRUCT_MEMBERS) {
-						WARN_PRINT("component_to_dict_cursor: Maximum struct member count exceeded, truncating");
-						break;
-					}
+				const int member_count = MIN(_get_struct_member_count(type), MAX_STRUCT_MEMBERS);
+				for (int member_index = 0; member_index < member_count; member_index++) {
 					const char* member_name = cur.get_member();
 					if (member_name && strlen(member_name) > 0) {
 						Variant value = cursor_to_variant(cur);
 						dict[String(member_name)] = value;
 					}
-					member_count++;
-				} while (cur.next() == 0);
+					if (member_index + 1 < member_count && cur.next() != 0) {
+						break;
+					}
+				}
 				cur.pop();
 			}
 			return dict;
@@ -340,6 +497,86 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 	Variant value = cursor_to_variant(cur);
 	result["value"] = value;
 	return result;
+}
+
+static void _set_cursor_from_variant_impl(flecs::cursor &p_cur, const Variant &p_value, int p_depth) {
+	if (p_depth > MAX_CURSOR_DEPTH) {
+		WARN_PRINT("cursor_from_variant: Maximum recursion depth exceeded, truncating");
+		return;
+	}
+
+	flecs::entity type = p_cur.get_type();
+	if (!type.is_valid()) {
+		return;
+	}
+
+	flecs::string_view type_name_view = type.name();
+	const char *type_name = type_name_view.c_str();
+	void *ptr = p_cur.get_ptr();
+
+	if (_assign_variant_to_typed_ptr(type_name, ptr, p_value)) {
+		return;
+	}
+
+	if (type.has<EcsType>()) {
+		const EcsType &ecs_type = type.get<EcsType>();
+		if (ecs_type.kind == EcsStructType && p_value.get_type() == Variant::DICTIONARY) {
+			const Dictionary dict = p_value;
+			if (p_cur.push() == 0) {
+				Array keys = dict.keys();
+				for (int i = 0; i < keys.size(); i++) {
+					const String key = keys[i];
+					if (p_cur.member(key.utf8().get_data()) == 0) {
+						_set_cursor_from_variant_impl(p_cur, dict[key], p_depth + 1);
+					}
+				}
+				p_cur.pop();
+			}
+			return;
+		}
+
+		if (ecs_type.kind == EcsPrimitiveType && type.has<EcsPrimitive>()) {
+			const EcsPrimitive &prim = type.get<EcsPrimitive>();
+			switch (prim.kind) {
+				case EcsBool:
+					p_cur.set_bool(p_value);
+					return;
+				case EcsChar:
+				case EcsU8:
+				case EcsU16:
+				case EcsU32:
+				case EcsU64:
+				case EcsUPtr:
+					p_cur.set_uint(static_cast<uint64_t>(int64_t(p_value)));
+					return;
+				case EcsI8:
+				case EcsI16:
+				case EcsI32:
+				case EcsI64:
+				case EcsIPtr:
+					p_cur.set_int(p_value);
+					return;
+				case EcsF32:
+				case EcsF64:
+					p_cur.set_float(p_value);
+					return;
+				case EcsString:
+					p_cur.set_string(String(p_value).utf8().get_data());
+					return;
+				case EcsEntity:
+					if (p_value.get_type() == Variant::RID) {
+						RID entity_rid = p_value;
+						if (entity_rid.is_valid()) {
+							Variant entity_id_variant = entity_rid.get_id();
+							p_cur.set_entity(static_cast<flecs::entity_t>(uint64_t(entity_id_variant)));
+						}
+					}
+					return;
+				default:
+					break;
+			}
+		}
+	}
 }
 
 // Helper function to set component data from Dictionary using flecs cursor
@@ -428,6 +665,11 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 		return;
 	}
 
+	if (is_wrapped_opaque && _assign_variant_to_typed_ptr(type_name, comp_ptr, dict["value"])) {
+		entity.modified(comp_type_id);
+		return;
+	}
+
 	// For structs, iterate through dictionary keys and set members
 	// Create cursor after handling opaque types
 	flecs::cursor cur = entity.world().cursor(comp_type_id, comp_ptr);
@@ -437,86 +679,13 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 		const EcsType& ecs_type = type.get<EcsType>();
 		if (ecs_type.kind == EcsStructType && cur.push() == 0) {
 			Array keys = dict.keys();
-		for (int i = 0; i < keys.size(); i++) {
-			String key = keys[i];
-			Variant value = dict[key];
+			for (int i = 0; i < keys.size(); i++) {
+				String key = keys[i];
+				Variant value = dict[key];
 
-			if (cur.member(key.utf8().get_data()) == 0) {
-				flecs::entity member_type = cur.get_type();
-				// Keep string_view alive while we use the pointer
-				flecs::string_view member_name_view = member_type.name();
-				const char* member_type_name = member_name_view.c_str();
-
-				// Set value based on type
-				if (strcmp(member_type_name, "Variant") == 0) {
-					Variant* ptr = static_cast<Variant*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "String") == 0) {
-					String* ptr = static_cast<String*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "StringName") == 0) {
-					StringName* ptr = static_cast<StringName*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "Dictionary") == 0) {
-					Dictionary* ptr = static_cast<Dictionary*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "Array") == 0) {
-					Array* ptr = static_cast<Array*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "RID") == 0) {
-					RID* ptr = static_cast<RID*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "Vector2") == 0) {
-					Vector2* ptr = static_cast<Vector2*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "Vector3") == 0) {
-					Vector3* ptr = static_cast<Vector3*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else if (strcmp(member_type_name, "Quaternion") == 0) {
-					Quaternion* ptr = static_cast<Quaternion*>(cur.get_ptr());
-					if (ptr) {
-						*ptr = value;
-					}
-				} else {
-					// Try primitive types
-					switch (value.get_type()) {
-						case Variant::BOOL: {
-							cur.set_bool(value);
-							break;
-						}
-						case Variant::INT: {
-							cur.set_int(value);
-							break;
-						}
-						case Variant::FLOAT: {
-							cur.set_float(value);
-							break;
-						}
-						case Variant::STRING: {
-							cur.set_string(String(value).utf8().get_data());
-							break;
-						}
-						default:
-							break;
-					}
+				if (cur.member(key.utf8().get_data()) == 0) {
+					_set_cursor_from_variant_impl(cur, value, 0);
 				}
-			}
 			}
 			cur.pop();
 		}
@@ -1375,8 +1544,14 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 			ERR_PRINT("FlecsServer::get_component_by_name: entity is no longer valid/alive in Flecs world");
 			return component_data;
 		}
-		
-		flecs::entity component = entity.world().lookup(component_type.ascii().get_data());
+
+		flecs::world *world = _get_world(world_id);
+		if (!world) {
+			ERR_PRINT("FlecsServer::get_component_by_name: world not found");
+			return component_data;
+		}
+
+		flecs::entity component = world->lookup(component_type.utf8().get_data());
 		if (!component.is_valid()) {
 			ERR_PRINT("FlecsServer::get_component_by_name: component type not found: " + component_type);
 			return component_data;
@@ -1398,11 +1573,16 @@ bool FlecsServer::has_component(const RID& entity_id, const String &component_ty
 		ERR_PRINT("FlecsServer::has_component: world_id is not valid");
 		return false;
 	}
+	flecs::world *world = _get_world(world_id);
+	if (!world) {
+		ERR_PRINT("FlecsServer::has_component: world not found");
+		return false;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		flecs::entity comp_type = entity.world().component(String(component_type).ascii().get_data());
-		return entity.has(comp_type);
+		flecs::entity comp_type = world->lookup(component_type.utf8().get_data());
+		return comp_type.is_valid() && entity.has(comp_type);
 	}
 	ERR_PRINT("FlecsServer::has_component: entity_id is not a valid entity");
 	return false;
@@ -1622,10 +1802,15 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 		ERR_PRINT("FlecsServer::set_component: world_id is not valid");
 		return;
 	}
+	flecs::world *world = _get_world(world_id);
+	if (!world) {
+		ERR_PRINT("FlecsServer::set_component: world not found");
+		return;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		flecs::entity comp_type = entity.world().component(component_type.ascii().get_data());
+		flecs::entity comp_type = world->lookup(component_type.utf8().get_data());
 		if (comp_type.is_valid()) {
 			// Trace component write for neural visualizer
 			ECS_TRACE_WRITE(entity.id(), comp_type.id(), 0);
@@ -1667,15 +1852,20 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 		ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: world_id is not valid");
 		return;
 	}
+	flecs::world *world = _get_world(world_id);
+	if (!world) {
+		ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: world not found");
+		return;
+	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		flecs::entity_t comp_type = entity.world().component(component_type.ascii().get_data()).id();
-		if (comp_type) {
+		flecs::entity component = world->lookup(component_type.utf8().get_data());
+		if (component.is_valid()) {
 			// Trace component remove for neural visualizer
-			ECS_TRACE_REMOVE(entity.id(), comp_type);
+			ECS_TRACE_REMOVE(entity.id(), component.id());
 			
-			entity.remove(comp_type);
+			entity.remove(component.id());
 		}
 	} else {
 		ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: entity_id is not a valid entity");
@@ -1718,7 +1908,11 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 	if(is_entity){
 		CHECK_ENTITY_VALIDITY_V(entity_id, world_id, RID(), get_component_type_by_name)
 		flecs::entity comp_type;
-		comp_type = entity.world().component(component_type.ascii().get_data());
+		flecs::world *world = _get_world(world_id);
+		if (!world) {
+			ERR_FAIL_V_MSG(RID(), "World not found for entity");
+		}
+		comp_type = world->lookup(component_type.utf8().get_data());
 		if (comp_type.is_valid()) {
 			return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_type.id()));
 		}
@@ -1726,7 +1920,7 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 	}else if(is_world){
 		CHECK_WORLD_VALIDITY_V(world_id, RID(), get_component_type_by_name)
 		flecs::world &world = world_variant->get_world();
-		flecs::entity comp_type = world.component(String(component_type).ascii().get_data());
+		flecs::entity comp_type = world.lookup(component_type.utf8().get_data());
 		if (comp_type.is_valid()) {
 			return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_type.id()));
 		}
