@@ -58,6 +58,9 @@ private:
 	/** Setup the retry timer (called deferred after scene tree is ready) */
 	void _setup_retry_timer();
 
+	/** Attach the retry timer on the next process frame once the root is stable. */
+	void _attach_retry_timer();
+
 	/** Resolve retry timer from ObjectDB safely. */
 	Timer *_get_retry_timer() const;
 

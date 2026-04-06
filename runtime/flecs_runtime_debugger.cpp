@@ -13,6 +13,7 @@ FlecsRuntimeDebugger *FlecsRuntimeDebugger::singleton = nullptr;
 
 void FlecsRuntimeDebugger::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_on_retry_timer"), &FlecsRuntimeDebugger::_on_retry_timer);
+	ClassDB::bind_method(D_METHOD("_attach_retry_timer"), &FlecsRuntimeDebugger::_attach_retry_timer);
 }
 
 FlecsRuntimeDebugger::FlecsRuntimeDebugger() {
@@ -42,8 +43,12 @@ void FlecsRuntimeDebugger::_dispose_retry_timer() {
 	Timer *timer = _get_retry_timer();
 	if (timer) {
 		timer->stop();
-		if (!timer->is_queued_for_deletion() && SceneTree::get_singleton()) {
-			timer->queue_free();
+		if (!timer->is_queued_for_deletion()) {
+			if (timer->get_parent() != nullptr && SceneTree::get_singleton()) {
+				timer->queue_free();
+			} else {
+				memdelete(timer);
+			}
 		}
 	}
 	retry_timer_id = ObjectID();
@@ -140,12 +145,33 @@ void FlecsRuntimeDebugger::_setup_retry_timer() {
 	Timer *timer = memnew(Timer);
 	timer->set_wait_time(0.1); // 100ms between retries
 	timer->set_one_shot(false);
+	timer->set_autostart(true);
 	timer->connect("timeout", callable_mp(this, &FlecsRuntimeDebugger::_on_retry_timer));
-
-	// Add timer to the scene tree root
-	tree->get_root()->add_child(timer);
 	retry_timer_id = timer->get_instance_id();
-	timer->start();
+
+	// Wait until the next process frame so startup callers do not mutate the root
+	// while it is still instantiating the scene tree.
+	tree->connect(StringName("process_frame"), callable_mp(this, &FlecsRuntimeDebugger::_attach_retry_timer), Object::CONNECT_ONE_SHOT);
+}
+
+void FlecsRuntimeDebugger::_attach_retry_timer() {
+	if (!initialized || capture_registered) {
+		_dispose_retry_timer();
+		return;
+	}
+
+	Timer *timer = _get_retry_timer();
+	if (timer == nullptr || timer->get_parent() != nullptr) {
+		return;
+	}
+
+	SceneTree *tree = SceneTree::get_singleton();
+	if (!tree || !tree->get_root()) {
+		_dispose_retry_timer();
+		return;
+	}
+
+	tree->get_root()->add_child(timer);
 }
 
 void FlecsRuntimeDebugger::shutdown() {

@@ -523,11 +523,17 @@ static void _set_cursor_from_variant_impl(flecs::cursor &p_cur, const Variant &p
 		if (ecs_type.kind == EcsStructType && p_value.get_type() == Variant::DICTIONARY) {
 			const Dictionary dict = p_value;
 			if (p_cur.push() == 0) {
-				Array keys = dict.keys();
-				for (int i = 0; i < keys.size(); i++) {
-					const String key = keys[i];
-					if (p_cur.member(key.utf8().get_data()) == 0) {
-						_set_cursor_from_variant_impl(p_cur, dict[key], p_depth + 1);
+				const int member_count = _get_struct_member_count(type);
+				for (int member_index = 0; member_index < member_count; member_index++) {
+					const char *member_name = p_cur.get_member();
+					if (member_name != nullptr && member_name[0] != '\0') {
+						const String member_key(member_name);
+						if (dict.has(member_key)) {
+							_set_cursor_from_variant_impl(p_cur, dict[member_key], p_depth + 1);
+						}
+					}
+					if (member_index + 1 < member_count && p_cur.next() != 0) {
+						break;
 					}
 				}
 				p_cur.pop();
@@ -678,13 +684,17 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 	if (type.is_valid() && type.has<EcsType>()) {
 		const EcsType& ecs_type = type.get<EcsType>();
 		if (ecs_type.kind == EcsStructType && cur.push() == 0) {
-			Array keys = dict.keys();
-			for (int i = 0; i < keys.size(); i++) {
-				String key = keys[i];
-				Variant value = dict[key];
-
-				if (cur.member(key.utf8().get_data()) == 0) {
-					_set_cursor_from_variant_impl(cur, value, 0);
+			const int member_count = _get_struct_member_count(type);
+			for (int member_index = 0; member_index < member_count; member_index++) {
+				const char *member_name = cur.get_member();
+				if (member_name != nullptr && member_name[0] != '\0') {
+					const String member_key(member_name);
+					if (dict.has(member_key)) {
+						_set_cursor_from_variant_impl(cur, dict[member_key], 0);
+					}
+				}
+				if (member_index + 1 < member_count && cur.next() != 0) {
+					break;
 				}
 			}
 			cur.pop();
