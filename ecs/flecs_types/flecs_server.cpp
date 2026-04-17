@@ -1358,7 +1358,7 @@ RID FlecsServer::register_component_type(const RID& world_id, const String &type
 	desc.type.size = sizeof(ScriptVisibleComponent);
 	desc.type.alignment = alignof(ScriptVisibleComponent);
 	flecs::entity_t comp = ecs_component_init(world->c_ptr(), &desc);
-	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp));
+	return _create_rid_for_type_id(world_id, comp);
 }
 #endif // DISABLE_DEPRECATED
 
@@ -1480,7 +1480,7 @@ RID FlecsServer::create_runtime_component(const RID& world_id, const String &com
 	}
 
 	// Create and return RID for the component type
-	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_id));
+	return _create_rid_for_type_id(world_id, comp_id);
 }
 
 RID FlecsServer::add_script_system(const RID& world_id, const Array &component_types, const Callable &callable) {
@@ -1728,7 +1728,7 @@ TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
 		}
 		entity.each([&](flecs::id type) {
 			if (type.raw_id() != 0) {
-				component_ids.push_back(flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(type)));
+				component_ids.push_back(_create_rid_for_type_id(world_id, type.raw_id()));
 			}
 		});
 		return component_ids;
@@ -1924,7 +1924,7 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 		}
 		comp_type = world->lookup(component_type.utf8().get_data());
 		if (comp_type.is_valid()) {
-			return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_type.id()));
+			return _create_rid_for_type_id(world_id, comp_type.id());
 		}
 		ERR_FAIL_V_MSG(RID(), "Component type not found: " + component_type);
 	}else if(is_world){
@@ -1932,7 +1932,7 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 		flecs::world &world = world_variant->get_world();
 		flecs::entity comp_type = world.lookup(component_type.utf8().get_data());
 		if (comp_type.is_valid()) {
-			return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(comp_type.id()));
+			return _create_rid_for_type_id(world_id, comp_type.id());
 		}
 		ERR_FAIL_V_MSG(RID(), "Component type not found: " + component_type);
 	}else if (!is_world && !is_entity){
@@ -2180,7 +2180,7 @@ RID FlecsServer::get_relationship(const RID &entity_id, const String& first_enti
 		ERR_PRINT("FlecsServer::get_relationship: relationship is not valid");
 		return RID();
 	}
-	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(*rel_entity));
+	return _create_rid_for_type_id(world_id, *rel_entity);
 }
 
 TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
@@ -2244,7 +2244,29 @@ RID FlecsServer::_get_rid_for_world(const flecs::world *world) {
 }
 
 RID FlecsServer::_create_rid_for_type_id(const RID& world_id, const flecs::entity_t &type_id) {
-	return flecs_variant_owners.get(world_id).type_id_owner.make_rid(FlecsTypeIDVariant(type_id));
+	if (type_id == 0) {
+		return RID();
+	}
+	if (!flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::_create_rid_for_type_id: world_id is not a valid world");
+		return RID();
+	}
+
+	RID_Owner_Wrapper &owner = flecs_variant_owners.get(world_id);
+	if (owner.type_id_to_rid.has(type_id)) {
+		RID existing_rid = owner.type_id_to_rid[type_id];
+		FlecsTypeIDVariant *existing_type = owner.type_id_owner.get_or_null(existing_rid);
+		if (existing_type && existing_type->get_type() == type_id) {
+			return existing_rid;
+		}
+		owner.type_id_to_rid.erase(type_id);
+	}
+
+	RID rid = owner.type_id_owner.make_rid(FlecsTypeIDVariant(type_id));
+	if (rid.is_valid()) {
+		owner.type_id_to_rid[type_id] = rid;
+	}
+	return rid;
 }
 
 RID FlecsServer::_create_rid_for_script_system(const RID& world_id, const FlecsScriptSystem &system) {
@@ -2340,7 +2362,15 @@ flecs::entity FlecsServer::_get_entity(const RID& entity_id, const RID& world_id
 
 void FlecsServer::free_type_id(const RID& world_id, const RID& type_id) {
 	if (flecs_variant_owners.has(world_id)) {
-		flecs_variant_owners.get(world_id).type_id_owner.free(type_id);
+		RID_Owner_Wrapper &owner = flecs_variant_owners.get(world_id);
+		FlecsTypeIDVariant *type_variant = owner.type_id_owner.get_or_null(type_id);
+		if (type_variant) {
+			flecs::entity_t flecs_type_id = type_variant->get_type();
+			if (owner.type_id_to_rid.has(flecs_type_id) && owner.type_id_to_rid[flecs_type_id] == type_id) {
+				owner.type_id_to_rid.erase(flecs_type_id);
+			}
+		}
+		owner.type_id_owner.free(type_id);
 	} else {
 		ERR_PRINT("FlecsServer::free_type_id: world_id is not a valid world");
 	}

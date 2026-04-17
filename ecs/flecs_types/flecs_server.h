@@ -460,6 +460,9 @@ private:
 		HashMap<String, Ref<CommandHandler>> command_handlers;
 		// Reverse lookup map: Flecs entity ID -> Godot RID (for O(1) lookups)
 		HashMap<uint64_t, RID> entity_id_to_rid;
+		// Reverse lookup map: Flecs type/component ID -> Godot RID. Type IDs are
+		// frequently resolved by name, so reusing RIDs prevents per-frame leaks.
+		HashMap<uint64_t, RID> type_id_to_rid;
 		RID_Owner_Wrapper() = default;
 		RID_Owner_Wrapper(RID p_world_id) : world_id(p_world_id),
 			entity_owner(ENTITY_OWNER_CHUNK_SIZE, MAX_ENTITY_COUNT),
@@ -482,7 +485,11 @@ private:
 			LocalVector<RID> other_type_ids = other.type_id_owner.get_owned_list();
 
 			for (RID rid : other_type_ids) {
-				type_id_owner.make_rid(FlecsTypeIDVariant(FlecsServer::get_singleton()->_get_type_id(rid, world_id)));
+				flecs::entity_t type_id = FlecsServer::get_singleton()->_get_type_id(rid, world_id);
+				RID new_rid = type_id_owner.make_rid(FlecsTypeIDVariant(type_id));
+				if (type_id != 0 && new_rid.is_valid()) {
+					type_id_to_rid[type_id] = new_rid;
+				}
 			}
 
 			LocalVector<RID> other_system_ids = other.system_owner.get_owned_list();
@@ -525,7 +532,11 @@ private:
 				}
 
 				for (RID rid : other.type_id_owner.get_owned_list()) {
-					type_id_owner.make_rid(FlecsTypeIDVariant(get_singleton()->_get_type_id(rid, world_id)));
+					flecs::entity_t type_id = get_singleton()->_get_type_id(rid, world_id);
+					RID new_rid = type_id_owner.make_rid(FlecsTypeIDVariant(type_id));
+					if (type_id != 0 && new_rid.is_valid()) {
+						type_id_to_rid[type_id] = new_rid;
+					}
 				}
 
 				for (RID rid : other.system_owner.get_owned_list()) {
