@@ -45,6 +45,7 @@
 #include "core/math/projection.h"
 #include "core/object/object_id.h"
 #include "core/string/string_name.h"
+#include "core/string/ustring.h"
 #include "servers/rendering/rendering_server.h"
 #include "core/variant/dictionary.h"
 
@@ -81,6 +82,14 @@ struct ObjectInstanceComponent {
 
 struct GameScriptComponent {
 	StringName instance_type;
+	String script_path;
+	StringName ready_method;
+	StringName process_method;
+	StringName physics_process_method;
+	bool has_ready = false;
+	bool has_process = false;
+	bool has_physics_process = false;
+	bool ready_called = false;
 };
 
 struct ResourceComponent {
@@ -530,6 +539,14 @@ inline Dictionary serialize_game_script(const void* data) {
 	const GameScriptComponent* comp = static_cast<const GameScriptComponent*>(data);
 	Dictionary dict;
 	dict["instance_type"] = comp->instance_type;
+	dict["script_path"] = comp->script_path;
+	dict["ready_method"] = comp->ready_method;
+	dict["process_method"] = comp->process_method;
+	dict["physics_process_method"] = comp->physics_process_method;
+	dict["has_ready"] = comp->has_ready;
+	dict["has_process"] = comp->has_process;
+	dict["has_physics_process"] = comp->has_physics_process;
+	dict["ready_called"] = comp->ready_called;
 	return dict;
 }
 
@@ -537,6 +554,30 @@ inline void deserialize_game_script(void* data, const Dictionary& dict) {
 	GameScriptComponent* comp = static_cast<GameScriptComponent*>(data);
 	if (dict.has("instance_type")) {
 		comp->instance_type = dict["instance_type"];
+	}
+	if (dict.has("script_path")) {
+		comp->script_path = dict["script_path"];
+	}
+	if (dict.has("ready_method")) {
+		comp->ready_method = dict["ready_method"];
+	}
+	if (dict.has("process_method")) {
+		comp->process_method = dict["process_method"];
+	}
+	if (dict.has("physics_process_method")) {
+		comp->physics_process_method = dict["physics_process_method"];
+	}
+	if (dict.has("has_ready")) {
+		comp->has_ready = dict["has_ready"];
+	}
+	if (dict.has("has_process")) {
+		comp->has_process = dict["has_process"];
+	}
+	if (dict.has("has_physics_process")) {
+		comp->has_physics_process = dict["has_physics_process"];
+	}
+	if (dict.has("ready_called")) {
+		comp->ready_called = dict["ready_called"];
 	}
 }
 
@@ -726,7 +767,15 @@ inline void register_all(flecs::world& world, bool enable_serialization = false)
 	world.component<ObjectInstanceComponent>()
 		.member<ObjectID>("object_instance_id");
 	world.component<GameScriptComponent>()
-		.member<StringName>("instance_type");
+		.member<StringName>("instance_type")
+		.member<String>("script_path")
+		.member<StringName>("ready_method")
+		.member<StringName>("process_method")
+		.member<StringName>("physics_process_method")
+		.member<bool>("has_ready")
+		.member<bool>("has_process")
+		.member<bool>("has_physics_process")
+		.member<bool>("ready_called");
 	world.component<ResourceComponent>()
 		.member<RID>("resource_id")
 		.member<StringName>("resource_type")

@@ -7,13 +7,15 @@
 #include "modules/godot_turbo/ecs/components/all_components.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_phases.h"
 
+class Node;
+
 /**
  * @class GDScriptRunnerSystem
  * @brief ECS system that executes script methods on entities with GameScriptComponent
  * 
  * This system bridges the gap between traditional Godot scripting and the ECS architecture.
  * It searches for entities with GameScriptComponent and executes their virtual methods
- * (_flecs_process, _flecs_physics_process) similar to how Node processes work.
+ * (_flecs_ready, _flecs_process, _flecs_physics_process) similar to how Node processes work.
  * 
  * @section Features
  * - **Method caching**: Checks method existence once per script type for performance
@@ -23,8 +25,10 @@
  * 
  * @section Virtual Methods
  * Scripts attached to converted nodes can implement:
+ * - `_flecs_ready(entity_rid: RID)` - Called once before frame updates
  * - `_flecs_process(entity_rid: RID, delta: float)` - Called every frame
  * - `_flecs_physics_process(entity_rid: RID, delta: float)` - Called at physics rate
+ * - `_FlecsReady(entityRid: Rid)` - C# variant (ready)
  * - `_FlecsProcess(entityRid: Rid, delta: float)` - C# variant (process)
  * - `_FlecsPhysicsProcess(entityRid: Rid, delta: float)` - C# variant (physics)
  * 
@@ -63,26 +67,33 @@ public:
      * @brief Caches which virtual methods a script type has to avoid repeated reflection
      */
     struct ScriptMethodCache {
+        bool has_ready = false;                ///< Script has _flecs_ready method
         bool has_process = false;              ///< Script has _flecs_process method
         bool has_physics_process = false;      ///< Script has _flecs_physics_process method
+        StringName ready_method;               ///< Actual ready method name to invoke
+        StringName process_method;             ///< Actual process method name to invoke
+        StringName physics_process_method;     ///< Actual physics method name to invoke
         bool checked = false;                  ///< Cache has been populated
         
         ScriptMethodCache() = default;
     };
 
 private:
+    flecs::entity ready_system;                ///< System running one-shot ready hooks before OnUpdate phase
     flecs::entity process_system;              ///< System running during OnUpdate phase
     flecs::entity physics_process_system;      ///< System running during OnPhysicsUpdate phase
     flecs::world* world = nullptr;             ///< Pointer to Flecs world
     RID world_rid;                             ///< RID of the Flecs world
     bool physics_process_suspended_by_process = false; ///< Tracks auto-suspend when phases overlap
-    
-    // Method cache: maps script instance_type to method availability
+
+    // Method cache: maps script_path when available, otherwise instance_type, to method availability
     HashMap<StringName, ScriptMethodCache> method_cache;
-    
+
     // Method name constants (checked in order for GDScript, then C# conventions)
+    static constexpr const char* READY_METHOD_GDSCRIPT = "_flecs_ready";
     static constexpr const char* PROCESS_METHOD_GDSCRIPT = "_flecs_process";
     static constexpr const char* PHYSICS_PROCESS_METHOD_GDSCRIPT = "_flecs_physics_process";
+    static constexpr const char* READY_METHOD_CSHARP = "_FlecsReady";
     static constexpr const char* PROCESS_METHOD_CSHARP = "_FlecsProcess";
     static constexpr const char* PHYSICS_PROCESS_METHOD_CSHARP = "_FlecsPhysicsProcess";
     
@@ -94,9 +105,16 @@ private:
      * @param csharp_name Method name in C# convention
      * @return true if the script has the method
      */
-    bool check_and_cache_method(const StringName& instance_type, 
-                                 const char* gdscript_name, 
-                                 const char* csharp_name);
+    bool check_and_cache_method(const StringName& instance_type,
+                                 const char* gdscript_name,
+                                 const char* csharp_name,
+                                 StringName* r_method_name = nullptr);
+
+    StringName get_cache_key(const GameScriptComponent& script_comp) const;
+    Node* get_node_for_entity(flecs::entity entity) const;
+    void populate_method_cache(flecs::entity entity,
+                               GameScriptComponent& script_comp,
+                               ScriptMethodCache& cache);
     
     /**
      * @brief Gets or creates cache entry for a script type
@@ -115,11 +133,12 @@ private:
      * @param method_name The method to call
      * @param delta Delta time to pass to the method
      */
-    void execute_script_method(flecs::entity entity,
+    bool execute_script_method(flecs::entity entity,
                                const RID& entity_rid,
                                const GameScriptComponent* script_comp,
                                const StringName& method_name,
-                               float delta);
+                               float delta,
+                               bool p_include_delta = true);
     
     /**
      * @brief System callback for processing phase

@@ -41,6 +41,7 @@
 #include "scene/2d/light_occluder_2d.h"
 #include "scene/2d/gpu_particles_2d.h"
 #include "core/variant/binder_common.h"
+#include "core/object/script_language.h"
 #include "core/object/script_instance.h"
 #include "scene/3d/gpu_particles_3d.h"
 #include "scene/3d/reflection_probe.h"
@@ -48,6 +49,51 @@
 #include "scene/3d/world_environment.h"
 #include "scene/3d/light_3d.h"
 #include "scene/3d/voxel_gi.h"
+
+namespace {
+
+static bool _script_has_hook(const Ref<Script> &p_script, const char *p_gdscript_name, const char *p_csharp_name, StringName &r_method_name) {
+    if (p_script.is_null()) {
+        return false;
+    }
+
+    const StringName gdscript_method(p_gdscript_name);
+    if (p_script->has_method(gdscript_method)) {
+        r_method_name = gdscript_method;
+        return true;
+    }
+
+    const StringName csharp_method(p_csharp_name);
+    if (p_script->has_method(csharp_method)) {
+        r_method_name = csharp_method;
+        return true;
+    }
+
+    return false;
+}
+
+static GameScriptComponent _make_game_script_component(const Node *p_node, const Ref<Script> &p_script) {
+    GameScriptComponent script_comp;
+    if (p_script.is_null()) {
+        return script_comp;
+    }
+
+    script_comp.script_path = p_script->get_path();
+    script_comp.instance_type = p_script->get_global_name();
+    if (script_comp.instance_type.is_empty()) {
+        script_comp.instance_type = p_script->get_instance_base_type();
+    }
+    if (script_comp.instance_type.is_empty() && p_node) {
+        script_comp.instance_type = p_node->get_class();
+    }
+
+    script_comp.has_ready = _script_has_hook(p_script, "_flecs_ready", "_FlecsReady", script_comp.ready_method);
+    script_comp.has_process = _script_has_hook(p_script, "_flecs_process", "_FlecsProcess", script_comp.process_method);
+    script_comp.has_physics_process = _script_has_hook(p_script, "_flecs_physics_process", "_FlecsPhysicsProcess", script_comp.physics_process_method);
+    return script_comp;
+}
+
+} // namespace
 
 TypedArray<RID> SceneObjectUtility::create_entities_from_scene(const RID &world_id, SceneTree *tree){
     if (tree == nullptr) {
@@ -448,6 +494,7 @@ RID SceneObjectUtility::get_node_script(const RID &world_id, const Node *node, c
         }
         flecs::entity child_resource_flecs_entity = server->_get_entity(child_resource_entity, world_id);
         flecs::entity flecs_entity = server->_get_entity(entity_id, world_id);
+        flecs_entity.set<GameScriptComponent>(_make_game_script_component(node, node_script));
         child_resource_flecs_entity.add(flecs::ChildOf, flecs_entity);
         return child_resource_entity;
     }
