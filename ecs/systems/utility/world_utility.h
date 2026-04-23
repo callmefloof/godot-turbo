@@ -12,6 +12,7 @@
 #include "servers/physics_2d/physics_server_2d.h"
 #include "servers/rendering/rendering_server.h"
 #include "scene/resources/camera_attributes.h"
+#include "scene/resources/environment.h"
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
 #include "modules/godot_turbo/ecs/components/all_components.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
@@ -337,6 +338,66 @@ private:
 		world->set<World3DComponent>(w3c);
 	}
 
+	static void _populate_world_3d_component(World3DComponent &r_component, const Ref<World3D> &p_world_3d, const World3DComponent *p_existing = nullptr) {
+		RenderingServer *rs = RenderingServer::get_singleton();
+		NavigationServer3D *ns3d = NavigationServer3D::get_singleton();
+		PhysicsServer3D *ps3d = PhysicsServer3D::get_singleton();
+
+		const Ref<CameraAttributes> camera_attributes = p_world_3d->get_camera_attributes();
+		if (camera_attributes.is_valid()) {
+			r_component.camera_attributes_id = camera_attributes->get_rid();
+		} else if (p_existing != nullptr && p_existing->camera_attributes_id.is_valid()) {
+			r_component.camera_attributes_id = p_existing->camera_attributes_id;
+		} else if (rs != nullptr) {
+			r_component.camera_attributes_id = rs->camera_attributes_create();
+		}
+
+		const Ref<Environment> environment = p_world_3d->get_environment();
+		if (environment.is_valid()) {
+			r_component.environment_id = environment->get_rid();
+		} else if (p_existing != nullptr && p_existing->environment_id.is_valid()) {
+			r_component.environment_id = p_existing->environment_id;
+		} else if (rs != nullptr) {
+			r_component.environment_id = rs->environment_create();
+		}
+
+		const Ref<Environment> fallback_environment = p_world_3d->get_fallback_environment();
+		if (fallback_environment.is_valid()) {
+			r_component.fallback_environment_id = fallback_environment->get_rid();
+		} else if (p_existing != nullptr && p_existing->fallback_environment_id.is_valid()) {
+			r_component.fallback_environment_id = p_existing->fallback_environment_id;
+		} else if (rs != nullptr) {
+			r_component.fallback_environment_id = rs->environment_create();
+		}
+
+		const RID navigation_map = p_world_3d->get_navigation_map();
+		if (navigation_map.is_valid()) {
+			r_component.navigation_map_id = navigation_map;
+		} else if (p_existing != nullptr && p_existing->navigation_map_id.is_valid()) {
+			r_component.navigation_map_id = p_existing->navigation_map_id;
+		} else if (ns3d != nullptr) {
+			r_component.navigation_map_id = ns3d->map_create();
+		}
+
+		const RID scenario = p_world_3d->get_scenario();
+		if (scenario.is_valid()) {
+			r_component.scenario_id = scenario;
+		} else if (p_existing != nullptr && p_existing->scenario_id.is_valid()) {
+			r_component.scenario_id = p_existing->scenario_id;
+		} else if (rs != nullptr) {
+			r_component.scenario_id = rs->scenario_create();
+		}
+
+		const RID space = p_world_3d->get_space();
+		if (space.is_valid()) {
+			r_component.space_id = space;
+		} else if (p_existing != nullptr && p_existing->space_id.is_valid()) {
+			r_component.space_id = p_existing->space_id;
+		} else if (ps3d != nullptr) {
+			r_component.space_id = ps3d->space_create();
+		}
+	}
+
 	/**
 	 * @brief Internal implementation - creates/updates World3DComponent from World3D.
 	 *
@@ -354,12 +415,8 @@ private:
 		if (world->has<World3DComponent>()) {
 			World3DComponent& mut_ref = world->get_mut<World3DComponent>();
 			if (world_3d.is_valid() && !world_3d.is_null()) {
-				mut_ref.camera_attributes_id = world_3d->get_camera_attributes()->get_rid();
-				mut_ref.environment_id = world_3d->get_environment()->get_rid();
-				mut_ref.fallback_environment_id = world_3d->get_fallback_environment()->get_rid();
-				mut_ref.navigation_map_id = world_3d->get_navigation_map();
-				mut_ref.scenario_id = world_3d->get_scenario();
-				mut_ref.space_id = world_3d->get_space();
+				const World3DComponent existing = mut_ref;
+				_populate_world_3d_component(mut_ref, world_3d, &existing);
 			}
 			world->modified<World3DComponent>();
 			return;
@@ -373,12 +430,7 @@ private:
 
 		// Use existing World3D resources
 		World3DComponent w3c;
-		w3c.camera_attributes_id = world_3d->get_camera_attributes()->get_rid();
-		w3c.environment_id = world_3d->get_environment()->get_rid();
-		w3c.fallback_environment_id = world_3d->get_fallback_environment()->get_rid();
-		w3c.navigation_map_id = world_3d->get_navigation_map();
-		w3c.scenario_id = world_3d->get_scenario();
-		w3c.space_id = world_3d->get_space();
+		_populate_world_3d_component(w3c, world_3d);
 		world->set<World3DComponent>(w3c);
 	}
 
