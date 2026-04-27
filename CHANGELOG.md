@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+#### Documentation
+- Updated FlecsServer API docs to reflect the current RID calling conventions:
+  - Component and hierarchy methods take `entity_id`/`parent_id` directly and resolve the world internally.
+  - Script system, native system, query, storage, singleton, and world lifecycle methods require `world_id` plus the target RID.
+  - `create_runtime_component()` is the preferred runtime component API; `register_component_type()` remains deprecated.
+- Updated GDScriptRunner docs for one-shot ready hooks:
+  - `_flecs_ready(entity_rid)` and `_FlecsReady(entityRid)` are detected and called once before frame update callbacks.
+  - Method cache entries now track ready/process/physics hooks by script path when available, falling back to instance type.
+- Updated world utility docs for resilient `World3D` component creation:
+  - Missing camera attributes, environments, navigation maps, scenarios, or physics spaces now fall back to existing component RIDs or freshly created server resources.
+- Updated README documentation links to the current `ecs/systems/utility` paths.
+
+### Fixed
+
+- Documented Flecs type RID caching behavior, which prevents duplicate component type RID creation during repeated lookups in hot loops.
+- Clarified that runtime component Dictionary data is mapped by reflected field/member name, not Dictionary key order.
+
 ## [1.2.1-beta.1] - 2026-02-16
 
 ### Added

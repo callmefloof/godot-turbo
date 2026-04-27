@@ -49,7 +49,7 @@
 ### Class Hierarchy
 
 ```
-RefCounted (Godot)
+Object (Godot)
   └── FlecsServer (Singleton)
        ├── RID_Owner<FlecsWorldVariant> (world storage)
        └── Per-World RID_Owner_Wrapper
@@ -75,6 +75,25 @@ struct RID_Owner_Wrapper {
     RID_Owner<FlecsQuery> query_owner;               // Queries
     HashMap<String, CommandHandler> command_handlers; // Custom handlers
 };
+```
+
+### RID Calling Conventions
+
+The current bindings use two calling patterns:
+
+- World-scoped methods require `world_id`: world lifecycle, entity creation/lookup, runtime component creation, script systems, native systems, queries, storage, command handlers, and world singletons.
+- Entity-scoped methods take the entity RID directly and resolve the owning world internally: component get/set/remove, component type lookup from an entity, names, parent/child relationships, and relationship inspection.
+
+```gdscript
+# World-scoped.
+var entity = FlecsServer.create_entity(world_id)
+var query = FlecsServer.create_query(world_id, PackedStringArray(["Health"]))
+var matches = FlecsServer.query_get_entities(world_id, query)
+
+# Entity-scoped.
+FlecsServer.set_component(entity, "Health", {"current": 100, "max": 100})
+var health = FlecsServer.get_component_by_name(entity, "Health")
+var type_id = FlecsServer.get_component_type_by_name(entity, "Health")
 ```
 
 ### Memory Management
@@ -187,19 +206,18 @@ RID _get_or_create_rid_for_entity(RID world_id, flecs::entity entity)
 ### Component Registration
 
 ```gdscript
-# Register component type dynamically
-var comp_schema = {
-    "x": TYPE_FLOAT,
-    "y": TYPE_FLOAT,
-    "z": TYPE_FLOAT
-}
-var position_type_id = FlecsServer.register_component_type(
-    world_rid, "Position", comp_schema
-)
+# Create a runtime component with typed reflected fields.
+var position_type_id = FlecsServer.create_runtime_component(world_rid, "Position", {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0
+})
 
-# Get component type by name
-var type_id = FlecsServer.get_component_type_by_name(world_rid, "Position")
+# Once an entity has the component, look up its type RID from that entity.
+var type_id = FlecsServer.get_component_type_by_name(entity_rid, "Position")
 ```
+
+`register_component_type(world_id, type_name, data)` is deprecated. Keep it only for legacy projects that still need `ScriptVisibleComponent` dictionary storage.
 
 ### Adding Components
 
@@ -255,8 +273,9 @@ var comp_ids = FlecsServer.get_component_types_as_id(entity_rid)
 ### Component API Reference
 
 ```cpp
-RID register_component_type(RID world_id, String type_name, Dictionary schema)
-RID get_component_type_by_name(RID world_id, String name)
+RID create_runtime_component(RID world_id, String component_name, Dictionary fields)
+RID register_component_type(RID world_id, String type_name, Dictionary schema) // Deprecated.
+RID get_component_type_by_name(RID entity_id, String name)
 void add_component(RID entity_id, RID comp_type_id)
 void set_component(RID entity_id, String comp_name, Dictionary data)
 Dictionary get_component_by_name(RID entity_id, String comp_name)
@@ -295,35 +314,35 @@ func update_movement(entities: Array):
 
 ```gdscript
 # Set dispatch mode (0=per-entity, 1=batch)
-FlecsServer.set_script_system_dispatch_mode(system_rid, 1)
+FlecsServer.set_script_system_dispatch_mode(world_rid, system_rid, 1)
 
 # Enable change-only mode (react to changes, not every frame)
-FlecsServer.set_script_system_change_only(system_rid, true)
+FlecsServer.set_script_system_change_only(world_rid, system_rid, true)
 
 # Enable multi-threading
-FlecsServer.set_script_system_multi_threaded(system_rid, true)
+FlecsServer.set_script_system_multi_threaded(world_rid, system_rid, true)
 
 # Set batch size
-FlecsServer.set_script_system_batch_chunk_size(system_rid, 100)
+FlecsServer.set_script_system_batch_chunk_size(world_rid, system_rid, 100)
 
 # Pause/resume
-FlecsServer.set_script_system_paused(system_rid, true)
-FlecsServer.set_script_system_paused(system_rid, false)
+FlecsServer.set_script_system_paused(world_rid, system_rid, true)
+FlecsServer.set_script_system_paused(world_rid, system_rid, false)
 ```
 
 ### System Instrumentation
 
 ```gdscript
 # Enable instrumentation
-FlecsServer.set_script_system_instrumentation(system_rid, true)
+FlecsServer.set_script_system_instrumentation(world_rid, system_rid, true)
 
 # Get performance data
-var stats = FlecsServer.get_script_system_instrumentation(system_rid)
+var stats = FlecsServer.get_script_system_instrumentation(world_rid, system_rid)
 print("Entities processed: ", stats["total_entities_processed"])
 print("Average time: ", stats["frame_median_usec"], " µs")
 
 # Reset counters
-FlecsServer.reset_script_system_instrumentation(system_rid)
+FlecsServer.reset_script_system_instrumentation(world_rid, system_rid)
 ```
 
 ### System Queries
@@ -331,12 +350,12 @@ FlecsServer.reset_script_system_instrumentation(system_rid)
 ```gdscript
 # Get all systems
 var all_systems = FlecsServer.get_all_systems(world_rid)
-for sys_rid in all_systems:
-    var info = FlecsServer.get_script_system_info(sys_rid)
+for sys_rid in all_systems["script"]:
+    var info = FlecsServer.get_script_system_info(world_rid, sys_rid)
     print("System: ", info["name"])
 
 # Get system info
-var info = FlecsServer.get_script_system_info(system_rid)
+var info = FlecsServer.get_script_system_info(world_rid, system_rid)
 print("Components: ", info["required_components"])
 print("Paused: ", info["is_paused"])
 ```
@@ -346,77 +365,77 @@ print("Paused: ", info["is_paused"])
 ```cpp
 // Creation & Lifecycle
 RID add_script_system(RID world_id, Array comp_types, Callable callback)
-void free_script_system(RID system_id)
-void set_script_system_name(RID system_id, String name)
-String get_script_system_name(RID system_id)
+void free_script_system(RID world_id, RID system_id)
+void set_script_system_name(RID world_id, RID system_id, String name)
+String get_script_system_name(RID world_id, RID system_id)
 
 // Configuration
-void set_script_system_callback(RID system_id, Callable callback)
-Callable get_script_system_callback(RID system_id)
-void set_script_system_required_components(RID system_id, PackedStringArray comps)
-PackedStringArray get_script_system_required_components(RID system_id)
-void set_script_system_world(RID system_id, RID world_id)
-RID get_script_system_world(RID system_id)
+void set_script_system_callback(RID world_id, RID system_id, Callable callback)
+Callable get_script_system_callback(RID world_id, RID system_id)
+void set_script_system_required_components(RID world_id, RID system_id, PackedStringArray comps)
+PackedStringArray get_script_system_required_components(RID world_id, RID system_id)
+void set_script_system_world(RID world_id, RID system_id, RID script_system_world_id)
+RID get_script_system_world(RID world_id, RID system_id)
 
 // Dispatch Mode
-void set_script_system_dispatch_mode(RID system_id, int mode)
-int get_script_system_dispatch_mode(RID system_id)
+void set_script_system_dispatch_mode(RID world_id, RID system_id, int mode)
+int get_script_system_dispatch_mode(RID world_id, RID system_id)
 
 // Change-Only Mode
-void set_script_system_change_only(RID system_id, bool enabled)
-bool is_script_system_change_only(RID system_id)
-void set_script_system_change_observe_add_and_set(RID system_id, bool both)
-bool get_script_system_change_observe_add_and_set(RID system_id)
-void set_script_system_change_observe_remove(RID system_id, bool enabled)
-bool get_script_system_change_observe_remove(RID system_id)
+void set_script_system_change_only(RID world_id, RID system_id, bool enabled)
+bool is_script_system_change_only(RID world_id, RID system_id)
+void set_script_system_change_observe_add_and_set(RID world_id, RID system_id, bool both)
+bool get_script_system_change_observe_add_and_set(RID world_id, RID system_id)
+void set_script_system_change_observe_remove(RID world_id, RID system_id, bool enabled)
+bool get_script_system_change_observe_remove(RID world_id, RID system_id)
 
 // Performance
-void set_script_system_multi_threaded(RID system_id, bool enabled)
-bool get_script_system_multi_threaded(RID system_id)
-void set_script_system_batch_chunk_size(RID system_id, int size)
-int get_script_system_batch_chunk_size(RID system_id)
-void set_script_system_flush_min_interval_msec(RID system_id, double ms)
-double get_script_system_flush_min_interval_msec(RID system_id)
-void set_script_system_use_deferred_calls(RID system_id, bool deferred)
-bool get_script_system_use_deferred_calls(RID system_id)
+void set_script_system_multi_threaded(RID world_id, RID system_id, bool enabled)
+bool get_script_system_multi_threaded(RID world_id, RID system_id)
+void set_script_system_batch_chunk_size(RID world_id, RID system_id, int size)
+int get_script_system_batch_chunk_size(RID world_id, RID system_id)
+void set_script_system_flush_min_interval_msec(RID world_id, RID system_id, double ms)
+double get_script_system_flush_min_interval_msec(RID world_id, RID system_id)
+void set_script_system_use_deferred_calls(RID world_id, RID system_id, bool deferred)
+bool get_script_system_use_deferred_calls(RID world_id, RID system_id)
 
 // Instrumentation
-void set_script_system_instrumentation(RID system_id, bool enabled)
-Dictionary get_script_system_instrumentation(RID system_id)
-void reset_script_system_instrumentation(RID system_id)
-void set_script_system_detailed_timing(RID system_id, bool enabled)
-bool get_script_system_detailed_timing(RID system_id)
-void set_script_system_auto_reset(RID system_id, bool enabled)
-bool get_script_system_auto_reset(RID system_id)
-void set_script_system_max_sample_count(RID system_id, int count)
-int get_script_system_max_sample_count(RID system_id)
+void set_script_system_instrumentation(RID world_id, RID system_id, bool enabled)
+Dictionary get_script_system_instrumentation(RID world_id, RID system_id)
+void reset_script_system_instrumentation(RID world_id, RID system_id)
+void set_script_system_detailed_timing(RID world_id, RID system_id, bool enabled)
+bool get_script_system_detailed_timing(RID world_id, RID system_id)
+void set_script_system_auto_reset(RID world_id, RID system_id, bool enabled)
+bool get_script_system_auto_reset(RID world_id, RID system_id)
+void set_script_system_max_sample_count(RID world_id, RID system_id, int count)
+int get_script_system_max_sample_count(RID world_id, RID system_id)
 
 // Metrics (getters)
-int get_script_system_last_frame_entity_count(RID system_id)
-uint64_t get_script_system_last_frame_dispatch_usec(RID system_id)
-uint64_t get_script_system_frame_dispatch_invocations(RID system_id)
-uint64_t get_script_system_frame_dispatch_accum_usec(RID system_id)
-uint64_t get_script_system_frame_min_usec(RID system_id)
-uint64_t get_script_system_frame_max_usec(RID system_id)
-double get_script_system_frame_median_usec(RID system_id)
-double get_script_system_frame_percentile_usec(RID system_id, double percentile)
-double get_script_system_frame_stddev_usec(RID system_id)
-double get_script_system_frame_p99_usec(RID system_id)
-uint64_t get_script_system_last_frame_onadd(RID system_id)
-uint64_t get_script_system_last_frame_onset(RID system_id)
-uint64_t get_script_system_last_frame_onremove(RID system_id)
-uint64_t get_script_system_total_callbacks(RID system_id)
-uint64_t get_script_system_total_entities_processed(RID system_id)
-Dictionary get_script_system_event_totals(RID system_id)
+int get_script_system_last_frame_entity_count(RID world_id, RID system_id)
+uint64_t get_script_system_last_frame_dispatch_usec(RID world_id, RID system_id)
+uint64_t get_script_system_frame_dispatch_invocations(RID world_id, RID system_id)
+uint64_t get_script_system_frame_dispatch_accum_usec(RID world_id, RID system_id)
+uint64_t get_script_system_frame_min_usec(RID world_id, RID system_id)
+uint64_t get_script_system_frame_max_usec(RID world_id, RID system_id)
+double get_script_system_frame_median_usec(RID world_id, RID system_id)
+double get_script_system_frame_percentile_usec(RID world_id, RID system_id, double percentile)
+double get_script_system_frame_stddev_usec(RID world_id, RID system_id)
+double get_script_system_frame_p99_usec(RID world_id, RID system_id)
+uint64_t get_script_system_last_frame_onadd(RID world_id, RID system_id)
+uint64_t get_script_system_last_frame_onset(RID world_id, RID system_id)
+uint64_t get_script_system_last_frame_onremove(RID world_id, RID system_id)
+uint64_t get_script_system_total_callbacks(RID world_id, RID system_id)
+uint64_t get_script_system_total_entities_processed(RID world_id, RID system_id)
+Dictionary get_script_system_event_totals(RID world_id, RID system_id)
 
 // Control
-void set_script_system_paused(RID system_id, bool paused)
-bool is_script_system_paused(RID system_id)
-void set_script_system_dependency(RID system_id, uint32_t depends_on_id)
+void set_script_system_paused(RID world_id, RID system_id, bool paused)
+bool is_script_system_paused(RID world_id, RID system_id)
+void set_script_system_dependency(RID world_id, RID system_id, uint32_t depends_on_id)
 
 // Inspection
-Dictionary get_script_system_info(RID system_id)
-Ref<Resource> make_script_system_inspector(RID system_id)
+Dictionary get_script_system_info(RID world_id, RID system_id)
+Ref<Resource> make_script_system_inspector(RID world_id, RID system_id)
 
 // Batch Operations
 void pause_systems(RID world_id)
@@ -439,12 +458,12 @@ var query_rid = FlecsServer.create_query(
 )
 
 # Get matching entities
-var entities = FlecsServer.query_get_entities(query_rid)
+var entities = FlecsServer.query_get_entities(world_rid, query_rid)
 for entity_rid in entities:
     # Process entity...
 
 # Get entities with component data
-var results = FlecsServer.query_get_entities_with_components(query_rid)
+var results = FlecsServer.query_get_entities_with_components(world_rid, query_rid)
 for result in results:
     var entity_rid = result["rid"]
     var pos = result["components"]["Position"]
@@ -456,60 +475,61 @@ for result in results:
 ```gdscript
 # Set required components
 FlecsServer.query_set_required_components(
+    world_rid,
     query_rid,
     PackedStringArray(["Transform", "Mesh"])
 )
 
 # Set caching strategy (0=none, 1=entities, 2=full)
-FlecsServer.query_set_caching_strategy(query_rid, 1)
+FlecsServer.query_set_caching_strategy(world_rid, query_rid, 1)
 
 # Set name filter
-FlecsServer.query_set_filter_name_pattern(query_rid, "Player*")
+FlecsServer.query_set_filter_name_pattern(world_rid, query_rid, "Player*")
 
 # Enable instrumentation
-FlecsServer.query_set_instrumentation_enabled(query_rid, true)
+FlecsServer.query_set_instrumentation_enabled(world_rid, query_rid, true)
 ```
 
 ### Query Operations
 
 ```gdscript
 # Get entity count (fast, no fetch)
-var count = FlecsServer.query_get_entity_count(query_rid)
+var count = FlecsServer.query_get_entity_count(world_rid, query_rid)
 
 # Check if entity matches query
-if FlecsServer.query_matches_entity(query_rid, entity_rid):
+if FlecsServer.query_matches_entity(world_rid, query_rid, entity_rid):
     print("Entity matches query")
 
 # Limited fetch (pagination)
 var page_size = 100
 var offset = 0
-var page = FlecsServer.query_get_entities_limited(query_rid, page_size, offset)
+var page = FlecsServer.query_get_entities_limited(world_rid, query_rid, page_size, offset)
 ```
 
 ### Query Cache Control
 
 ```gdscript
 # Force cache refresh
-FlecsServer.query_force_cache_refresh(query_rid)
+FlecsServer.query_force_cache_refresh(world_rid, query_rid)
 
 # Check if cache is dirty
-if FlecsServer.query_is_cache_dirty(query_rid):
+if FlecsServer.query_is_cache_dirty(world_rid, query_rid):
     print("Cache needs refresh")
 
 # Clear filters
-FlecsServer.query_clear_filter(query_rid)
+FlecsServer.query_clear_filter(world_rid, query_rid)
 ```
 
 ### Query Instrumentation
 
 ```gdscript
 # Get performance metrics
-var stats = FlecsServer.query_get_instrumentation_data(query_rid)
+var stats = FlecsServer.query_get_instrumentation_data(world_rid, query_rid)
 print("Total fetches: ", stats["total_fetches"])
 print("Cache hits: ", stats["cache_hits"])
 
 # Reset instrumentation
-FlecsServer.query_reset_instrumentation(query_rid)
+FlecsServer.query_reset_instrumentation(world_rid, query_rid)
 ```
 
 ### Query API Reference
@@ -517,34 +537,34 @@ FlecsServer.query_reset_instrumentation(query_rid)
 ```cpp
 // Creation & Lifecycle
 RID create_query(RID world_id, PackedStringArray required_comps)
-void free_query(RID query_id)
+void free_query(RID world_id, RID query_id)
 
 // Entity Fetching
-Array query_get_entities(RID query_id)
-Array query_get_entities_with_components(RID query_id)
-int query_get_entity_count(RID query_id)
-Array query_get_entities_limited(RID query_id, int max_count, int offset)
-Array query_get_entities_with_components_limited(RID query_id, int max_count, int offset)
-bool query_matches_entity(RID query_id, RID entity_id)
+Array query_get_entities(RID world_id, RID query_id)
+Array query_get_entities_with_components(RID world_id, RID query_id)
+int query_get_entity_count(RID world_id, RID query_id)
+Array query_get_entities_limited(RID world_id, RID query_id, int max_count, int offset)
+Array query_get_entities_with_components_limited(RID world_id, RID query_id, int max_count, int offset)
+bool query_matches_entity(RID world_id, RID query_id, RID entity_id)
 
 // Configuration
-void query_set_required_components(RID query_id, PackedStringArray comps)
-PackedStringArray query_get_required_components(RID query_id)
-void query_set_caching_strategy(RID query_id, int strategy)
-int query_get_caching_strategy(RID query_id)
-void query_set_filter_name_pattern(RID query_id, String pattern)
-String query_get_filter_name_pattern(RID query_id)
-void query_clear_filter(RID query_id)
+void query_set_required_components(RID world_id, RID query_id, PackedStringArray comps)
+PackedStringArray query_get_required_components(RID world_id, RID query_id)
+void query_set_caching_strategy(RID world_id, RID query_id, int strategy)
+int query_get_caching_strategy(RID world_id, RID query_id)
+void query_set_filter_name_pattern(RID world_id, RID query_id, String pattern)
+String query_get_filter_name_pattern(RID world_id, RID query_id)
+void query_clear_filter(RID world_id, RID query_id)
 
 // Cache Control
-void query_force_cache_refresh(RID query_id)
-bool query_is_cache_dirty(RID query_id)
+void query_force_cache_refresh(RID world_id, RID query_id)
+bool query_is_cache_dirty(RID world_id, RID query_id)
 
 // Instrumentation
-void query_set_instrumentation_enabled(RID query_id, bool enabled)
-bool query_get_instrumentation_enabled(RID query_id)
-Dictionary query_get_instrumentation_data(RID query_id)
-void query_reset_instrumentation(RID query_id)
+void query_set_instrumentation_enabled(RID world_id, RID query_id, bool enabled)
+bool query_get_instrumentation_enabled(RID world_id, RID query_id)
+Dictionary query_get_instrumentation_data(RID world_id, RID query_id)
+void query_reset_instrumentation(RID world_id, RID query_id)
 ```
 
 ---
@@ -636,41 +656,41 @@ TypedArray<RID> get_relationships(RID entity_id)
 ### Node Storage
 
 ```gdscript
-# Associate Godot Node with entity
-FlecsServer.add_to_node_storage(entity_rid, node)
+# Register a Godot Node with the world's node storage
+FlecsServer.add_to_node_storage(node, world_rid)
 
-# Retrieve Node
-var node = FlecsServer.get_node_from_node_storage(entity_rid)
+# Retrieve Node by ObjectID
+var node = FlecsServer.get_node_from_node_storage(node.get_instance_id(), world_rid)
 
-# Remove Node reference
-FlecsServer.remove_from_node_storage(entity_rid)
+# Remove Node reference by ObjectID
+FlecsServer.remove_from_node_storage(node.get_instance_id(), world_rid)
 ```
 
 ### Resource Storage
 
 ```gdscript
-# Associate Resource with entity
-FlecsServer.add_to_ref_storage(entity_rid, resource)
+# Register Resource with the world's resource storage
+FlecsServer.add_to_ref_storage(resource, world_rid)
 
-# Retrieve Resource
-var resource = FlecsServer.get_resource_from_ref_storage(entity_rid)
+# Retrieve Resource by RID
+var resource = FlecsServer.get_resource_from_ref_storage(resource.get_rid(), world_rid)
 
-# Remove Resource reference
-FlecsServer.remove_from_ref_storage(entity_rid)
+# Remove Resource reference by RID
+FlecsServer.remove_from_ref_storage(resource.get_rid(), world_rid)
 ```
 
 ### Storage API
 
 ```cpp
 // Node Storage
-void add_to_node_storage(RID entity_id, Node* node)
-void remove_from_node_storage(RID entity_id)
-Node* get_node_from_node_storage(RID entity_id)
+void add_to_node_storage(Node* node, RID world_id)
+void remove_from_node_storage(int64_t node_id, RID world_id)
+Node* get_node_from_node_storage(int64_t node_id, RID world_id)
 
 // Resource Storage
-void add_to_ref_storage(RID entity_id, Ref<Resource> resource)
-void remove_from_ref_storage(RID entity_id)
-Ref<Resource> get_resource_from_ref_storage(RID entity_id)
+void add_to_ref_storage(Ref<Resource> resource, RID world_id)
+void remove_from_ref_storage(RID resource_rid, RID world_id)
+Ref<Resource> get_resource_from_ref_storage(RID resource_rid, RID world_id)
 ```
 
 ---
@@ -755,8 +775,8 @@ func _exit_tree():
 
 ```gdscript
 # Good: Small, focused components
-var position_schema = {"x": TYPE_FLOAT, "y": TYPE_FLOAT}
-var health_schema = {"current": TYPE_INT, "max": TYPE_INT}
+var position_fields = {"x": 0.0, "y": 0.0}
+var health_fields = {"current": 100, "max": 100}
 
 # Avoid: Large, monolithic components
 # Bad: {"position_x": ..., "velocity_x": ..., "health": ..., "name": ...}
@@ -766,25 +786,25 @@ var health_schema = {"current": TYPE_INT, "max": TYPE_INT}
 
 ```gdscript
 # Good: Batch mode for many entities
-FlecsServer.set_script_system_dispatch_mode(system_rid, 1)  # BATCH
-FlecsServer.set_script_system_batch_chunk_size(system_rid, 100)
+FlecsServer.set_script_system_dispatch_mode(world_rid, system_rid, 1)  # BATCH
+FlecsServer.set_script_system_batch_chunk_size(world_rid, system_rid, 100)
 
 # Good: Change-only for reactive systems
-FlecsServer.set_script_system_change_only(health_system, true)
+FlecsServer.set_script_system_change_only(world_rid, health_system, true)
 
 # Good: Multi-threading for heavy computation
-FlecsServer.set_script_system_multi_threaded(physics_system, true)
-FlecsServer.set_script_system_use_deferred_calls(physics_system, true)
+FlecsServer.set_script_system_multi_threaded(world_rid, physics_system, true)
+FlecsServer.set_script_system_use_deferred_calls(world_rid, physics_system, true)
 ```
 
 ### 4. Query Optimization
 
 ```gdscript
 # Good: Cache entities list for stable queries
-FlecsServer.query_set_caching_strategy(query_rid, 1)  # CACHE_ENTITIES
+FlecsServer.query_set_caching_strategy(world_rid, query_rid, 1)  # CACHE_ENTITIES
 
 # Good: Use limited fetch for large result sets
-var page = FlecsServer.query_get_entities_limited(query_rid, 100, 0)
+var page = FlecsServer.query_get_entities_limited(world_rid, query_rid, 100, 0)
 ```
 
 ### 5. Error Handling
@@ -818,12 +838,12 @@ func _ready():
     world_rid = FlecsServer.create_world()
     FlecsServer.init_world(world_rid)
     
-    # Register components
-    var pos_type = FlecsServer.register_component_type(world_rid, "Position", {
-        "x": TYPE_FLOAT, "y": TYPE_FLOAT
+    # Create runtime components
+    var pos_type = FlecsServer.create_runtime_component(world_rid, "Position", {
+        "x": 0.0, "y": 0.0
     })
-    var vel_type = FlecsServer.register_component_type(world_rid, "Velocity", {
-        "x": TYPE_FLOAT, "y": TYPE_FLOAT
+    var vel_type = FlecsServer.create_runtime_component(world_rid, "Velocity", {
+        "x": 0.0, "y": 0.0
     })
     
     # Create player
@@ -837,12 +857,12 @@ func _ready():
         PackedStringArray(["Position", "Velocity"]),
         update_movement
     )
-    FlecsServer.set_script_system_dispatch_mode(movement_system, 1)  # Batch mode
+    FlecsServer.set_script_system_dispatch_mode(world_rid, movement_system, 1)  # Batch mode
     
     # Create render system
     render_system = FlecsServer.add_script_system(
         world_rid,
-        PackedStringArray(["Position", "Sprite"]),
+        PackedStringArray(["Position", "Sprite", "ObjectInstanceComponent"]),
         update_sprites
     )
 
@@ -867,7 +887,8 @@ func update_sprites(entities: Array):
         var sprite = entity_data["components"]["Sprite"]
         
         # Update sprite position from ECS
-        var node = FlecsServer.get_node_from_node_storage(entity_data["rid"])
+        var object_info = entity_data["components"]["ObjectInstanceComponent"]
+        var node = FlecsServer.get_node_from_node_storage(object_info["object_instance_id"], world_rid)
         if node:
             node.position = Vector2(pos["x"], pos["y"])
 
@@ -888,19 +909,19 @@ func _ready():
     system_rid = # ... create system
     
     # Enable instrumentation
-    FlecsServer.set_script_system_instrumentation(system_rid, true)
-    FlecsServer.set_script_system_detailed_timing(system_rid, true)
+    FlecsServer.set_script_system_instrumentation(world_rid, system_rid, true)
+    FlecsServer.set_script_system_detailed_timing(world_rid, system_rid, true)
 
 func _process(_delta):
     # Update performance display
-    var stats = FlecsServer.get_script_system_instrumentation(system_rid)
+    var stats = FlecsServer.get_script_system_instrumentation(world_rid, system_rid)
     
     $EntityCount.text = "Entities: %d" % stats["last_frame_entity_count"]
     $CallbackTime.text = "Time: %.2f µs" % stats["frame_median_usec"]
     $TotalProcessed.text = "Total: %d" % stats["total_entities_processed"]
     
     # Show P99 latency
-    var p99 = FlecsServer.get_script_system_frame_p99_usec(system_rid)
+    var p99 = FlecsServer.get_script_system_frame_p99_usec(world_rid, system_rid)
     $P99Latency.text = "P99: %.2f µs" % p99
 ```
 

@@ -222,6 +222,13 @@ All ECS objects are referenced by RIDs (Resource IDs), providing:
 - **Type safety**: RIDs are strongly typed
 - **Fast lookups**: O(1) access via RID_Owner
 - **Memory safety**: Automatic cleanup when RIDs are freed
+- **Stable type IDs**: Flecs type/component IDs are cached per world, so repeated lookups reuse the same RID instead of allocating duplicates in hot loops
+
+#### Current Binding Conventions
+
+World-scoped methods take `world_id` explicitly: world lifecycle, entity creation and lookup, runtime component creation, script systems, queries, storage, command handlers, and world singletons.
+
+Entity-scoped methods take the entity RID directly and resolve the world internally: component get/set/remove, component type lookup, entity names, parent/child operations, and relationships.
 
 #### Multi-World Support
 Each world is an isolated ECS instance:
@@ -284,62 +291,65 @@ FlecsServer.free_entity(world, entity)
 #### Component Management
 
 ```gdscript
-# Register component type
-var transform_type: RID = FlecsServer.register_component_type(world, "Transform")
+# Create runtime component type
+var transform_type: RID = FlecsServer.create_runtime_component(world, "Transform", {
+    "position": Vector3.ZERO,
+    "rotation": Quaternion.IDENTITY
+})
 
 # Set component (auto-registers if needed)
-FlecsServer.set_component(world, entity, "Transform", {
+FlecsServer.set_component(entity, "Transform", {
     "position": Vector3(1, 2, 3),
     "rotation": Quaternion.IDENTITY
 })
 
 # Get component
-var transform: Dictionary = FlecsServer.get_component_by_name(world, entity, "Transform")
+var transform: Dictionary = FlecsServer.get_component_by_name(entity, "Transform")
 print(transform["position"])  # Vector3(1, 2, 3)
 
 # Check if entity has component
-var has: bool = FlecsServer.has_component(world, entity, transform_type)
+var has: bool = FlecsServer.has_component(entity, "Transform")
 
 # Remove component
-FlecsServer.remove_component_from_entity_with_name(world, entity, "Transform")
+FlecsServer.remove_component_from_entity_with_name(entity, "Transform")
 
 # Get all component types on entity
-var type_names: PackedStringArray = FlecsServer.get_component_types_as_name(world, entity)
-var type_rids: Array[RID] = FlecsServer.get_component_types_as_id(world, entity)
+var type_names: PackedStringArray = FlecsServer.get_component_types_as_name(entity)
+var type_rids: Array[RID] = FlecsServer.get_component_types_as_id(entity)
 
 # Remove all components
-FlecsServer.remove_all_components_from_entity(world, entity)
+FlecsServer.remove_all_components_from_entity(entity)
 ```
 
 #### Hierarchy & Relationships
 
 ```gdscript
 # Set parent-child relationship
-FlecsServer.set_parent(world, child_entity, parent_entity)
-var parent: RID = FlecsServer.get_parent(world, child_entity)
+FlecsServer.set_parent(child_entity, parent_entity)
+var parent: RID = FlecsServer.get_parent(child_entity)
 
 # Add/remove children
-FlecsServer.add_child(world, parent_entity, child_entity)
-FlecsServer.remove_child(world, parent_entity, child_entity)
+FlecsServer.add_child(parent_entity, child_entity)
+FlecsServer.remove_child(parent_entity, child_entity)
 
 # Get children
-var children: Array[RID] = FlecsServer.get_children(world, parent_entity)
-var child: RID = FlecsServer.get_child(world, parent_entity, 0)
-var named_child: RID = FlecsServer.get_child_by_name(world, parent_entity, "ChildName")
+var children: Array[RID] = FlecsServer.get_children(parent_entity)
+var child: RID = FlecsServer.get_child(parent_entity, 0)
+var named_child: RID = FlecsServer.get_child_by_name(parent_entity, "ChildName")
 
 # Set all children at once
-FlecsServer.set_children(world, parent_entity, [child1, child2, child3])
+FlecsServer.set_children(parent_entity, [child1, child2, child3])
 
 # Remove children
-FlecsServer.remove_child_by_name(world, parent_entity, "ChildName")
-FlecsServer.remove_child_by_index(world, parent_entity, 0)
-FlecsServer.remove_all_children(world, parent_entity)
+FlecsServer.remove_child_by_name(parent_entity, "ChildName")
+FlecsServer.remove_child_by_index(parent_entity, 0)
+FlecsServer.remove_all_children(parent_entity)
 
 # Generic relationships
-FlecsServer.add_relationship(world, entity, relation_type, target_entity)
-FlecsServer.remove_relationship(world, entity, relation_type, target_entity)
-var target: RID = FlecsServer.get_relationship(world, entity, relation_type)
-var targets: Array[RID] = FlecsServer.get_relationships(world, entity, relation_type)
+FlecsServer.add_relationship(entity, relationship)
+FlecsServer.remove_relationship(entity, relationship)
+var target: RID = FlecsServer.get_relationship(entity, "Relation", "Target")
+var targets: Array[RID] = FlecsServer.get_relationships(entity)
 ```
 
 #### Script Systems
@@ -422,7 +432,7 @@ var query: RID = FlecsServer.create_query(
 # Get entity RIDs only (fastest)
 var entities: Array = FlecsServer.query_get_entities(world, query)
 for entity_rid in entities:
-    var transform = FlecsServer.get_component_by_name(world, entity_rid, "Transform")
+    var transform = FlecsServer.get_component_by_name(entity_rid, "Transform")
     # Process...
 
 # Get entities with component data (convenience)
@@ -569,7 +579,7 @@ Calls GDScript once for each matching entity.
 - Not suitable for thousands of entities
 
 ```gdscript
-FlecsServer.set_script_system_dispatch_mode(system, 0)
+FlecsServer.set_script_system_dispatch_mode(world, system, 0)
 
 func callback(entities: Array) -> void:
     # Called once per entity
@@ -591,8 +601,8 @@ Accumulates entities and sends in batches.
 - Potential latency if flush interval is set
 
 ```gdscript
-FlecsServer.set_script_system_dispatch_mode(system, 1)
-FlecsServer.set_script_system_batch_chunk_size(system, 100)
+FlecsServer.set_script_system_dispatch_mode(world, system, 1)
+FlecsServer.set_script_system_batch_chunk_size(world, system, 100)
 
 func callback(entities: Array) -> void:
     # Called with batch of entities
@@ -607,11 +617,11 @@ Instead of running every frame, react only to component changes.
 
 ```gdscript
 # Enable change-only mode
-FlecsServer.set_script_system_change_only(system, true)
+FlecsServer.set_script_system_change_only(world, system, true)
 
 # Configure which events to observe
-FlecsServer.set_script_system_change_observe_add_and_set(system, true)  # OnAdd + OnSet
-FlecsServer.set_script_system_change_observe_remove(system, true)  # OnRemove
+FlecsServer.set_script_system_change_observe_add_and_set(world, system, true)  # OnAdd + OnSet
+FlecsServer.set_script_system_change_observe_remove(world, system, true)  # OnRemove
 
 # System callback will only be invoked when components are added/set/removed
 func callback(entities: Array) -> void:
@@ -621,7 +631,7 @@ func callback(entities: Array) -> void:
 **Event Tracking:**
 
 ```gdscript
-var event_totals: Dictionary = FlecsServer.get_script_system_event_totals(system)
+var event_totals: Dictionary = FlecsServer.get_script_system_event_totals(world, system)
 print("OnAdd events: ", event_totals["last_frame_onadd"])
 print("OnSet events: ", event_totals["last_frame_onset"])
 print("OnRemove events: ", event_totals["last_frame_onremove"])
@@ -631,10 +641,10 @@ print("OnRemove events: ", event_totals["last_frame_onremove"])
 
 ```gdscript
 # Enable multi-threaded execution
-FlecsServer.set_script_system_multi_threaded(system, true)
+FlecsServer.set_script_system_multi_threaded(world, system, true)
 
 # IMPORTANT: Must use deferred calls with multi-threading!
-FlecsServer.set_script_system_use_deferred_calls(system, true)
+FlecsServer.set_script_system_use_deferred_calls(world, system, true)
 
 # System will be scheduled across CPU cores automatically
 # Batching is enabled automatically for thread safety
@@ -651,12 +661,12 @@ FlecsServer.set_script_system_use_deferred_calls(system, true)
 # Batch flush chunk size
 # 0 = send all entities at once
 # >0 = send in chunks of this size
-FlecsServer.set_script_system_batch_chunk_size(system, 100)
+FlecsServer.set_script_system_batch_chunk_size(world, system, 100)
 
 # Minimum flush interval (milliseconds)
 # 0 = no limit (flush every frame)
 # >0 = minimum time between flushes
-FlecsServer.set_script_system_flush_min_interval_msec(system, 16.0)  # ~60 FPS
+FlecsServer.set_script_system_flush_min_interval_msec(world, system, 16.0)  # ~60 FPS
 ```
 
 ### Instrumentation
@@ -665,37 +675,37 @@ FlecsServer.set_script_system_flush_min_interval_msec(system, 16.0)  # ~60 FPS
 
 ```gdscript
 # Enable instrumentation
-FlecsServer.set_script_system_instrumentation(system, true)
+FlecsServer.set_script_system_instrumentation(world, system, true)
 
 # Get basic metrics
-var entity_count = FlecsServer.get_script_system_last_frame_entity_count(system)
-var dispatch_usec = FlecsServer.get_script_system_last_frame_dispatch_usec(system)
-var total_callbacks = FlecsServer.get_script_system_total_callbacks(system)
-var total_entities = FlecsServer.get_script_system_total_entities_processed(system)
+var entity_count = FlecsServer.get_script_system_last_frame_entity_count(world, system)
+var dispatch_usec = FlecsServer.get_script_system_last_frame_dispatch_usec(world, system)
+var total_callbacks = FlecsServer.get_script_system_total_callbacks(world, system)
+var total_entities = FlecsServer.get_script_system_total_entities_processed(world, system)
 ```
 
 #### Detailed Timing
 
 ```gdscript
 # Enable detailed timing (per-dispatch samples)
-FlecsServer.set_script_system_detailed_timing(system, true)
-FlecsServer.set_script_system_max_sample_count(system, 2048)
+FlecsServer.set_script_system_detailed_timing(world, system, true)
+FlecsServer.set_script_system_max_sample_count(world, system, 2048)
 
 # Timing statistics
-var min_usec = FlecsServer.get_script_system_frame_min_usec(system)
-var max_usec = FlecsServer.get_script_system_frame_max_usec(system)
-var median_usec = FlecsServer.get_script_system_frame_median_usec(system)
-var p99_usec = FlecsServer.get_script_system_frame_p99_usec(system)
-var stddev_usec = FlecsServer.get_script_system_frame_stddev_usec(system)
+var min_usec = FlecsServer.get_script_system_frame_min_usec(world, system)
+var max_usec = FlecsServer.get_script_system_frame_max_usec(world, system)
+var median_usec = FlecsServer.get_script_system_frame_median_usec(world, system)
+var p99_usec = FlecsServer.get_script_system_frame_p99_usec(world, system)
+var stddev_usec = FlecsServer.get_script_system_frame_stddev_usec(world, system)
 
 # Custom percentiles
-var p95 = FlecsServer.get_script_system_frame_percentile_usec(system, 95.0)
+var p95 = FlecsServer.get_script_system_frame_percentile_usec(world, system, 95.0)
 ```
 
 #### Instrumentation Dictionary
 
 ```gdscript
-var info: Dictionary = FlecsServer.get_script_system_info(system)
+var info: Dictionary = FlecsServer.get_script_system_info(world, system)
 # Returns comprehensive system information:
 # - dispatch_mode
 # - change_only
@@ -715,17 +725,17 @@ var info: Dictionary = FlecsServer.get_script_system_info(system)
 
 ```gdscript
 # Automatically reset per-frame counters each frame
-FlecsServer.set_script_system_auto_reset(system, true)
+FlecsServer.set_script_system_auto_reset(world, system, true)
 ```
 
 ### Pause/Resume
 
 ```gdscript
 # Pause system (won't execute)
-FlecsServer.set_script_system_paused(system, true)
+FlecsServer.set_script_system_paused(world, system, true)
 
 # Resume system
-FlecsServer.set_script_system_paused(system, false)
+FlecsServer.set_script_system_paused(world, system, false)
 
 # Check pause state
 var is_paused: bool = FlecsServer.is_script_system_paused(system)
@@ -735,8 +745,8 @@ var is_paused: bool = FlecsServer.is_script_system_paused(system)
 
 ```gdscript
 # Make system2 run after system1
-var system1_id = FlecsServer.get_script_system_id(system1)
-FlecsServer.set_script_system_dependency(system2, system1_id)
+var system1_id = FlecsServer.get_script_system_info(world, system1)["id"]
+FlecsServer.set_script_system_dependency(world, system2, system1_id)
 ```
 
 ### Complete Example
@@ -770,8 +780,8 @@ func _ready():
     # Create test entities
     for i in range(1000):
         var entity = flecs.create_entity(world)
-        flecs.set_component(world, entity, "Transform", {"position": Vector3.ZERO})
-        flecs.set_component(world, entity, "Velocity", {"direction": Vector3.RIGHT})
+        FlecsServer.set_component(entity, "Transform", {"position": Vector3.ZERO})
+        FlecsServer.set_component(entity, "Velocity", {"direction": Vector3.RIGHT})
 
 func _process(delta):
     FlecsServer.progress_world(world, delta)
@@ -822,13 +832,13 @@ func _ready():
     )
     
     # Query player health
-    var health = flecs.get_component_by_name(world, player, "Health")
+    var health = FlecsServer.get_component_by_name(player, "Health")
     print("Player health: %d/%d" % [health["current"], health["max"]])
 
 func take_damage(amount: int):
-    var health = FlecsServer.get_component_by_name(world, player, "Health")
+    var health = FlecsServer.get_component_by_name(player, "Health")
     health["current"] = max(0, health["current"] - amount)
-    FlecsServer.set_component(world, player, "Health", health)
+    FlecsServer.set_component(player, "Health", health)
     
     if health["current"] <= 0:
         print("Player died!")
@@ -855,9 +865,9 @@ func _ready():
     # Spawn enemies
     for i in range(100):
         var enemy = flecs.create_entity(world)
-        flecs.set_component(world, enemy, "Transform", {"position": Vector3(randf() * 100, 0, randf() * 100)})
-        flecs.set_component(world, enemy, "Enemy", {"type": "goblin"})
-        flecs.set_component(world, enemy, "Health", {"current": 50, "max": 50})
+        FlecsServer.set_component(enemy, "Transform", {"position": Vector3(randf() * 100, 0, randf() * 100)})
+        FlecsServer.set_component(enemy, "Enemy", {"type": "goblin"})
+        FlecsServer.set_component(enemy, "Health", {"current": 50, "max": 50})
 
 func _process(delta):
     # Get all enemies
@@ -865,8 +875,8 @@ func _process(delta):
     
     # Process each enemy
     for enemy_rid in enemies:
-        var transform = FlecsServer.get_component_by_name(world, enemy_rid, "Transform")
-        var health = FlecsServer.get_component_by_name(world, enemy_rid, "Health")
+        var transform = FlecsServer.get_component_by_name(enemy_rid, "Transform")
+        var health = FlecsServer.get_component_by_name(enemy_rid, "Health")
         
         # Update enemy...
 ```
@@ -879,7 +889,7 @@ func create_vehicle():
     
     # Create vehicle body
     var vehicle = flecs.create_entity_with_name(world, "Vehicle")
-    flecs.set_component(world, vehicle, "Transform", {"position": Vector3.ZERO})
+    FlecsServer.set_component(vehicle, "Transform", {"position": Vector3.ZERO})
     
     # Create wheels as children
     var wheel_positions = [
@@ -891,7 +901,7 @@ func create_vehicle():
     
     for i in range(4):
         var wheel = flecs.create_entity_with_name(world, "Wheel%d" % i)
-        flecs.set_component(world, wheel, "Transform", {"position": wheel_positions[i]})
+        FlecsServer.set_component(wheel, "Transform", {"position": wheel_positions[i]})
         flecs.add_child(world, vehicle, wheel)
     
     # Query all wheels
@@ -960,14 +970,14 @@ func _ready():
 ✅ **DO:**
 ```gdscript
 # Use batch mode for large entity counts
-FlecsServer.set_script_system_dispatch_mode(system, 1)
-FlecsServer.set_script_system_batch_chunk_size(system, 100)
+FlecsServer.set_script_system_dispatch_mode(world, system, 1)
+FlecsServer.set_script_system_batch_chunk_size(world, system, 100)
 ```
 
 ❌ **DON'T:**
 ```gdscript
 # Per-entity mode with 10,000 entities = 10,000 GDScript calls!
-FlecsServer.set_script_system_dispatch_mode(system, 0)
+FlecsServer.set_script_system_dispatch_mode(world, system, 0)
 ```
 
 ### 3. Change-Only When Appropriate
@@ -990,14 +1000,14 @@ FlecsServer.set_script_system_change_only(movement_system, true)  # Transform ch
 ```gdscript
 # Enable instrumentation during development
 if OS.is_debug_build():
-    FlecsServer.set_script_system_instrumentation(system, true)
-    FlecsServer.set_script_system_detailed_timing(system, true)
+    FlecsServer.set_script_system_instrumentation(world, system, true)
+    FlecsServer.set_script_system_detailed_timing(world, system, true)
 ```
 
 ❌ **DON'T:**
 ```gdscript
 # Don't leave detailed timing on in release builds
-FlecsServer.set_script_system_detailed_timing(system, true)  # Performance overhead!
+FlecsServer.set_script_system_detailed_timing(world, system, true)  # Performance overhead!
 ```
 
 ### 5. Query Caching
@@ -1023,8 +1033,8 @@ FlecsServer.query_set_caching_strategy(world, dynamic_query, 2)  # Data constant
 ✅ **DO:**
 ```gdscript
 # Use deferred calls with multi-threading
-FlecsServer.set_script_system_multi_threaded(system, true)
-FlecsServer.set_script_system_use_deferred_calls(system, true)
+FlecsServer.set_script_system_multi_threaded(world, system, true)
+FlecsServer.set_script_system_use_deferred_calls(world, system, true)
 
 func callback(entities: Array):
     # Queue changes, don't modify scene tree directly
@@ -1035,7 +1045,7 @@ func callback(entities: Array):
 ❌ **DON'T:**
 ```gdscript
 # Direct scene tree access from worker threads - CRASHES!
-FlecsServer.set_script_system_multi_threaded(system, true)
+FlecsServer.set_script_system_multi_threaded(world, system, true)
 
 func callback(entities: Array):
     for entity_data in entities:
@@ -1132,7 +1142,7 @@ For complete API documentation, see:
 **Solution**: Check RID validity before use
 ```gdscript
 if entity.is_valid():
-    var health = FlecsServer.get_component_by_name(world, entity, "Health")
+    var health = FlecsServer.get_component_by_name(entity, "Health")
 ```
 
 #### Issue: System not executing
@@ -1162,7 +1172,7 @@ func _exit_tree():
 
 **Solution**: Enable deferred calls
 ```gdscript
-FlecsServer.set_script_system_use_deferred_calls(system, true)
+FlecsServer.set_script_system_use_deferred_calls(world, system, true)
 ```
 
 ---

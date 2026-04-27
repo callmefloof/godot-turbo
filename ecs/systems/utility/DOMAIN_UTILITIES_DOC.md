@@ -1,8 +1,8 @@
 # Domain-Specific Utilities Documentation
 
-**Last Updated:** Phase 2 Complete  
-**Module:** `godot_turbo/ecs/utility`  
-**Status:** ✅ Comprehensive documentation added to all domain utilities
+**Last Updated:** 2026-04-27
+**Module:** `godot_turbo/ecs/systems/utility`
+**Status:** Comprehensive documentation for domain utilities and world resource helpers
 
 ---
 
@@ -13,6 +13,19 @@ This document summarizes the documentation work completed for the domain-specifi
 ---
 
 ## Documented Utilities
+
+### 0. World Utilities
+
+#### **World2DUtility** (`world_utility.h`)
+- Creates or updates `World2DComponent` with canvas, navigation map, and physics space RIDs.
+- Uses existing `World2D` resources when provided.
+- Creates fallback server resources when no `World2D` is available.
+
+#### **World3DUtility** (`world_utility.h`)
+- Creates or updates `World3DComponent` with scenario, camera attributes, environment, fallback environment, navigation map, and physics space RIDs.
+- Uses existing `World3D` resources when valid.
+- Handles partial or missing `World3D` resources by preserving existing component RIDs when available, then creating fallback server resources through Godot servers.
+- Safe to call repeatedly; existing components are updated and marked modified.
 
 ### 1. Physics Utilities
 

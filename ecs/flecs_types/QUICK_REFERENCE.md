@@ -9,9 +9,9 @@
 var world = FlecsServer.create_world()
 FlecsServer.init_world(world)
 
-# Register component
-var pos_type = FlecsServer.register_component_type(world, "Position", {
-    "x": TYPE_FLOAT, "y": TYPE_FLOAT, "z": TYPE_FLOAT
+# Create runtime component
+var pos_type = FlecsServer.create_runtime_component(world, "Position", {
+    "x": 0.0, "y": 0.0, "z": 0.0
 })
 
 # Create entity
@@ -75,31 +75,31 @@ func update_movement(entities: Array):
 ### Performance Modes
 ```gdscript
 # Batch mode (10-100x faster for many entities)
-FlecsServer.set_script_system_dispatch_mode(system, 1)
-FlecsServer.set_script_system_batch_chunk_size(system, 100)
+FlecsServer.set_script_system_dispatch_mode(world, system, 1)
+FlecsServer.set_script_system_batch_chunk_size(world, system, 100)
 
 # Change-only mode (react to changes)
-FlecsServer.set_script_system_change_only(system, true)
+FlecsServer.set_script_system_change_only(world, system, true)
 
 # Multi-threaded
-FlecsServer.set_script_system_multi_threaded(system, true)
-FlecsServer.set_script_system_use_deferred_calls(system, true)
+FlecsServer.set_script_system_multi_threaded(world, system, true)
+FlecsServer.set_script_system_use_deferred_calls(world, system, true)
 
 # Pause/Resume
-FlecsServer.set_script_system_paused(system, true)
+FlecsServer.set_script_system_paused(world, system, true)
 ```
 
 ### Instrumentation
 ```gdscript
 # Enable metrics
-FlecsServer.set_script_system_instrumentation(system, true)
-FlecsServer.set_script_system_detailed_timing(system, true)
+FlecsServer.set_script_system_instrumentation(world, system, true)
+FlecsServer.set_script_system_detailed_timing(world, system, true)
 
 # Get stats
-var stats = FlecsServer.get_script_system_instrumentation(system)
+var stats = FlecsServer.get_script_system_instrumentation(world, system)
 print("Entities: ", stats["last_frame_entity_count"])
 print("Time: ", stats["frame_median_usec"], " µs")
-print("P99: ", FlecsServer.get_script_system_frame_p99_usec(system))
+print("P99: ", FlecsServer.get_script_system_frame_p99_usec(world, system))
 ```
 
 ---
@@ -115,12 +115,12 @@ var query = FlecsServer.create_query(
 )
 
 # Get entities
-var entities = FlecsServer.query_get_entities(query)
+var entities = FlecsServer.query_get_entities(world, query)
 for entity_rid in entities:
     # Process...
 
 # Get entities with components
-var results = FlecsServer.query_get_entities_with_components(query)
+var results = FlecsServer.query_get_entities_with_components(world, query)
 for result in results:
     var entity = result["rid"]
     var pos = result["components"]["Position"]
@@ -130,20 +130,20 @@ for result in results:
 ### Query Optimization
 ```gdscript
 # Enable caching (10-100x faster)
-FlecsServer.query_set_caching_strategy(query, 1)  # CACHE_ENTITIES
+FlecsServer.query_set_caching_strategy(world, query, 1)  # CACHE_ENTITIES
 
 # Pagination
-var page = FlecsServer.query_get_entities_limited(query, 100, offset)
+var page = FlecsServer.query_get_entities_limited(world, query, 100, offset)
 
 # Count (fast, no fetch)
-var count = FlecsServer.query_get_entity_count(query)
+var count = FlecsServer.query_get_entity_count(world, query)
 
 # Check match
-if FlecsServer.query_matches_entity(query, entity):
+if FlecsServer.query_matches_entity(world, query, entity):
     print("Matches!")
 
 # Force refresh
-FlecsServer.query_force_cache_refresh(query)
+FlecsServer.query_force_cache_refresh(world, query)
 ```
 
 ---
@@ -175,12 +175,12 @@ FlecsServer.remove_all_children(parent)
 
 ```gdscript
 # Store Godot Node
-FlecsServer.add_to_node_storage(entity, node)
-var node = FlecsServer.get_node_from_node_storage(entity)
+FlecsServer.add_to_node_storage(node, world)
+var stored_node = FlecsServer.get_node_from_node_storage(node.get_instance_id(), world)
 
 # Store Godot Resource
-FlecsServer.add_to_ref_storage(entity, resource)
-var res = FlecsServer.get_resource_from_ref_storage(entity)
+FlecsServer.add_to_ref_storage(resource, world)
+var res = FlecsServer.get_resource_from_ref_storage(resource.get_rid(), world)
 ```
 
 ---
@@ -228,12 +228,15 @@ func cleanup_dead(entities: Array):
 func update_visible_sprites():
     var query = FlecsServer.create_query(world, 
         PackedStringArray(["Position", "Sprite", "Visible"]))
-    var entities = FlecsServer.query_get_entities_with_components(query)
+var entities = FlecsServer.query_get_entities_with_components(world, query)
     for e in entities:
-        var node = FlecsServer.get_node_from_node_storage(e["rid"])
-        node.position = Vector3(e["components"]["Position"]["x"], 
-                                e["components"]["Position"]["y"], 
-                                e["components"]["Position"]["z"])
+        # NodeStorage is keyed by ObjectID. Store that ID in a component if a
+        # query needs to resolve back to a scene node.
+        var node = FlecsServer.get_node_from_node_storage(e["components"]["ObjectInstanceComponent"]["object_instance_id"], world)
+        if node:
+            node.position = Vector3(e["components"]["Position"]["x"],
+                                    e["components"]["Position"]["y"],
+                                    e["components"]["Position"]["z"])
 ```
 
 ---
@@ -261,7 +264,7 @@ print("Entity: ", FlecsServer.get_entity_name(entity))
 
 ```gdscript
 # Pause single system
-FlecsServer.set_script_system_paused(system, true)
+FlecsServer.set_script_system_paused(world, system, true)
 
 # Pause all systems
 FlecsServer.pause_all_systems(world)
@@ -272,7 +275,7 @@ FlecsServer.resume_all_systems(world)
 # Get all systems
 var systems = FlecsServer.get_all_systems(world)
 for sys in systems:
-    var info = FlecsServer.get_script_system_info(sys)
+    var info = FlecsServer.get_script_system_info(world, sys)
     print(info["name"])
 ```
 
@@ -306,4 +309,4 @@ for sys in systems:
 
 ---
 
-**Cheat Sheet Version**: 1.0 | **Flecs ECS** + **Godot 4.x**
+**Cheat Sheet Version**: 1.1 | **Flecs ECS** + **Godot 4.6+**

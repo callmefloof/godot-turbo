@@ -2,8 +2,8 @@
 
 **Module**: godot_turbo/ecs/systems  
 **Purpose**: Execute GDScript methods on ECS entities with scripts attached  
-**Version**: 1.0  
-**Date**: January 21, 2025
+**Version**: 1.1
+**Date**: April 27, 2026
 
 ---
 
@@ -29,7 +29,7 @@
 
 ### Key Features
 
-- ✅ **Script Method Execution**: Automatically calls `_flecs_process` and `_flecs_physics_process` on entities with scripts
+- ✅ **Script Method Execution**: Automatically calls `_flecs_ready`, `_flecs_process`, and `_flecs_physics_process` on entities with scripts
 - ✅ **Method Caching**: Checks method existence once per script type for optimal performance
 - ✅ **Multi-Phase Support**: Separate systems for regular updates (OnUpdate) and physics updates (OnPhysicsUpdate)
 - ✅ **GDScript & C# Compatible**: Supports both naming conventions (`_flecs_process` and `_FlecsProcess`)
@@ -52,6 +52,10 @@
 
 ```
 GDScriptRunnerSystem
+├── Ready System (before OnUpdate)
+│   └── Queries: GameScriptComponent
+│       └── Calls once: _flecs_ready(entity_rid)
+│
 ├── Process System (OnUpdate phase)
 │   └── Queries: GameScriptComponent
 │       └── Calls: _flecs_process(entity_rid, delta)
@@ -72,7 +76,12 @@ For a script to be executed by `GDScriptRunnerSystem`, the entity must have:
 
 ```
 1. World.progress() called
-2. OnUpdate phase triggers
+2. Ready hook runs before frame update callbacks
+   └─> For each entity with GameScriptComponent:
+       ├─> Check cache for script path/type
+       └─> If method exists: Execute _flecs_ready(entity_rid) once
+
+3. OnUpdate phase triggers
    └─> Process system iterates entities with GameScriptComponent
        └─> For each entity:
            ├─> Check cache for script type
@@ -80,7 +89,7 @@ For a script to be executed by `GDScriptRunnerSystem`, the entity must have:
            ├─> Cache result
            └─> If method exists: Execute _flecs_process(entity_rid, delta)
 
-3. OnPhysicsUpdate phase triggers
+4. OnPhysicsUpdate phase triggers
    └─> Physics process system iterates entities with GameScriptComponent
        └─> (Same flow as above, but for _flecs_physics_process)
 ```
@@ -90,6 +99,23 @@ For a script to be executed by `GDScriptRunnerSystem`, the entity must have:
 ## Virtual Methods
 
 Scripts can implement the following virtual methods to receive ECS callbacks:
+
+### _flecs_ready(entity_rid: RID) -> void
+
+**GDScript Convention**
+
+Called once for an entity before its frame update callbacks.
+
+**Parameters:**
+- `entity_rid: RID` - The RID of this entity in the ECS world
+
+**Example:**
+```gdscript
+func _flecs_ready(entity_rid: RID) -> void:
+    FlecsServer.set_component(entity_rid, "Health", {"current": 100, "max": 100})
+```
+
+---
 
 ### _flecs_process(entity_rid: RID, delta: float) -> void
 
@@ -104,17 +130,14 @@ Called every frame during the `OnUpdate` phase.
 **Example:**
 ```gdscript
 func _flecs_process(entity_rid: RID, delta: float) -> void:
-    var flecs = FlecsServer.get_singleton()
-    var world_rid = get_meta("flecs_world_rid")
-    
     # Read transform component
-    var transform = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
+    var transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
     
     # Modify position
     transform["position"] += Vector3.RIGHT * delta
     
     # Write back
-    flecs.set_component(world_rid, entity_rid, "Transform3DComponent", transform)
+    FlecsServer.set_component(entity_rid, "Transform3DComponent", transform)
 ```
 
 ---
@@ -132,13 +155,10 @@ Called at physics rate during the `OnPhysicsUpdate` phase.
 **Example:**
 ```gdscript
 func _flecs_physics_process(entity_rid: RID, delta: float) -> void:
-    var flecs = FlecsServer.get_singleton()
-    var world_rid = get_meta("flecs_world_rid")
-    
     # Apply physics forces
-    var physics = flecs.get_component_by_name(world_rid, entity_rid, "PhysicsBody3DComponent")
+    var physics = FlecsServer.get_component_by_name(entity_rid, "PhysicsBody3DComponent")
     physics["linear_velocity"] += Vector3.DOWN * 9.8 * delta  # Gravity
-    flecs.set_component(world_rid, entity_rid, "PhysicsBody3DComponent", physics)
+    FlecsServer.set_component(entity_rid, "PhysicsBody3DComponent", physics)
 ```
 
 ---
@@ -149,6 +169,7 @@ For C# scripts, use PascalCase naming:
 
 ```csharp
 // C# convention
+void _FlecsReady(Rid entityRid) { }
 void _FlecsProcess(Rid entityRid, float delta) { }
 void _FlecsPhysicsProcess(Rid entityRid, float delta) { }
 ```
@@ -210,9 +231,9 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
     var world_rid = get_meta("flecs_world_rid")
     
     # Your game logic here
-    var transform = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
+    var transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
     transform["position"] += Vector3.FORWARD * delta * 5.0
-    flecs.set_component(world_rid, entity_rid, "Transform3DComponent", transform)
+    FlecsServer.set_component(entity_rid, "Transform3DComponent", transform)
 
 func _flecs_physics_process(entity_rid: RID, delta: float) -> void:
     # Physics logic here
@@ -241,6 +262,7 @@ func _process(delta: float) -> void:
 HashMap<StringName, ScriptMethodCache> method_cache;
 
 struct ScriptMethodCache {
+    bool has_ready;                // Has _flecs_ready?
     bool has_process;              // Has _flecs_process?
     bool has_physics_process;      // Has _flecs_physics_process?
     bool checked;                  // Cache populated?
@@ -249,9 +271,11 @@ struct ScriptMethodCache {
 
 **Caching Flow:**
 1. First time an entity with script type "MyScript" is processed
-2. System checks if "MyScript" has `_flecs_process` method
+2. System checks whether the script has `_flecs_ready`, `_flecs_process`, and `_flecs_physics_process`
 3. Result is cached in `method_cache["MyScript"]`
 4. Subsequent entities with "MyScript" skip the check
+
+The cache key uses the script path when available, then falls back to the instance type. This avoids mixing method availability for different scripts that share a base type.
 
 ### Cache Management
 
@@ -355,9 +379,9 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
 
 ❌ **Bad** (multiple API calls):
 ```gdscript
-var pos = flecs.get_component_by_name(world, entity, "Transform3DComponent")
-var vel = flecs.get_component_by_name(world, entity, "VelocityComponent")
-var health = flecs.get_component_by_name(world, entity, "HealthComponent")
+var pos = FlecsServer.get_component_by_name(entity, "Transform3DComponent")
+var vel = FlecsServer.get_component_by_name(entity, "VelocityComponent")
+var health = FlecsServer.get_component_by_name(entity, "HealthComponent")
 ```
 
 ✅ **Good** (minimize calls):
@@ -367,7 +391,7 @@ var component_types = flecs.get_component_types_as_name(world, entity)
 var components = {}
 for type in needed_components:
     if type in component_types:
-        components[type] = flecs.get_component_by_name(world, entity, type)
+        components[type] = FlecsServer.get_component_by_name(entity, type)
 ```
 
 #### 3. Conditional Processing
@@ -510,14 +534,14 @@ func _ready():
 func _flecs_process(entity_rid: RID, delta: float) -> void:
     var flecs = FlecsServer.get_singleton()
     
-    var transform = flecs.get_component_by_name(cached_world_rid, entity_rid, "Transform3DComponent")
+    var transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
     if not transform:
         return
     
     # Move forward
     transform["position"] += transform["basis"].z * speed * delta
     
-    flecs.set_component(cached_world_rid, entity_rid, "Transform3DComponent", transform)
+    FlecsServer.set_component(entity_rid, "Transform3DComponent", transform)
 ```
 
 ### Example 2: Health System
@@ -529,7 +553,7 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
     var flecs = FlecsServer.get_singleton()
     var world_rid = get_meta("flecs_world_rid")
     
-    var health = flecs.get_component_by_name(world_rid, entity_rid, "HealthComponent")
+    var health = FlecsServer.get_component_by_name(entity_rid, "HealthComponent")
     if not health:
         return
     
@@ -540,7 +564,7 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
     if current < max_health:
         current = min(current + 10.0 * delta, max_health)
         health["current"] = current
-        flecs.set_component(world_rid, entity_rid, "HealthComponent", health)
+        FlecsServer.set_component(entity_rid, "HealthComponent", health)
 ```
 
 ### Example 3: AI Behavior
@@ -570,7 +594,7 @@ func process_patrol(entity_rid: RID, delta: float) -> void:
     var flecs = FlecsServer.get_singleton()
     var world_rid = get_meta("flecs_world_rid")
     
-    var transform = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
+    var transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
     # Patrol logic...
 ```
 
@@ -585,7 +609,7 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
     var query = flecs.create_query(world_rid, PackedStringArray(["Transform3DComponent", "EnemyComponent"]))
     var enemies = flecs.query_get_entities(world_rid, query)
     
-    var my_transform = flecs.get_component_by_name(world_rid, entity_rid, "Transform3DComponent")
+    var my_transform = FlecsServer.get_component_by_name(entity_rid, "Transform3DComponent")
     var my_pos = my_transform["position"]
     
     # Find closest enemy
@@ -594,7 +618,7 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
         if enemy_rid == entity_rid:
             continue
         
-        var enemy_transform = flecs.get_component_by_name(world_rid, enemy_rid, "Transform3DComponent")
+        var enemy_transform = FlecsServer.get_component_by_name(enemy_rid, "Transform3DComponent")
         var enemy_pos = enemy_transform["position"]
         var dist = my_pos.distance_to(enemy_pos)
         
@@ -641,8 +665,7 @@ func _flecs_process(entity_rid: RID, delta: float) -> void:
 1. **GameScriptComponent Missing**
    ```gdscript
    # Check if entity has component
-   var has_comp = flecs.has_component(world_rid, entity_rid, 
-       flecs.get_component_type_by_name(world_rid, "GameScriptComponent"))
+   var has_comp = FlecsServer.has_component(entity_rid, "GameScriptComponent")
    ```
 
 2. **System Disabled**

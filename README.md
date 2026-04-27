@@ -180,9 +180,18 @@ godot_turbo/
 
 ### Utility Documentation
 
-- **[Utilities README](ecs/utility/README.md)** - Utility functions overview
-- **[Scene Object Utility](ecs/utility/SCENE_OBJECT_UTILITY_DOC.md)** - Scene conversion
-- **[Domain Utilities](ecs/utility/DOMAIN_UTILITIES_DOC.md)** - Physics, rendering, navigation
+- **[Utilities README](ecs/systems/utility/README.md)** - Utility functions overview
+- **[Scene Object Utility](ecs/systems/utility/SCENE_OBJECT_UTILITY_DOC.md)** - Scene conversion
+- **[Domain Utilities](ecs/systems/utility/DOMAIN_UTILITIES_DOC.md)** - Physics, rendering, navigation
+- **[Flecs Types API](ecs/flecs_types/FLECS_SERVER_API.md)** - Current RID calling conventions and server API reference
+
+### Current API Notes
+
+- `FlecsServer` methods are bound on the singleton and are called directly from GDScript.
+- World-scoped creation and management methods take `world_id`, including world lifecycle, script systems, native systems, queries, storage, and world singletons.
+- Component and hierarchy methods take entity RIDs directly and resolve the owning world internally. For example, use `FlecsServer.get_component_by_name(entity_rid, "Health")`, not `FlecsServer.get_component_by_name(world_id, entity_rid, "Health")`.
+- Use `create_runtime_component(world_id, name, fields)` for new runtime component types. `register_component_type()` is deprecated and kept only for compatibility builds.
+- `World3DUtility.create_world_3d()` can now populate missing `World3D` resources by preserving existing component RIDs or creating fallback server resources.
 
 ### API Documentation
 
@@ -520,6 +529,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ---
 
 **Version:** 1.2.1-beta.1  
-**Last Updated:** 2026-02-16  
+**Last Updated:** 2026-04-27
 **Godot Version:** 4.6+  
 **Maintainer:** [@callmefloof](https://github.com/callmefloof)
