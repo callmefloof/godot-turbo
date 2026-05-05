@@ -328,6 +328,86 @@ scons tests=yes target=editor dev_build=yes
 
 ## 📝 Changelog
 
+### Version 1.3.0-beta.1 (2026-05-05)
+
+**Flecs REST Controls:**
+- ✨ **`FlecsServer.set_rest_enabled()`/`is_rest_enabled()`** - Per-world REST explorer toggle
+- ✨ **`FlecsServer.set_rest_port()`/`get_rest_port()`** - Runtime REST port configuration per world
+
+**Thread Diagnostics:**
+- 🔍 **Opt-in non-main-thread diagnostics** - Callsite-aware warnings for direct `_get_world()` and RID helper access from non-main threads
+
+**Flecs Editor & Debugger:**
+- 🔧 Improved snapshots to include direct Flecs systems (not only pipeline-registered ones)
+- 🔧 More resilient stale world/entity handling across scene transitions
+- 🔧 Component inspector shows read-only serialized values where reflection is available
+- 🔧 Long component values (transforms, structs) now wrap in the inspector
+
+**Flecs Profiler:**
+- 🔧 Profiler keeps its own remote world cache independent of the Worlds dock
+- 🔧 Timeout recovery for world/metrics requests to survive scene reloads
+- 🔧 Handles both flat and nested debugger payloads for remote metrics
+
+**Fixed:**
+- 🐛 Entity expansion returning no results after remote/world refreshes
+- 🐛 Double-clicking stale entities no longer crashes the debugger
+- 🐛 Unserializable component entries no longer produce noisy type-lookup errors
+- 🐛 Component display no longer labels all unserialized components as tags
+- 🐛 Profiler request state no longer gets stuck after a lost remote response
+
+---
+
+### Version 1.2.1-beta.1 (2026-02-16)
+
+**Component Reflection System:**
+- ✨ **`register_reflection_components()`** - Automatic component type introspection
+- ✨ **`DispatchMode` enum** - `DISPATCH_PER_ENTITY` / `DISPATCH_BATCH` exposed on FlecsServer
+- ✨ **Component resolution helpers** in `FlecsQuery` and `FlecsScriptSystem`
+
+**ECS Tracing Integration:**
+- ✨ **Worker thread tracking** via traced OS API in FlecsServer
+- ✨ **Query/system trace markers** for performance analysis
+- ✨ **`native_system_prev_time_spent`** field for profiler integration
+
+**FlecsRuntimeDebugger:**
+- 🔧 `FlecsRuntimeDebugger` now inherits from `Object` for proper Godot integration
+- 🔧 Retry timer mechanism (50 retries, ~5 seconds) with safe `queue_free`/`memdelete` cleanup
+
+**Godot 4.6+ Compatibility:**
+- 🔧 Updated server header include paths to new subdirectories (`rendering/`, `physics_3d/`, etc.)
+- 🔧 Normalized `world_id` parameter names across all utilities
+- 🔧 Switched ClassDB bindings to `D_METHOD` macro
+
+**Fixed:**
+- 🐛 Test startup crash in `FlecsRuntimeDebugger`
+- 🐛 Constructor parameter shadowing warnings
+- 🐛 `SceneObjectUtility` recursion issues
+- 🐛 Rendering server include path
+
+**Breaking:** Requires Godot 4.6+ (not compatible with 4.5 or earlier).
+
+---
+
+### Version 1.2.0-beta.1 (2025-01-29)
+
+**Networking System (Major Feature):**
+- ✨ **`NetworkServer` singleton** - Multiplayer networking built on ECS
+  - Host/join with configurable tick rate, authority management, input prediction/reconciliation
+  - Component replication modes (continuous, on-change, reliable, once)
+  - Transform interpolation, RPC queue, relevancy system, network statistics
+- ✨ **12 Network ECS components** - `NetworkIdentity`, `NetworkAuthority`, `NetworkReplicated`, `NetworkInterpolation`, `NetworkPrediction`, `NetworkInput`, and more
+- ✨ **Network Editor Plugin** - "Network Inspector" dock for monitoring entity replication
+
+**Editor Improvements:**
+- ✨ **`InstanceManager`** - Multi-editor-instance coordination via lock files; prevents debugger/profiler conflicts
+
+**Fixed:**
+- 🐛 Enum binding errors with namespaced enums in Godot bindings
+- 🐛 Missing dock name in Network Editor Plugin `TabContainer`
+- 🐛 Multi-instance profiler/debugger conflicts resolved by InstanceManager
+
+---
+
 ### Version 1.1.1-a.2 (2025-01-28)
 
 **Documentation Fixes:**
@@ -528,7 +608,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Version:** 1.2.1-beta.1  
-**Last Updated:** 2026-04-27
+**Version:** 1.3.0-beta.1  
+**Last Updated:** 2026-05-05
 **Godot Version:** 4.6+  
 **Maintainer:** [@callmefloof](https://github.com/callmefloof)
