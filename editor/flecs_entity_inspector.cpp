@@ -169,6 +169,19 @@ void FlecsEntityInspector::_rebuild_inspector() {
 		return;
 	}
 
+	if (!is_remote_mode) {
+		RID entity_rid = RID::from_uint64(current_entity_id);
+		if (!entity_rid.is_valid() || flecs_server->get_world_of_entity(entity_rid) != current_world) {
+			current_entity_id = 0;
+			current_world = RID();
+			Label *empty = memnew(Label);
+			empty->set_text("No entity selected");
+			empty->add_theme_font_size_override("font_size", 11);
+			content_container->add_child(empty);
+			return;
+		}
+	}
+
 	_build_entity_header();
 	content_container->add_child(memnew(HSeparator));
 	_build_components_section();
@@ -262,6 +275,8 @@ void FlecsEntityInspector::_build_components_section() {
 			if (data_var.get_type() == Variant::DICTIONARY) {
 				comp_data_dict = data_var;
 			}
+			String comp_type = component_dict.get("type", "component");
+			String data_status = component_dict.get("data_status", String());
 
 			// Check if component matches filter
 			if (!current_component_filter.is_empty()) {
@@ -272,7 +287,7 @@ void FlecsEntityInspector::_build_components_section() {
 			}
 
 			// Always create a component widget, even for empty data
-			Control *comp_widget = _build_component_widget(comp_name, comp_data_dict);
+			Control *comp_widget = _build_component_widget(comp_name, comp_data_dict, comp_type, data_status);
 			if (comp_widget) {
 				content_container->add_child(comp_widget);
 				if (!comp_data_dict.is_empty()) {
@@ -315,6 +330,8 @@ void FlecsEntityInspector::_build_components_section() {
 			}
 			
 			Dictionary comp_data_dict = flecs_server->get_component_by_name(entity_rid, comp_name);
+			String comp_type = comp_name.begins_with("(") ? String("pair") : String("component");
+			String data_status = comp_data_dict.is_empty() ? String("unavailable") : String("serialized");
 
 			// Check if component matches filter
 			if (!current_component_filter.is_empty()) {
@@ -325,7 +342,7 @@ void FlecsEntityInspector::_build_components_section() {
 			}
 
 			// Always create a component widget, even for empty data
-			Control *comp_widget = _build_component_widget(comp_name, comp_data_dict);
+			Control *comp_widget = _build_component_widget(comp_name, comp_data_dict, comp_type, data_status);
 			if (comp_widget) {
 				content_container->add_child(comp_widget);
 				if (!comp_data_dict.is_empty()) {
@@ -338,7 +355,9 @@ void FlecsEntityInspector::_build_components_section() {
 }
 
 Control *FlecsEntityInspector::_build_component_widget(const String &p_component_name, 
-	                                                     const Dictionary &p_component_data) {
+	                                                     const Dictionary &p_component_data,
+	                                                     const String &p_component_type,
+	                                                     const String &p_data_status) {
 	VBoxContainer *component_box = memnew(VBoxContainer);
 	component_box->add_theme_constant_override("separation", 4);
 
@@ -352,25 +371,6 @@ Control *FlecsEntityInspector::_build_component_widget(const String &p_component
 	comp_label->add_theme_font_size_override("font_size", 11);
 	comp_label->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	header_box->add_child(comp_label);
-
-	// Only show apply/revert buttons if component has data
-	if (!p_component_data.is_empty()) {
-		Button *apply_btn = memnew(Button);
-		apply_btn->set_text("✓");
-		apply_btn->set_custom_minimum_size(Vector2(30, 0));
-		apply_btn->set_tooltip_text("Apply changes");
-		apply_btn->connect(SceneStringName(pressed), 
-			callable_mp(this, &FlecsEntityInspector::_apply_component_changes).bind(p_component_name));
-		header_box->add_child(apply_btn);
-
-		Button *revert_btn = memnew(Button);
-		revert_btn->set_text("↺");
-		revert_btn->set_custom_minimum_size(Vector2(30, 0));
-		revert_btn->set_tooltip_text("Revert changes");
-		revert_btn->connect(SceneStringName(pressed), 
-			callable_mp(this, &FlecsEntityInspector::_revert_component_changes).bind(p_component_name));
-		header_box->add_child(revert_btn);
-	}
 
 	header_panel->add_child(header_box);
 	component_box->add_child(header_panel);
@@ -393,7 +393,15 @@ Control *FlecsEntityInspector::_build_component_widget(const String &p_component
 		no_data_box->set_alignment(BoxContainer::ALIGNMENT_CENTER);
 		
 		Label *no_data_label = memnew(Label);
-		no_data_label->set_text("Tag component (no data)");
+		if (p_component_type == "tag") {
+			no_data_label->set_text("Tag component");
+		} else if (p_component_type == "pair") {
+			no_data_label->set_text("Relationship pair");
+		} else if (p_data_status == "not_serialized") {
+			no_data_label->set_text("Component data not serialized");
+		} else {
+			no_data_label->set_text("Component data unavailable");
+		}
 		no_data_label->add_theme_font_size_override("font_size", 10);
 		no_data_label->add_theme_color_override("font_color", Color(0.6, 0.6, 0.6));
 		no_data_label->set_horizontal_alignment(HORIZONTAL_ALIGNMENT_CENTER);
@@ -410,11 +418,15 @@ Control *FlecsEntityInspector::_build_component_widget(const String &p_component
 Tree *FlecsEntityInspector::_build_property_tree(const String &p_component_name, 
 	                                               const Dictionary &p_data) {
 	Tree *tree = memnew(Tree);
+	tree->set_columns(2);
+	tree->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	tree->set_column_expand(0, true);
 	tree->set_column_expand(1, true);
 	tree->set_column_custom_minimum_width(0, 100);
 	tree->set_column_custom_minimum_width(1, 150);
+	tree->set_column_clip_content(1, true);
 	tree->set_hide_root(true);
+	tree->set_h_scroll_enabled(false);
 	tree->set_v_scroll_enabled(true);
 
 	TreeItem *root = tree->create_item();
@@ -472,12 +484,11 @@ TreeItem *FlecsEntityInspector::_add_property_item(TreeItem *p_parent, const Str
 		String summary = _format_value(p_value, p_depth);
 		item->set_text(1, summary);
 	} else {
-		// Create editor widget for primitives
-		Control *editor = _create_property_editor(new_path, p_value, p_component_name);
-		if (editor) {
-			item->set_cell_mode(1, TreeItem::CELL_MODE_CUSTOM);
-		}
+		item->set_text(1, _format_value(p_value));
+		item->set_tooltip_text(1, _get_type_string(p_value));
 	}
+	item->set_autowrap_mode(1, TextServer::AUTOWRAP_WORD_SMART);
+	item->set_text_overrun_behavior(1, TextServer::OVERRUN_NO_TRIMMING);
 
 	// Type info
 	String type_str = _get_type_string(p_value);
@@ -696,7 +707,7 @@ String FlecsEntityInspector::_format_value(const Variant &p_value, int p_depth) 
 			return vformat("[%d items]", a.size());
 		}
 		default:
-			return "[" + _get_type_string(p_value) + "]";
+			return p_value.stringify();
 	}
 }
 

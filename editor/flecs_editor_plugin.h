@@ -116,6 +116,8 @@ private:
 
 	// Guard flag to prevent re-entrancy during entity response handling
 	bool handling_entity_response = false;
+	uint64_t pending_component_world_id = 0;
+	uint64_t pending_component_entity_id = 0;
 
 	RID selected_world;
 	uint64_t selected_entity_id = 0;
@@ -141,6 +143,7 @@ private:
 	// Utility
 	void _clear_pending_requests_for_tree(Tree *p_tree);
 	bool _is_pending_request_valid(uint64_t p_world_id, TreeItem *p_world_item);
+	void _clear_selection_state();
 	String _format_world_name(RID world_rid) const;
 	String _format_entity_name(const String &name, uint64_t entity_id) const;
 
@@ -148,7 +151,7 @@ public:
 	// Expose world data for profiler integration
 	TypedArray<RID> get_available_worlds() const;
 	bool is_remote_mode() const { return remote_mode; }
-	Ref<EditorDebuggerSession> get_active_session() const { return active_session; }
+	Ref<EditorDebuggerSession> get_active_session() const { return active_session.is_valid() ? active_session : remote_session; }
 	
 	// Singleton access for other plugins
 	static FlecsWorldEditorPlugin *get_singleton();

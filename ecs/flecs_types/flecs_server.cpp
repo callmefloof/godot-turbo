@@ -1,3 +1,4 @@
+#define FLECS_SERVER_IMPLEMENTATION
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 
 #include "modules/godot_turbo/debug/ecs_trace_bridge.h"
@@ -33,6 +34,85 @@
 
 // Maximum recursion depth for cursor serialization to prevent stack overflow
 static constexpr int MAX_CURSOR_DEPTH = 32;
+static constexpr int DEFAULT_FLECS_REST_PORT = 27750;
+static constexpr int MAX_FLECS_REST_PORT = 65535;
+
+static int _get_flecs_rest_env_port() {
+	int rest_port = DEFAULT_FLECS_REST_PORT;
+	String rest_env = OS::get_singleton()->get_environment("GODOT_FLECS_REST_PORT");
+	if (!rest_env.is_empty()) {
+		rest_port = rest_env.to_int();
+	}
+	return rest_port;
+}
+
+static String _get_flecs_entity_display_name(const flecs::entity &p_entity, const String &p_fallback_prefix) {
+	flecs::string_view name_view = p_entity.name();
+	const char *name = name_view.c_str();
+	if (name && name[0] != '\0') {
+		return String(name);
+	}
+
+	flecs::string path = p_entity.path();
+	const char *path_str = path.c_str();
+	if (path_str && path_str[0] != '\0') {
+		return String(path_str);
+	}
+
+	return p_fallback_prefix + itos((int64_t)p_entity.id());
+}
+
+static bool _is_builtin_flecs_entity(const flecs::entity &p_entity) {
+	flecs::string path = p_entity.path();
+	const char *path_str = path.c_str();
+	if (!path_str) {
+		return false;
+	}
+
+	String godot_path(path_str);
+	return godot_path.begins_with("::flecs.") || godot_path.begins_with("flecs.");
+}
+
+static void _insert_nonzero_system_id(HashSet<uint64_t> &r_ids, uint64_t p_id) {
+	if (p_id != 0) {
+		r_ids.insert(p_id);
+	}
+}
+
+static void _warn_flecs_non_main_thread_access(const char *p_api, const RID &p_world_id, const char *p_file, int p_line, const char *p_function) {
+	if (Thread::is_main_thread()) {
+		return;
+	}
+
+	const String api = p_api != nullptr && p_api[0] != '\0' ? String(p_api) : String("FlecsServer");
+	String location = "source unavailable";
+	if (p_file != nullptr && p_file[0] != '\0') {
+		location = String(p_file) + ":" + itos(p_line);
+		if (p_function != nullptr && p_function[0] != '\0') {
+			location += " in ";
+			location += p_function;
+		}
+	}
+
+	const int64_t thread_id = (int64_t)Thread::get_caller_id();
+	const String warning_key = api + "|" + location + "|" + itos(thread_id);
+
+	static Mutex warned_sites_mutex;
+	static HashSet<String> warned_sites;
+	{
+		MutexLock lock(warned_sites_mutex);
+		if (warned_sites.has(warning_key)) {
+			return;
+		}
+		warned_sites.insert(warning_key);
+	}
+
+	WARN_PRINT(vformat("%s used from non-main thread %d for Flecs world RID %s. Raw Flecs access is allowed as an explicit bypass, but cross-thread reads/writes can race progress_world(), Flecs merges, and debugger/editor snapshots. Queue the operation onto the world owner/main thread or use Flecs deferral for cross-thread writes. Callsite: %s",
+			api,
+			thread_id,
+			itos((uint64_t)p_world_id.get_id()),
+			location));
+}
 
 static int _get_struct_member_count(const flecs::entity &p_type) {
 	if (!p_type.is_valid() || !p_type.has<EcsStruct>()) {
@@ -450,16 +530,25 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 		return Dictionary();
 	}
 
-	const void* comp_ptr = entity.get(comp_type_id);
-	if (!comp_ptr) {
-		ERR_PRINT("component_to_dict_cursor: entity.get() returned null pointer");
-		return Dictionary();
+	Dictionary registered_data = AllComponents::get_component_dict(entity, comp_type_id);
+	if (!registered_data.is_empty()) {
+		return registered_data;
 	}
 
-	// Validate world before creating cursor
 	flecs::world world = entity.world();
 	if (!world.c_ptr()) {
 		ERR_PRINT("component_to_dict_cursor: entity.world() returned invalid world");
+		return Dictionary();
+	}
+
+	flecs::entity comp_entity(world.c_ptr(), comp_type_id);
+	if (!comp_entity.is_valid() || _is_builtin_flecs_entity(comp_entity) || !comp_entity.has<EcsType>()) {
+		return Dictionary();
+	}
+
+	const void* comp_ptr = entity.get(comp_type_id);
+	if (!comp_ptr) {
+		ERR_PRINT("component_to_dict_cursor: entity.get() returned null pointer");
 		return Dictionary();
 	}
 
@@ -861,12 +950,18 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("create_world"), &FlecsServer::create_world);
 	ClassDB::bind_method(D_METHOD("get_world_list"), &FlecsServer::get_world_list);
 	ClassDB::bind_method(D_METHOD("init_world", "world_id"), &FlecsServer::init_world);
+	ClassDB::bind_method(D_METHOD("set_rest_enabled", "world_id", "enabled"), &FlecsServer::set_rest_enabled);
+	ClassDB::bind_method(D_METHOD("is_rest_enabled", "world_id"), &FlecsServer::is_rest_enabled);
+	ClassDB::bind_method(D_METHOD("set_rest_port", "world_id", "port"), &FlecsServer::set_rest_port);
+	ClassDB::bind_method(D_METHOD("get_rest_port", "world_id"), &FlecsServer::get_rest_port);
 	ClassDB::bind_method(D_METHOD("progress_world", "world_id", "delta"), &FlecsServer::progress_world);
 	ClassDB::bind_method(D_METHOD("create_entity", "world_id"), &FlecsServer::create_entity);
 	ClassDB::bind_method(D_METHOD("create_entity_with_name", "world_id", "name"), &FlecsServer::create_entity_with_name);
 	ClassDB::bind_method(D_METHOD("create_entity_with_name_and_comps", "world_id", "name", "components_type_ids"), &FlecsServer::create_entity_with_name_and_comps);
 	ClassDB::bind_method(D_METHOD("lookup", "world_id", "entity_name"), &FlecsServer::lookup);
 	ClassDB::bind_method(D_METHOD("get_world_of_entity", "entity_id"), &FlecsServer::get_world_of_entity);
+	ClassDB::bind_method(D_METHOD("set_thread_diagnostics_enabled", "enabled"), &FlecsServer::set_thread_diagnostics_enabled);
+	ClassDB::bind_method(D_METHOD("get_thread_diagnostics_enabled"), &FlecsServer::get_thread_diagnostics_enabled);
 	//all underscore types are not exposed and are only used internally
 #ifndef DISABLE_DEPRECATED
 	ClassDB::bind_method(D_METHOD("register_component_type", "world_id", "type_name", "script_visible_component_data"), &FlecsServer::register_component_type);
@@ -1095,8 +1190,12 @@ RID FlecsServer::create_world() {
 	world_ref.component<RID>();
 
 
-	// Register all components using the new reflection system
-	AllComponents::register_all(world_ref, false);
+	// Register all components using the new reflection system.
+	// Enable serializers so editor/debugger snapshots can show read-only values.
+	AllComponents::register_all(world_ref, true);
+
+	ecs_measure_frame_time(world_ref.c_ptr(), true);
+	ecs_measure_system_time(world_ref.c_ptr(), true);
 
 
 
@@ -1141,8 +1240,9 @@ int8_t FlecsServer::get_world_count() const {
 }
 
 TypedArray<RID> FlecsServer::get_world_list() const {
+	MutexLock server_lock(mutex);
 	TypedArray<RID> result;
-	
+
 	// Iterate through the worlds vector and collect valid RIDs
 	for (int i = 0; i < worlds.size(); ++i) {
 		const RID &world_rid = worlds[i];
@@ -1158,18 +1258,20 @@ void FlecsServer::init_world(const RID& world_id) {
 	CHECK_WORLD_VALIDITY(world_id, init_world);
 	flecs::world &world = world_variant->get_world();
 	world.import<flecs::stats>();
+	ecs_measure_frame_time(world.c_ptr(), true);
+	ecs_measure_system_time(world.c_ptr(), true);
 
-	int rest_port = 27750;
-	String rest_env = OS::get_singleton()->get_environment("GODOT_FLECS_REST_PORT");
-	if (!rest_env.is_empty()) {
-		rest_port = rest_env.to_int();
-	}
+	int rest_port = rest_ports.has(world_id) ? rest_ports.get(world_id) : _get_flecs_rest_env_port();
 	if (rest_port <= 0) {
 		print_verbose("Flecs REST explorer disabled (GODOT_FLECS_REST_PORT<=0)");
 	} else {
 		flecs::Rest rest_config = {};
 		rest_config.port = (uint16_t)rest_port;
+		if (world.has<flecs::Rest>()) {
+			world.remove<flecs::Rest>();
+		}
 		world.set<flecs::Rest>(rest_config);
+		rest_ports.insert(world_id, rest_port);
 		print_verbose(vformat("Flecs REST explorer available at http://localhost:%d", rest_port));
 	}
 
@@ -1181,71 +1283,153 @@ void FlecsServer::init_world(const RID& world_id) {
 	world.set_threads(threads);
 }
 
-bool FlecsServer::progress_world(const RID& world_id, const double delta) {
-	// Log the incoming RID and snapshot owner/vector state immediately so we can
-	// detect any mismatches that occur when the value is stored in GDScript
-	// and later passed back into C++.
-	// ERR_PRINT("FlecsServer::progress_world: called with world_id=" + itos(world_id.get_id()));
-	// debug_check_rid(world_id);
+void FlecsServer::set_rest_enabled(const RID &world_id, bool p_enabled) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY(world_id, set_rest_enabled);
 
-	flecs::world *world = _get_world(world_id);
-	if (!world) {
-		ERR_PRINT("FlecsServer::progress_world: world not found");
-		return false;
-	}
-
-	const bool progress = world->progress(delta);
-	// Aggregate per-frame summary: totals across script systems + breakdown
-	Dictionary summary;
-	uint64_t total_entities = 0; uint64_t total_callbacks_all_time = 0; uint64_t batch_systems = 0;
-	uint64_t max_dispatch_usec = 0; uint64_t script_system_count = 0; uint64_t total_dispatch_invocations = 0; uint64_t accum_dispatch_usec = 0;
-	Array systems_breakdown;
-	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
-		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
-		if (!ss) { continue; }
-		++script_system_count;
-		uint64_t ent = ss->get_last_frame_entity_count();
-		uint64_t last_usec = ss->get_last_frame_dispatch_usec();
-		uint64_t inv = ss->get_frame_dispatch_invocations();
-		uint64_t accum = ss->get_frame_dispatch_accum_usec();
-		total_entities += ent;
-		total_callbacks_all_time += ss->get_total_callbacks_invoked();
-		total_dispatch_invocations += inv;
-		accum_dispatch_usec += accum;
-		if (ss->get_dispatch_mode() == FlecsScriptSystem::DISPATCH_BATCH) { batch_systems += 1; }
-		if (last_usec > max_dispatch_usec) { max_dispatch_usec = last_usec; }
-		Dictionary row;
-		row["rid"] = ss_rid;
-		row["entities"] = (int64_t)ent;
-		row["last_dispatch_usec"] = (int64_t)last_usec;
-		row["dispatch_invocations"] = (int64_t)inv;
-		row["dispatch_accum_usec"] = (int64_t)accum;
-		row["dispatch_avg_usec"] = inv == 0 ? Variant() : Variant((int64_t)(accum / inv));
-		row["mode"] = (int64_t)ss->get_dispatch_mode();
-		row["min_dispatch_usec"] = (int64_t)ss->get_frame_dispatch_min_usec();
-		row["max_dispatch_usec_system"] = (int64_t)ss->get_frame_dispatch_max_usec();
-		if (ss->get_detailed_timing_enabled() && ss->get_frame_dispatch_invocations() > 0) {
-			row["median_dispatch_usec"] = ss->get_frame_dispatch_median_usec();
-			row["p99_dispatch_usec"] = ss->get_frame_dispatch_percentile_usec(99.0);
-			row["stddev_dispatch_usec"] = ss->get_frame_dispatch_stddev_usec();
+	flecs::world &world = world_variant->get_world();
+	if (!p_enabled) {
+		if (world.has<flecs::Rest>()) {
+			world.remove<flecs::Rest>();
 		}
-		row["onadd"] = (int64_t)ss->get_last_frame_onadd();
-		row["onset"] = (int64_t)ss->get_last_frame_onset();
-		row["onremove"] = (int64_t)ss->get_last_frame_onremove();
-		systems_breakdown.push_back(row);
+		print_verbose("Flecs REST explorer disabled");
+		return;
 	}
-	summary["script_systems"] = (int64_t)script_system_count;
-	summary["total_entities_this_frame"] = (int64_t)total_entities;
-	summary["total_callbacks_all_time"] = (int64_t)total_callbacks_all_time;
-	summary["batch_system_count"] = (int64_t)batch_systems;
-	summary["max_dispatch_usec"] = (int64_t)max_dispatch_usec;
-	summary["dispatch_invocations"] = (int64_t)total_dispatch_invocations;
-	summary["dispatch_accum_usec"] = (int64_t)accum_dispatch_usec;
-	summary["dispatch_avg_usec"] = total_dispatch_invocations == 0 ? Variant() : Variant((int64_t)(accum_dispatch_usec / total_dispatch_invocations));
-	// For simplicity, we don't aggregate median/p99 across systems accurately (would need merge of distributions);
-	// could approximate by weighting but omitted for now. Per-system stats above carry detail.
-	summary["systems"] = systems_breakdown;
-	last_frame_summaries.insert(world_id, summary);
+
+	int rest_port = rest_ports.has(world_id) ? rest_ports.get(world_id) : _get_flecs_rest_env_port();
+	if (rest_port <= 0) {
+		rest_port = DEFAULT_FLECS_REST_PORT;
+	}
+	if (rest_port > MAX_FLECS_REST_PORT) {
+		ERR_PRINT(vformat("FlecsServer::set_rest_enabled: REST port %d is outside the valid range 1-%d", rest_port, MAX_FLECS_REST_PORT));
+		return;
+	}
+
+	flecs::Rest rest_config = {};
+	rest_config.port = (uint16_t)rest_port;
+	if (world.has<flecs::Rest>()) {
+		world.remove<flecs::Rest>();
+	}
+	world.set<flecs::Rest>(rest_config);
+	rest_ports.insert(world_id, rest_port);
+	print_verbose(vformat("Flecs REST explorer available at http://localhost:%d", rest_port));
+}
+
+bool FlecsServer::is_rest_enabled(const RID &world_id) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY_V(world_id, false, is_rest_enabled);
+
+	return world_variant->get_world().has<flecs::Rest>();
+}
+
+void FlecsServer::set_rest_port(const RID &world_id, int p_port) {
+	if (p_port <= 0 || p_port > MAX_FLECS_REST_PORT) {
+		ERR_PRINT(vformat("FlecsServer::set_rest_port: REST port %d is outside the valid range 1-%d", p_port, MAX_FLECS_REST_PORT));
+		return;
+	}
+
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY(world_id, set_rest_port);
+
+	flecs::world &world = world_variant->get_world();
+	const bool was_enabled = world.has<flecs::Rest>();
+	rest_ports.insert(world_id, p_port);
+
+	if (was_enabled) {
+		world.remove<flecs::Rest>();
+		flecs::Rest rest_config = {};
+		rest_config.port = (uint16_t)p_port;
+		world.set<flecs::Rest>(rest_config);
+		print_verbose(vformat("Flecs REST explorer moved to http://localhost:%d", p_port));
+	}
+}
+
+int FlecsServer::get_rest_port(const RID &world_id) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY_V(world_id, DEFAULT_FLECS_REST_PORT, get_rest_port);
+
+	const flecs::Rest *rest_config = world_variant->get_world().try_get<flecs::Rest>();
+	if (rest_config && rest_config->port > 0) {
+		return rest_config->port;
+	}
+
+	if (rest_ports.has(world_id)) {
+		return rest_ports.get(world_id);
+	}
+
+	int rest_port = _get_flecs_rest_env_port();
+	return rest_port > 0 ? rest_port : DEFAULT_FLECS_REST_PORT;
+}
+
+bool FlecsServer::progress_world(const RID& world_id, const double delta) {
+	bool progress = false;
+	{
+		MutexLock server_lock(mutex);
+		// Log the incoming RID and snapshot owner/vector state immediately so we can
+		// detect any mismatches that occur when the value is stored in GDScript
+		// and later passed back into C++.
+		// ERR_PRINT("FlecsServer::progress_world: called with world_id=" + itos(world_id.get_id()));
+		// debug_check_rid(world_id);
+
+		flecs::world *world = _get_world(world_id);
+		if (!world) {
+			ERR_PRINT("FlecsServer::progress_world: world not found");
+			return false;
+		}
+
+		progress = world->progress(delta);
+		// Aggregate per-frame summary: totals across script systems + breakdown
+		Dictionary summary;
+		uint64_t total_entities = 0; uint64_t total_callbacks_all_time = 0; uint64_t batch_systems = 0;
+		uint64_t max_dispatch_usec = 0; uint64_t script_system_count = 0; uint64_t total_dispatch_invocations = 0; uint64_t accum_dispatch_usec = 0;
+		Array systems_breakdown;
+		for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+			FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
+			if (!ss) { continue; }
+			++script_system_count;
+			uint64_t ent = ss->get_last_frame_entity_count();
+			uint64_t last_usec = ss->get_last_frame_dispatch_usec();
+			uint64_t inv = ss->get_frame_dispatch_invocations();
+			uint64_t accum = ss->get_frame_dispatch_accum_usec();
+			total_entities += ent;
+			total_callbacks_all_time += ss->get_total_callbacks_invoked();
+			total_dispatch_invocations += inv;
+			accum_dispatch_usec += accum;
+			if (ss->get_dispatch_mode() == FlecsScriptSystem::DISPATCH_BATCH) { batch_systems += 1; }
+			if (last_usec > max_dispatch_usec) { max_dispatch_usec = last_usec; }
+			Dictionary row;
+			row["rid"] = ss_rid;
+			row["entities"] = (int64_t)ent;
+			row["last_dispatch_usec"] = (int64_t)last_usec;
+			row["dispatch_invocations"] = (int64_t)inv;
+			row["dispatch_accum_usec"] = (int64_t)accum;
+			row["dispatch_avg_usec"] = inv == 0 ? Variant() : Variant((int64_t)(accum / inv));
+			row["mode"] = (int64_t)ss->get_dispatch_mode();
+			row["min_dispatch_usec"] = (int64_t)ss->get_frame_dispatch_min_usec();
+			row["max_dispatch_usec_system"] = (int64_t)ss->get_frame_dispatch_max_usec();
+			if (ss->get_detailed_timing_enabled() && ss->get_frame_dispatch_invocations() > 0) {
+				row["median_dispatch_usec"] = ss->get_frame_dispatch_median_usec();
+				row["p99_dispatch_usec"] = ss->get_frame_dispatch_percentile_usec(99.0);
+				row["stddev_dispatch_usec"] = ss->get_frame_dispatch_stddev_usec();
+			}
+			row["onadd"] = (int64_t)ss->get_last_frame_onadd();
+			row["onset"] = (int64_t)ss->get_last_frame_onset();
+			row["onremove"] = (int64_t)ss->get_last_frame_onremove();
+			systems_breakdown.push_back(row);
+		}
+		summary["script_systems"] = (int64_t)script_system_count;
+		summary["total_entities_this_frame"] = (int64_t)total_entities;
+		summary["total_callbacks_all_time"] = (int64_t)total_callbacks_all_time;
+		summary["batch_system_count"] = (int64_t)batch_systems;
+		summary["max_dispatch_usec"] = (int64_t)max_dispatch_usec;
+		summary["dispatch_invocations"] = (int64_t)total_dispatch_invocations;
+		summary["dispatch_accum_usec"] = (int64_t)accum_dispatch_usec;
+		summary["dispatch_avg_usec"] = total_dispatch_invocations == 0 ? Variant() : Variant((int64_t)(accum_dispatch_usec / total_dispatch_invocations));
+		// For simplicity, we don't aggregate median/p99 across systems accurately (would need merge of distributions);
+		// could approximate by weighting but omitted for now. Per-system stats above carry detail.
+		summary["systems"] = systems_breakdown;
+		last_frame_summaries.insert(world_id, summary);
+	}
 
 	RS::get_singleton()->call_on_render_thread(command_handler_callback);
 
@@ -1307,6 +1491,14 @@ RID FlecsServer::lookup(const RID &world_id, const String &entity_name) {
 }
 
 flecs::world *FlecsServer::_get_world(const RID &world_id) {
+	return _get_world_checked(world_id, nullptr, 0, nullptr);
+}
+
+flecs::world *FlecsServer::_get_world_checked(const RID &world_id, const char *p_file, int p_line, const char *p_function) {
+	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
+		_warn_flecs_non_main_thread_access("FlecsServer::_get_world", world_id, p_file, p_line, p_function);
+	}
+
 	// Invalid or stale world handles are used throughout wrapper code as a cheap
 	// liveness probe during teardown and resync. Return nullptr quietly so those
 	// guards stay cheap and do not spam logs.
@@ -1329,6 +1521,7 @@ flecs::world *FlecsServer::_get_world(const RID &world_id) {
 }
 
 RID FlecsServer::get_world_of_entity(const RID &entity_id) {
+	MutexLock server_lock(mutex);
 	for (auto &pair : flecs_variant_owners) {
 		FlecsEntityVariant *entity_variant = pair.value.entity_owner.get_or_null(entity_id);
 		if (entity_variant) {
@@ -1342,6 +1535,14 @@ RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 
 void FlecsServer::set_log_level(const int level) {
 	flecs::log::set_level(level);
+}
+
+void FlecsServer::set_thread_diagnostics_enabled(bool p_enabled) {
+	thread_diagnostics_enabled.store(p_enabled, std::memory_order_relaxed);
+}
+
+bool FlecsServer::get_thread_diagnostics_enabled() const {
+	return thread_diagnostics_enabled.load(std::memory_order_relaxed);
 }
 
 #ifndef DISABLE_DEPRECATED
@@ -1530,8 +1731,9 @@ void FlecsServer::remove_all_components_from_entity(const RID &entity_id) {
 
 
 Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String &component_type)  {
+	MutexLock server_lock(mutex);
 	Dictionary component_data;
-	
+
 	// Skip pair/relationship format strings - they can't be looked up by name
 	// These are formatted as "(First, Second)" from get_component_types_as_name
 	if (component_type.begins_with("(")) {
@@ -1563,7 +1765,12 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 
 		flecs::entity component = world->lookup(component_type.utf8().get_data());
 		if (!component.is_valid()) {
-			ERR_PRINT("FlecsServer::get_component_by_name: component type not found: " + component_type);
+			// Component lists can include scoped/internal Flecs metadata short names
+			// such as "struct". Treat unresolved names as non-serializable in the
+			// read-only inspector path instead of reporting them as user errors.
+			return component_data;
+		}
+		if (_is_builtin_flecs_entity(component)) {
 			return component_data;
 		}
 
@@ -1578,6 +1785,7 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 	return component_data;
 }
 bool FlecsServer::has_component(const RID& entity_id, const String &component_type) {
+	MutexLock server_lock(mutex);
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::has_component: world_id is not valid");
@@ -1600,6 +1808,7 @@ bool FlecsServer::has_component(const RID& entity_id, const String &component_ty
 
 
 PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id) {
+	MutexLock server_lock(mutex);
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_types_as_name: world_id is not valid");
@@ -1695,7 +1904,10 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 			if (!comp.is_valid()) {
 				return; // Skip invalid component entities
 			}
-			
+			if (_is_builtin_flecs_entity(comp)) {
+				return; // Skip Flecs/meta internals such as flecs.meta.struct
+			}
+
 			flecs::string_view name_view = comp.name();
 			const char* name = name_view.c_str();
 			if (name && name[0] != '\0') {
@@ -1712,6 +1924,7 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 }
 
 TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
+	MutexLock server_lock(mutex);
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_types_as_id: world_id is not valid");
@@ -1738,6 +1951,7 @@ TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
 }
 
 String FlecsServer::get_entity_name(const RID &entity_id) {
+	MutexLock server_lock(mutex);
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_entity_name: world_id is not valid");
@@ -1883,6 +2097,7 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 }
 
 Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& component_type_id) {
+	MutexLock server_lock(mutex);
 
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
@@ -2222,20 +2437,36 @@ TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
 }
 
 RID FlecsServer::_create_rid_for_entity(const RID& world_id, const flecs::entity &entity) {
+	return _create_rid_for_entity_checked(world_id, entity, nullptr, 0, nullptr);
+}
+
+RID FlecsServer::_create_rid_for_entity_checked(const RID& world_id, const flecs::entity &entity, const char *p_file, int p_line, const char *p_function) {
+	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
+		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_entity", world_id, p_file, p_line, p_function);
+	}
 	return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
 }
 
 RID FlecsServer::_create_rid_for_system(const RID& world_id, const flecs::system &system) {
+	return _create_rid_for_system_checked(world_id, system, nullptr, 0, nullptr);
+}
+
+RID FlecsServer::_create_rid_for_system_checked(const RID& world_id, const flecs::system &system, const char *p_file, int p_line, const char *p_function) {
+	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
+		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_system", world_id, p_file, p_line, p_function);
+	}
 	return flecs_variant_owners.get(world_id).system_owner.make_rid(FlecsSystemVariant(system));
 }
 
 RID FlecsServer::_get_rid_for_world(const flecs::world *world) {
+	MutexLock server_lock(mutex);
 	if (!world) {
 		ERR_PRINT("FlecsServer::_get_rid_for_world: world is null");
 		return RID();
 	}
 	for(auto it = worlds.begin(); it != worlds.end(); ++it) {
-		if (_get_world(*it)->c_ptr() == world->c_ptr()) {
+		flecs::world *candidate = _get_world(*it);
+		if (candidate && candidate->c_ptr() == world->c_ptr()) {
 			return *it;
 		}
 	}
@@ -2244,6 +2475,13 @@ RID FlecsServer::_get_rid_for_world(const flecs::world *world) {
 }
 
 RID FlecsServer::_create_rid_for_type_id(const RID& world_id, const flecs::entity_t &type_id) {
+	return _create_rid_for_type_id_checked(world_id, type_id, nullptr, 0, nullptr);
+}
+
+RID FlecsServer::_create_rid_for_type_id_checked(const RID& world_id, const flecs::entity_t &type_id, const char *p_file, int p_line, const char *p_function) {
+	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
+		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_type_id", world_id, p_file, p_line, p_function);
+	}
 	if (type_id == 0) {
 		return RID();
 	}
@@ -2270,26 +2508,51 @@ RID FlecsServer::_create_rid_for_type_id(const RID& world_id, const flecs::entit
 }
 
 RID FlecsServer::_create_rid_for_script_system(const RID& world_id, const FlecsScriptSystem &system) {
+	return _create_rid_for_script_system_checked(world_id, system, nullptr, 0, nullptr);
+}
+
+RID FlecsServer::_create_rid_for_script_system_checked(const RID& world_id, const FlecsScriptSystem &system, const char *p_file, int p_line, const char *p_function) {
+	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
+		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_script_system", world_id, p_file, p_line, p_function);
+	}
 	return flecs_variant_owners.get(world_id).script_system_owner.make_rid(system);
 }
 
 void FlecsServer::free_world(const RID& rid) {
+	MutexLock server_lock(mutex);
 	if (flecs_world_owners.owns(rid)) {
-			for (const RID& owned : flecs_variant_owners.get(rid).entity_owner.get_owned_list()) {
-				flecs_variant_owners.get(rid).entity_owner.free(owned);
-			}
+		RID_Owner_Wrapper &owner = flecs_variant_owners.get(rid);
 
-			for (const RID& owned : flecs_variant_owners.get(rid).type_id_owner.get_owned_list()) {
-				flecs_variant_owners.get(rid).type_id_owner.free(owned);
-			}
-
-		flecs_variant_owners.get(rid).system_owner.get_owned_list();
-		for (const RID& owned : flecs_variant_owners.get(rid).system_owner.get_owned_list()) {
-			flecs_variant_owners.get(rid).system_owner.free(owned);
+		flecs::world *world = _get_world(rid);
+		if (world) {
+			world->each(flecs::System, [&](flecs::entity e) {
+				if (!e.is_valid()) {
+					return;
+				}
+				regular_system_paused.erase(RID::from_uint64(e.id()));
+				native_system_prev_time_spent.erase(e.id());
+			});
 		}
 
-		for (const RID& owned : flecs_variant_owners.get(rid).script_system_owner.get_owned_list()) {
-			flecs_variant_owners.get(rid).script_system_owner.free(owned);
+		for (const RID& owned : owner.query_owner.get_owned_list()) {
+			owner.query_owner.free(owned);
+		}
+
+		for (const RID& owned : owner.entity_owner.get_owned_list()) {
+			owner.entity_owner.free(owned);
+		}
+
+		for (const RID& owned : owner.type_id_owner.get_owned_list()) {
+			owner.type_id_owner.free(owned);
+		}
+
+		for (const RID& owned : owner.system_owner.get_owned_list()) {
+			owner.system_owner.free(owned);
+			regular_system_paused.erase(owned);
+		}
+
+		for (const RID& owned : owner.script_system_owner.get_owned_list()) {
+			owner.script_system_owner.free(owned);
 		}
 		flecs_variant_owners.erase(rid);
 
@@ -2297,6 +2560,7 @@ void FlecsServer::free_world(const RID& rid) {
 		flecs_world_owners.free(rid);
 
 		pipeline_managers.erase(rid);
+		rest_ports.erase(rid);
 
 		if (node_storages.has(rid)) {
 			memdelete(node_storages.get(rid));
@@ -2434,6 +2698,14 @@ Node* FlecsServer::get_node_from_node_storage(const int64_t node_id, const RID &
 }
 
 RID FlecsServer::_get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity) {
+	return _get_or_create_rid_for_entity_checked(world_id, entity, nullptr, 0, nullptr);
+}
+
+RID FlecsServer::_get_or_create_rid_for_entity_checked(const RID &world_id, const flecs::entity &entity, const char *p_file, int p_line, const char *p_function) {
+	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
+		_warn_flecs_non_main_thread_access("FlecsServer::_get_or_create_rid_for_entity", world_id, p_file, p_line, p_function);
+	}
+	MutexLock server_lock(mutex);
 	// Early validation of entity
 	if (!entity.is_valid() || !entity.is_alive()) {
 		ERR_PRINT("FlecsServer::_get_or_create_rid_for_entity: entity is not valid or not alive");
@@ -2604,22 +2876,51 @@ void FlecsServer::set_script_system_dependency(const RID &world_id, const RID &s
 }
 
 Dictionary FlecsServer::get_all_systems(const RID &world_id) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_all_systems);
+
 	Dictionary result;
-	Array cpp_list; Array script_list;
-	// C++ systems
+	Array cpp_list;
+	Array script_list;
+	Array native_list;
+	HashSet<uint64_t> added_system_ids;
+
+	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
+	flecs::world *world_ptr = wv ? &wv->get_world() : nullptr;
+
+	// C++ systems registered through the Godot wrapper/RID owner.
 	for (RID rid : flecs_variant_owners.get(world_id).system_owner.get_owned_list()) {
 		FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(rid);
 		if (!sv) { continue; }
 		flecs::system sys = sv->get_system();
-		Dictionary d; d["rid"] = rid; d["name"] = String("cpp_system_") + itos((int64_t)sys.id()); d["depends_on"] = Variant(); d["type"] = String("cpp");
+		if (!sys.is_valid()) { continue; }
+
+		added_system_ids.insert(sys.id());
+
+		Dictionary d;
+		d["rid"] = rid;
+		d["entity_id"] = (int64_t)sys.id();
+		d["name"] = _get_flecs_entity_display_name(sys, "cpp_system_");
+		d["depends_on"] = Variant();
+		d["type"] = String("cpp");
+		d["registered"] = true;
 		cpp_list.push_back(d);
 	}
-	// Script systems
+
+	// Script-system wrappers. Track their underlying Flecs systems so the raw
+	// Flecs scan below does not list the wrapper internals as duplicate native systems.
 	for (RID rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
 		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(rid);
 		if (!ss) { continue; }
-		Dictionary d; d["rid"] = rid; d["name"] = String("ScriptSystem#") + itos(ss->get_system_id());
+		uint64_t runtime_system_id = ss->get_runtime_system_entity_id();
+		_insert_nonzero_system_id(added_system_ids, runtime_system_id);
+		_insert_nonzero_system_id(added_system_ids, ss->get_batch_flush_system_entity_id());
+		_insert_nonzero_system_id(added_system_ids, ss->get_auto_reset_system_entity_id());
+
+		Dictionary d;
+		d["rid"] = rid;
+		d["entity_id"] = runtime_system_id == 0 ? Variant() : Variant((int64_t)runtime_system_id);
+		d["name"] = ss->get_system_name().is_empty() ? String("ScriptSystem#") + itos(ss->get_system_id()) : ss->get_system_name();
 		uint32_t dep = ss->get_system_dependency_id();
 		d["depends_on"] = dep == 0 ? Variant() : Variant((int64_t)dep);
 		d["type"] = String("script");
@@ -2630,8 +2931,32 @@ Dictionary FlecsServer::get_all_systems(const RID &world_id) {
 		d["dispatch_mode"] = (int64_t)ss->get_dispatch_mode();
 		script_list.push_back(d);
 	}
+
+	// Direct Flecs systems. These include systems created with world->system()
+	// that never went through PipelineManager::add_to_pipeline().
+	if (world_ptr) {
+		world_ptr->each(flecs::System, [&](flecs::entity e) {
+			if (!e.is_valid() || added_system_ids.has(e.id()) || _is_builtin_flecs_entity(e)) {
+				return;
+			}
+
+			Dictionary d;
+			d["rid"] = RID::from_uint64(e.id());
+			d["entity_id"] = (int64_t)e.id();
+			d["name"] = _get_flecs_entity_display_name(e, "native_system_");
+			d["depends_on"] = Variant();
+			d["type"] = String("native");
+			d["registered"] = false;
+			cpp_list.push_back(d);
+			native_list.push_back(d);
+			added_system_ids.insert(e.id());
+		});
+	}
+
 	result["cpp"] = cpp_list;
 	result["script"] = script_list;
+	result["native"] = native_list;
+	result["system_count"] = (int64_t)(cpp_list.size() + script_list.size());
 	return result;
 }
 
@@ -2762,14 +3087,21 @@ Dictionary FlecsServer::get_script_system_info(const RID &world_id, const RID &s
 }
 
 Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_id) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_system_info);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
 	ERR_FAIL_NULL_V(wv, Dictionary());
 	flecs::world &w = wv->get_world();
-	flecs::entity e = w.entity(system_id.get_id());
+	flecs::entity e;
+	FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id);
+	if (sv) {
+		e = sv->get_system();
+	} else {
+		e = w.entity(system_id.get_id());
+	}
 	if (!e.is_valid()) { ERR_PRINT("get_system_info: invalid system entity"); return Dictionary(); }
 	Dictionary d;
-	d["id"] = (int64_t)system_id.get_id();
+	d["id"] = (int64_t)e.id();
 	// Keep string_view alive while we use the pointer
 	flecs::string_view name_view = e.name();
 	d["name"] = String(name_view.c_str());
@@ -2787,27 +3119,42 @@ Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_i
 }
 
 void FlecsServer::set_system_paused(const RID &world_id, const RID &system_id, bool paused) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, set_system_paused);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
 	if (!wv) { return; }
 	flecs::world &w = wv->get_world();
-	flecs::entity e = w.entity(system_id.get_id());
+	flecs::entity e;
+	FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id);
+	if (sv) {
+		e = sv->get_system();
+	} else {
+		e = w.entity(system_id.get_id());
+	}
 	if (!e.is_valid()) { ERR_PRINT("set_system_paused: invalid system"); return; }
 	if (paused) { e.disable(); } else { e.enable(); }
+	regular_system_paused.insert(RID::from_uint64(e.id()), paused);
 }
 
 bool FlecsServer::is_system_paused(const RID &world_id, const RID &system_id) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, false, is_system_paused);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
 	ERR_FAIL_NULL_V(wv, false);
 	flecs::world &w = wv->get_world();
-	flecs::entity e = w.entity(system_id.get_id());
+	flecs::entity e;
+	FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id);
+	if (sv) {
+		e = sv->get_system();
+	} else {
+		e = w.entity(system_id.get_id());
+	}
 	if (!e.is_valid()) { ERR_PRINT("is_system_paused: invalid system"); return false; }
-	flecs::entity disabled = w.lookup("flecs.core.Disabled");
-	return disabled.is_valid() ? e.has(disabled) : false;
+	return !e.enabled();
 }
 
 void FlecsServer::pause_systems(const RID &world_id, const PackedInt64Array &system_ids) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, pause_systems);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
@@ -2832,6 +3179,7 @@ bool FlecsServer::get_script_system_change_observe_remove(const RID &world_id, c
 }
 
 void FlecsServer::resume_systems(const RID &world_id, const PackedInt64Array &system_ids) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, resume_systems);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
@@ -2846,17 +3194,47 @@ void FlecsServer::resume_systems(const RID &world_id, const PackedInt64Array &sy
 }
 
 void FlecsServer::pause_all_systems(const RID &world_id) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, pause_all_systems);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
-	w.each([](flecs::entity e){ if (e.is_valid()) { e.disable(); }});
+
+	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
+		if (ss) {
+			ss->set_is_paused(true);
+		}
+	}
+
+	w.each(flecs::System, [&](flecs::entity e) {
+		if (!e.is_valid() || _is_builtin_flecs_entity(e)) {
+			return;
+		}
+		e.disable();
+		regular_system_paused.insert(RID::from_uint64(e.id()), true);
+	});
 }
 
 void FlecsServer::resume_all_systems(const RID &world_id) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, resume_all_systems);
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
-	w.each([](flecs::entity e){ if (e.is_valid()) { e.enable(); }});
+
+	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
+		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
+		if (ss) {
+			ss->set_is_paused(false);
+		}
+	}
+
+	w.each(flecs::System, [&](flecs::entity e) {
+		if (!e.is_valid() || _is_builtin_flecs_entity(e)) {
+			return;
+		}
+		e.enable();
+		regular_system_paused.insert(RID::from_uint64(e.id()), false);
+	});
 }
 
 Dictionary FlecsServer::get_world_distribution_summary(const RID &world_id) {
@@ -2909,6 +3287,8 @@ Dictionary FlecsServer::get_world_distribution_summary(const RID &world_id) {
 }
 
 Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
+	MutexLock server_lock(mutex);
+
 	// Silent check - world may be destroyed during shutdown while profiler is still running
 	FlecsWorldVariant* world_variant = flecs_world_owners.get_or_null(world_id);
 	if (!world_variant) {
@@ -2926,18 +3306,26 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 	for (RID ss_rid : flecs_variant_owners.get(world_id).script_system_owner.get_owned_list()) {
 		FlecsScriptSystem *ss = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(ss_rid);
 		if (!ss) { continue; }
-		
-		// Track this system's entity ID if it has one
-		if (ss->get_system_id() != 0) {
-			added_system_ids.insert(ss->get_system_id());
+
+		if (!ss->get_instrumentation_enabled()) {
+			ss->set_instrumentation_enabled(true);
 		}
-		
+
+		_insert_nonzero_system_id(added_system_ids, ss->get_runtime_system_entity_id());
+		_insert_nonzero_system_id(added_system_ids, ss->get_batch_flush_system_entity_id());
+		_insert_nonzero_system_id(added_system_ids, ss->get_auto_reset_system_entity_id());
+
 		Dictionary sys_metric;
 		sys_metric["rid"] = ss_rid;
-		sys_metric["name"] = ss->get_system_name().is_empty() ? 
-			String("ScriptSystem#") + itos(ss->get_system_id()) : 
+		uint64_t runtime_system_id = ss->get_runtime_system_entity_id();
+		if (runtime_system_id != 0) {
+			sys_metric["entity_id"] = (int64_t)runtime_system_id;
+		}
+		sys_metric["name"] = ss->get_system_name().is_empty() ?
+			String("ScriptSystem#") + itos(ss->get_system_id()) :
 			ss->get_system_name();
 		sys_metric["type"] = "script";
+		sys_metric["registered"] = true;
 		
 		// Timing metrics
 		uint64_t last_usec = ss->get_last_frame_dispatch_usec();
@@ -2995,11 +3383,11 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 		
 		Dictionary sys_metric;
 		sys_metric["rid"] = sys_rid;
-		
+		sys_metric["entity_id"] = (int64_t)sys.id();
+		sys_metric["registered"] = true;
+
 		// Get system name - keep string_view alive while we use the pointer
-		flecs::string_view name_view = sys.name();
-		const char* name = name_view.c_str();
-		sys_metric["name"] = name ? String(name) : String("cpp_system_") + itos((int64_t)sys.id());
+		sys_metric["name"] = _get_flecs_entity_display_name(sys, "cpp_system_");
 		sys_metric["type"] = "cpp";
 		
 		// Try to get raw system data first
@@ -3062,9 +3450,10 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 		sys_metric["call_count"] = 0; // Not directly available from ecs_system_stats_t
 		
 		// State flags
-		bool paused_state = false;
-		if (regular_system_paused.has(sys_rid)) {
-			paused_state = regular_system_paused[sys_rid];
+		RID system_entity_key = RID::from_uint64(sys.id());
+		bool paused_state = !sys.enabled();
+		if (regular_system_paused.has(system_entity_key)) {
+			paused_state = regular_system_paused[system_entity_key];
 		}
 		sys_metric["paused"] = paused_state;
 		
@@ -3076,38 +3465,19 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 	// Note: world_variant and world_ptr are already defined above
 	if (world_ptr) {
 		{
-			// Query for all entities with EcsSystem component (the System tag)
-			world_ptr->each([&](flecs::entity e) {
-				// Check if this entity is a system (has System component)
-				if (!e.has(flecs::System)) {
+			// Query for all entities with EcsSystem component. This catches direct
+			// world->system() creation that never touched PipelineManager.
+			world_ptr->each(flecs::System, [&](flecs::entity e) {
+				if (!e.is_valid() || added_system_ids.has(e.id()) || _is_builtin_flecs_entity(e)) {
 					return;
 				}
-				
-				// Skip if we've already added this system
-				if (added_system_ids.has(e.id())) {
-					return;
-				}
-				
-				// Skip built-in Flecs systems (timer systems, etc.) - they have ChildOf relationship to flecs modules
-				// We only want user-created systems. Check if it's a child of flecs.* modules
-				flecs::string path_str_flecs = e.path(); // flecs::string is owned, keep it alive
-				const char* path = path_str_flecs.c_str();
-				if (path) {
-					String path_str(path);
-					// Skip internal flecs systems (flecs.timer.*, flecs.pipeline.*, etc.)
-					if (path_str.begins_with("::flecs.")) {
-						return;
-					}
-				}
-			
+
 				Dictionary sys_metric;
-				sys_metric["rid"] = RID(); // No RID for unregistered systems
+				sys_metric["rid"] = RID::from_uint64(e.id()); // Raw entity RID for pause/info helpers.
 				sys_metric["entity_id"] = (int64_t)e.id(); // Provide entity ID for reference
-				
-				// Get system name
-				flecs::string_view name_view = e.name();
-				const char* name = name_view.c_str();
-				sys_metric["name"] = name ? String(name) : String("system_") + itos((int64_t)e.id());
+				sys_metric["registered"] = false;
+
+				sys_metric["name"] = _get_flecs_entity_display_name(e, "system_");
 				sys_metric["type"] = "native"; // Distinguish from "cpp" (registered) and "script"
 				
 				// Try to get raw system data first
@@ -3168,8 +3538,13 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 				}
 				
 				sys_metric["call_count"] = 0; // Not directly available from ecs_system_stats_t
-				sys_metric["paused"] = false;
-			
+				RID system_entity_key = RID::from_uint64(e.id());
+				bool paused_state = !e.enabled();
+				if (regular_system_paused.has(system_entity_key)) {
+					paused_state = regular_system_paused[system_entity_key];
+				}
+				sys_metric["paused"] = paused_state;
+
 				systems_array.push_back(sys_metric);
 				added_system_ids.insert(e.id());
 			});

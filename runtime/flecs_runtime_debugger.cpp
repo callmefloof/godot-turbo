@@ -277,6 +277,16 @@ Error FlecsRuntimeDebugger::_handle_request_entities(const Array &p_args) {
 
 	Array entities_array;
 
+	server->lock();
+	if (!server->_get_world(world_rid)) {
+		server->unlock();
+		response["entities"] = entities_array;
+		response["offset"] = offset;
+		response["count"] = count;
+		_send_debugger_message("flecs:entities", response);
+		return OK;
+	}
+
 	// Create a query to get all entities (empty required_components = all entities)
 	PackedStringArray empty_components;
 	RID query_rid = server->create_query(world_rid, empty_components);
@@ -315,6 +325,8 @@ Error FlecsRuntimeDebugger::_handle_request_entities(const Array &p_args) {
 		server->free_query(world_rid, query_rid);
 	}
 
+	server->unlock();
+
 	response["entities"] = entities_array;
 	response["offset"] = offset;
 	response["count"] = count;
@@ -352,9 +364,18 @@ Error FlecsRuntimeDebugger::_handle_request_components(const Array &p_args) {
 	response["world_id"] = world_id;
 	response["entity_id"] = entity_id;
 
-	// Get components for the entity - use simplified serialization to avoid crashes
-	// during multithreaded world progression
-	Array components_array = _serialize_components_safe(world_rid, entity_id);
+	// Get component values while the FlecsServer lock is held. The debugger only
+	// sends a read-only snapshot to the editor.
+	server->lock();
+	RID entity_rid = RID::from_uint64(entity_id);
+	if (!server->_get_world(world_rid) || server->get_world_of_entity(entity_rid) != world_rid) {
+		server->unlock();
+		response["components"] = Array();
+		_send_debugger_message("flecs:components", response);
+		return OK;
+	}
+	Array components_array = _serialize_components(world_rid, entity_id);
+	server->unlock();
 
 	response["components"] = components_array;
 
@@ -412,7 +433,7 @@ Dictionary FlecsRuntimeDebugger::_serialize_entity_info(const RID &p_world_rid, 
 
 	// Verify the entity belongs to a valid world before proceeding
 	RID entity_world = server->get_world_of_entity(entity_rid);
-	if (!entity_world.is_valid()) {
+	if (!entity_world.is_valid() || entity_world != p_world_rid) {
 		return entity_dict;
 	}
 
@@ -451,7 +472,7 @@ Array FlecsRuntimeDebugger::_serialize_components_safe(const RID &p_world_rid, u
 
 	// Verify entity exists
 	RID entity_world = server->get_world_of_entity(entity_rid);
-	if (!entity_world.is_valid()) {
+	if (!entity_world.is_valid() || entity_world != p_world_rid) {
 		return components_array;
 	}
 
@@ -468,16 +489,17 @@ Array FlecsRuntimeDebugger::_serialize_components_safe(const RID &p_world_rid, u
 
 		Dictionary component_dict;
 		component_dict["name"] = component_name;
+		component_dict["read_only"] = true;
 		
 		// Mark pairs differently
 		if (component_name.begins_with("(")) {
 			component_dict["type"] = "pair";
 			component_dict["data"] = Dictionary();
+			component_dict["data_status"] = "relationship";
 		} else {
 			component_dict["type"] = "component";
-			// For safety, don't try to serialize component data during potential world progression
-			// Just return empty data - the UI will show the component exists but without values
 			component_dict["data"] = Dictionary();
+			component_dict["data_status"] = "not_serialized";
 		}
 
 		components_array.push_back(component_dict);
@@ -507,7 +529,7 @@ Array FlecsRuntimeDebugger::_serialize_components(const RID &p_world_rid, uint64
 
 	// Verify entity exists by checking its world
 	RID entity_world = server->get_world_of_entity(entity_rid);
-	if (!entity_world.is_valid()) {
+	if (!entity_world.is_valid() || entity_world != p_world_rid) {
 		return components_array;
 	}
 
@@ -522,7 +544,7 @@ Array FlecsRuntimeDebugger::_serialize_components(const RID &p_world_rid, uint64
 
 	// Re-validate entity is still valid before iterating components
 	RID recheck_world = server->get_world_of_entity(entity_rid);
-	if (!recheck_world.is_valid()) {
+	if (!recheck_world.is_valid() || recheck_world != p_world_rid) {
 		return components_array;
 	}
 
@@ -542,6 +564,8 @@ Array FlecsRuntimeDebugger::_serialize_components(const RID &p_world_rid, uint64
 			component_dict["name"] = component_name;
 			component_dict["type"] = "pair";
 			component_dict["data"] = Dictionary();
+			component_dict["data_status"] = "relationship";
+			component_dict["read_only"] = true;
 			components_array.push_back(component_dict);
 			continue;
 		}
@@ -549,15 +573,17 @@ Array FlecsRuntimeDebugger::_serialize_components(const RID &p_world_rid, uint64
 		Dictionary component_dict;
 		component_dict["name"] = component_name;
 		component_dict["type"] = "component";
+		component_dict["read_only"] = true;
 
 		// Try to get component data
 		Dictionary component_data = server->get_component_by_name(entity_rid, component_name);
 		
 		if (!component_data.is_empty()) {
 			component_dict["data"] = component_data;
+			component_dict["data_status"] = "serialized";
 		} else {
-			// Still add the component, just without data
 			component_dict["data"] = Dictionary();
+			component_dict["data_status"] = "unavailable";
 		}
 
 		components_array.push_back(component_dict);
@@ -584,6 +610,12 @@ Error FlecsRuntimeDebugger::_handle_request_profiler_metrics(const Array &p_args
 	Dictionary response;
 	response["type"] = "profiler_metrics";
 	response["world_id"] = world_id;
+
+	if (!server->_get_world(world_rid)) {
+		response["metrics"] = Dictionary();
+		_send_debugger_message("flecs:profiler_metrics", response);
+		return OK;
+	}
 
 	// Get system metrics from FlecsServer
 	Dictionary metrics = server->get_system_metrics(world_rid);

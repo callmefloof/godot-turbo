@@ -49,8 +49,11 @@
 #include "core/string/print_string.h"
 #include "core/object/callable_method_pointer.h"
 #include "core/io/image.h"
+#include "core/os/os.h"
 #include "scene/resources/image_texture.h"
 #include "core/input/input_event.h"
+
+static constexpr uint64_t REMOTE_REQUEST_TIMEOUT_USEC = 2000000;
 
 void FlecsProfiler::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_refresh_world_list_deferred"), &FlecsProfiler::_refresh_world_list_deferred);
@@ -366,11 +369,17 @@ void FlecsProfiler::_refresh_world_list() {
 		if (world_plugin) {
 			worlds = world_plugin->get_available_worlds();
 		}
+		if (worlds.is_empty()) {
+			for (const RID &world_rid : remote_worlds_cache) {
+				worlds.append(world_rid);
+			}
+		}
 	} else {
 		// Local mode - get worlds directly from FlecsServer
 		if (flecs_server) {
 			worlds = flecs_server->get_world_list();
 		}
+		remote_worlds_cache.clear();
 	}
 
 	if (worlds.is_empty()) {
@@ -408,7 +417,11 @@ void FlecsProfiler::_refresh_world_list() {
 
 void FlecsProfiler::_request_remote_worlds() {
 	if (waiting_for_remote_worlds) {
-		return; // Already waiting for a response
+		const uint64_t now = OS::get_singleton()->get_ticks_usec();
+		if (remote_worlds_request_usec != 0 && now - remote_worlds_request_usec < REMOTE_REQUEST_TIMEOUT_USEC) {
+			return; // Already waiting for a recent response.
+		}
+		waiting_for_remote_worlds = false;
 	}
 
 	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
@@ -422,6 +435,7 @@ void FlecsProfiler::_request_remote_worlds() {
 		if (has_requested_worlds) {
 			has_requested_worlds = false;
 			waiting_for_remote_worlds = false;
+			remote_worlds_request_usec = 0;
 		}
 		return;
 	}
@@ -430,6 +444,7 @@ void FlecsProfiler::_request_remote_worlds() {
 	session->send_message("flecs:request_worlds", args);
 	waiting_for_remote_worlds = true;
 	has_requested_worlds = true;
+	remote_worlds_request_usec = OS::get_singleton()->get_ticks_usec();
 }
 
 void FlecsProfiler::_on_world_refresh_timer() {
@@ -440,6 +455,7 @@ void FlecsProfiler::_on_world_refresh_timer() {
 
 void FlecsProfiler::handle_remote_worlds(const Array &p_data) {
 	waiting_for_remote_worlds = false;
+	remote_worlds_request_usec = 0;
 	
 	
 	if (p_data.is_empty()) {
@@ -448,6 +464,15 @@ void FlecsProfiler::handle_remote_worlds(const Array &p_data) {
 	
 	Dictionary response = p_data[0];
 	Array worlds_array = response.get("worlds", Array());
+	remote_worlds_cache.clear();
+	for (int i = 0; i < worlds_array.size(); i++) {
+		Dictionary world_dict = worlds_array[i];
+		uint64_t world_id = world_dict.get("id", 0);
+		if (world_id == 0) {
+			continue;
+		}
+		remote_worlds_cache.push_back(RID::from_uint64(world_id));
+	}
 	
 	
 	// The worlds will be added to world_dirty in the world plugin's handler
@@ -464,6 +489,8 @@ void FlecsProfiler::_refresh_world_list_deferred() {
 void FlecsProfiler::_on_world_selected(int p_index) {
 	if (p_index >= 0 && p_index < available_worlds.size()) {
 		selected_world = available_worlds[p_index];
+		waiting_for_remote_metrics = false;
+		remote_metrics_request_usec = 0;
 		clear_metrics();
 	}
 }
@@ -515,7 +542,11 @@ void FlecsProfiler::_collect_frame_metrics() {
 
 void FlecsProfiler::_request_remote_metrics() {
 	if (waiting_for_remote_metrics) {
-		return; // Already waiting for a response
+		const uint64_t now = OS::get_singleton()->get_ticks_usec();
+		if (remote_metrics_request_usec != 0 && now - remote_metrics_request_usec < REMOTE_REQUEST_TIMEOUT_USEC) {
+			return; // Already waiting for a recent response.
+		}
+		waiting_for_remote_metrics = false;
 	}
 
 	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
@@ -525,6 +556,8 @@ void FlecsProfiler::_request_remote_metrics() {
 
 	Ref<EditorDebuggerSession> session = world_plugin->get_active_session();
 	if (!session.is_valid() || !session->is_active()) {
+		waiting_for_remote_metrics = false;
+		remote_metrics_request_usec = 0;
 		return;
 	}
 
@@ -532,12 +565,20 @@ void FlecsProfiler::_request_remote_metrics() {
 	args.push_back(selected_world.get_id());
 	session->send_message("flecs:request_profiler_metrics", args);
 	waiting_for_remote_metrics = true;
+	remote_metrics_request_usec = OS::get_singleton()->get_ticks_usec();
 }
 
 void FlecsProfiler::handle_remote_metrics(const Dictionary &p_data) {
 	waiting_for_remote_metrics = false;
+	remote_metrics_request_usec = 0;
 
 	if (!is_profiling) {
+		return;
+	}
+
+	if (p_data.has("metrics")) {
+		Dictionary nested_metrics = p_data.get("metrics", Dictionary());
+		_process_metrics_dictionary(nested_metrics);
 		return;
 	}
 
@@ -927,7 +968,7 @@ Vector<Vector<String>> FlecsProfiler::_get_metrics_as_csv() const {
 			frame_row.push_back("");
 			csv_data.push_back(frame_row);
 		} else {
-			for (size_t i = 0; i < frame.system_metrics.size(); i++) {
+			for (int i = 0; i < frame.system_metrics.size(); i++) {
 				const SystemMetric &sys = frame.system_metrics[i];
 				Vector<String> sys_row = frame_row;
 				sys_row.push_back(sys.name);

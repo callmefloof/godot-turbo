@@ -123,10 +123,13 @@ private:
 	// World selector
 	OptionButton *world_selector = nullptr;
 	Vector<RID> available_worlds;
+	Vector<RID> remote_worlds_cache;
 	uint64_t frame_counter = 0;
 	bool waiting_for_remote_metrics = false;
 	bool waiting_for_remote_worlds = false;
 	bool has_requested_worlds = false;
+	uint64_t remote_metrics_request_usec = 0;
+	uint64_t remote_worlds_request_usec = 0;
 	Timer *world_refresh_timer = nullptr;
 
 	Button *activate_btn = nullptr;

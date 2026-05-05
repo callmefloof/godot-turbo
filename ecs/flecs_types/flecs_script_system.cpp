@@ -13,6 +13,10 @@
 #include "modules/godot_turbo/debug/ecs_trace_bridge.h"
 #include "core/os/os.h"
 
+#ifdef _get_world
+#undef _get_world
+#endif
+
 // Clean refactored implementation below
 
 std::atomic_uint32_t FlecsScriptSystem::global_system_index = 0; // definition
@@ -523,7 +527,7 @@ RID FlecsScriptSystem::get_world() {
 
 void FlecsScriptSystem::set_world(const RID &p_world_id) {
 	world_id = p_world_id;
-	world = FlecsServer::get_singleton()->_get_world(p_world_id);
+	world = FlecsServer::get_singleton()->_get_world_checked(p_world_id, __FILE__, __LINE__, __func__);
 	if (!world) { ERR_PRINT("FlecsScriptSystem::set_world: invalid world"); return; }
 	build_system();
 }

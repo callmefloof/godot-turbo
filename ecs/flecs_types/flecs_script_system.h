@@ -441,6 +441,11 @@ public:
     
     /** @brief Get unique system ID */
     uint32_t get_system_id() const { return id; }
+
+    /** @brief Get the underlying Flecs system entity ids used by this wrapper. */
+    uint64_t get_runtime_system_entity_id() const { return script_system.is_valid() ? script_system.id() : 0; }
+    uint64_t get_batch_flush_system_entity_id() const { return batch_flush_system.is_valid() ? batch_flush_system.id() : 0; }
+    uint64_t get_auto_reset_system_entity_id() const { return reset_system.is_valid() ? reset_system.id() : 0; }
     
     /** @brief Set system to depend on another system */
     void set_system_dependency(uint32_t p_system_id);

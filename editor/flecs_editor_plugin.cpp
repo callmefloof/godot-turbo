@@ -21,6 +21,38 @@
 #include "core/object/object_id.h"
 #include "core/object/object.h"
 
+static TreeItem *_find_world_item_by_rid(TreeItem *p_item, const RID &p_world_rid) {
+	if (!p_item) {
+		return nullptr;
+	}
+
+	Variant meta = p_item->get_metadata(0);
+	if (meta.get_type() == Variant::RID && RID(meta) == p_world_rid) {
+		return p_item;
+	}
+
+	TreeItem *child = p_item->get_first_child();
+	while (child) {
+		TreeItem *match = _find_world_item_by_rid(child, p_world_rid);
+		if (match) {
+			return match;
+		}
+		child = child->get_next();
+	}
+
+	return nullptr;
+}
+
+static bool _rid_array_has(const TypedArray<RID> &p_array, const RID &p_rid) {
+	for (int i = 0; i < p_array.size(); i++) {
+		Variant value = p_array[i];
+		if (value.get_type() == Variant::RID && RID(value) == p_rid) {
+			return true;
+		}
+	}
+	return false;
+}
+
 // FlecsDebuggerBridge implementation (bridge registered via EditorDebuggerNode)
 bool FlecsDebuggerBridge::_has_capture(const String &p_capture) const {
 	return (p_capture == "flecs");
@@ -105,6 +137,8 @@ FlecsWorldEditorPlugin::~FlecsWorldEditorPlugin() {
 	world_cache.clear();
 	world_dirty.clear();
 	tree_item_map.clear();
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
 	singleton = nullptr;
 }
 
@@ -153,6 +187,8 @@ void FlecsWorldEditorPlugin::_on_exit_tree() {
 	world_cache.clear();
 	world_dirty.clear();
 	tree_item_map.clear();
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
 }
 
 void FlecsWorldEditorPlugin::_setup_remote_debugger() {
@@ -211,6 +247,7 @@ void FlecsWorldEditorPlugin::_teardown_remote_debugger() {
 	
 	if (remote_session.is_valid()) {
 		remote_session.unref();
+		active_session.unref();
 		remote_mode = false;
 	}
 }
@@ -233,7 +270,19 @@ void FlecsWorldEditorPlugin::_attach_to_session(ScriptEditorDebugger *p_debugger
 	
 	// If already active, switch to remote mode immediately
 	if (p_debugger->is_session_active()) {
+		active_session = remote_session;
 		remote_mode = true;
+		if (world_refresh_timer && world_refresh_timer->is_stopped() == false) {
+			world_refresh_timer->stop();
+		}
+		selected_world = RID();
+		selected_entity_id = 0;
+		world_cache.clear();
+		world_dirty.clear();
+		tree_item_map.clear();
+		pending_entity_requests.clear();
+		pending_component_world_id = 0;
+		pending_component_entity_id = 0;
 		_request_remote_worlds();
 	}
 }
@@ -248,8 +297,6 @@ void FlecsWorldEditorPlugin::_on_session_started() {
 		world_refresh_timer->stop();
 	}
 
-	_request_remote_worlds();
-
 	// Clear any local-selected world/entity state when switching to remote
 	selected_world = RID();
 	selected_entity_id = 0;
@@ -257,6 +304,10 @@ void FlecsWorldEditorPlugin::_on_session_started() {
 	world_dirty.clear();
 	tree_item_map.clear();
 	pending_entity_requests.clear();
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
+
+	_request_remote_worlds();
 }
 
 void FlecsWorldEditorPlugin::_on_debugger_session_stopped() {
@@ -269,6 +320,9 @@ void FlecsWorldEditorPlugin::_on_debugger_session_stopped() {
 	world_cache.clear();
 	world_dirty.clear();
 	tree_item_map.clear();
+	pending_entity_requests.clear();
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
 
 	if (world_refresh_timer && world_refresh_timer->is_stopped()) {
 		world_refresh_timer->start();
@@ -321,6 +375,33 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 	Dictionary response = p_data[0];
 	Array worlds_array = response.get("worlds", Array());
 
+	TreeItem *existing_root = worlds_tree->get_root();
+	if (existing_root && !worlds_array.is_empty() && existing_root->get_text(0).contains("[REMOTE]") && existing_root->get_child_count() == worlds_array.size()) {
+		bool same_worlds = true;
+		TreeItem *world_item = existing_root->get_first_child();
+		for (int i = 0; i < worlds_array.size(); i++) {
+			Dictionary world_dict = worlds_array[i];
+			uint64_t world_id = world_dict.get("id", 0);
+			RID world_rid = RID::from_uint64(world_id);
+			if (!world_item || world_item->get_metadata(0) != world_rid) {
+				same_worlds = false;
+				break;
+			}
+			if (!world_dirty.has(world_rid)) {
+				world_dirty[world_rid] = true;
+			}
+			world_item = world_item->get_next();
+		}
+
+		if (same_worlds) {
+			existing_root->set_text(0, "Flecs Worlds (" + itos(worlds_array.size()) + ") [REMOTE]");
+			if (selected_world.is_valid() && !_find_world_item_by_rid(existing_root, selected_world)) {
+				_clear_selection_state();
+			}
+			return;
+		}
+	}
+
 	// Save selected world
 	RID prev_selected = selected_world;
 
@@ -335,9 +416,12 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 	tree_item_map.clear();
 	world_cache.clear();
 	world_dirty.clear();
-	pending_entity_requests.clear(); // Clear pending requests since tree items are now invalid
+	_clear_pending_requests_for_tree(worlds_tree);
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
 
 	if (worlds_array.is_empty()) {
+		_clear_selection_state();
 		TreeItem *root = worlds_tree->create_item();
 		root->set_text(0, "No Worlds Found [REMOTE]");
 		worlds_tree->set_block_signals(false);
@@ -347,6 +431,7 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 
 	TreeItem *root = worlds_tree->create_item();
 	root->set_text(0, "Flecs Worlds (" + itos(worlds_array.size()) + ") [REMOTE]");
+	bool restored_selection = false;
 
 	for (int i = 0; i < worlds_array.size(); i++) {
 		Dictionary world_dict = worlds_array[i];
@@ -364,6 +449,8 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 		if (world_rid == prev_selected) {
 			world_item->select(0);
 			selected_world = world_rid;
+			selected_entity_id = 0;
+			restored_selection = true;
 		}
 
 		// Add placeholder for entities
@@ -371,6 +458,12 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 		placeholder->set_text(0, "(click to load)");
 
 		world_dirty[world_rid] = true;
+	}
+
+	if (!restored_selection) {
+		_clear_selection_state();
+	} else if (entity_inspector) {
+		entity_inspector->clear_inspector();
 	}
 	
 	
@@ -389,22 +482,38 @@ void FlecsWorldEditorPlugin::_handle_remote_worlds(const Array &p_data) {
 }
 
 void FlecsWorldEditorPlugin::_request_remote_worlds() {
-	if (!remote_session.is_valid()) {
+	Ref<EditorDebuggerSession> session = active_session.is_valid() ? active_session : remote_session;
+	if (!session.is_valid()) {
 		return;
 	}
 
-	if (!remote_session->is_active()) {
+	if (!session->is_active()) {
 		return;
 	}
 
 	Array args;
-	remote_session->send_message("flecs:request_worlds", args);
+	session->send_message("flecs:request_worlds", args);
 }
 
 void FlecsWorldEditorPlugin::_request_remote_entity_components(uint64_t p_world_id, uint64_t p_entity_id) {
 	if (!active_session.is_valid() || !active_session->is_active()) {
 		return;
 	}
+
+	if (p_entity_id == 0) {
+		return;
+	}
+
+	if (p_world_id != selected_world.get_id() || p_entity_id != selected_entity_id) {
+		return;
+	}
+
+	if (pending_component_world_id == p_world_id && pending_component_entity_id == p_entity_id) {
+		return;
+	}
+
+	pending_component_world_id = p_world_id;
+	pending_component_entity_id = p_entity_id;
 
 	Array args;
 	args.push_back(p_world_id);
@@ -447,6 +556,11 @@ void FlecsWorldEditorPlugin::_handle_remote_components(const Array &p_data) {
 	uint64_t entity_id = response.get("entity_id", 0);
 	Array components = response.get("components", Array());
 
+	if (pending_component_world_id == world_id && pending_component_entity_id == entity_id) {
+		pending_component_world_id = 0;
+		pending_component_entity_id = 0;
+	}
+
 	// Check if this response is still relevant (user might have selected a different entity)
 	if (entity_id != selected_entity_id || world_id != selected_world.get_id()) {
 		return;
@@ -478,15 +592,22 @@ void FlecsWorldEditorPlugin::_handle_remote_entities(const Array &p_data) {
 		return;
 	}
 
-	// Find the world item from pending requests
-	if (!pending_entity_requests.has(world_id)) {
-		return;
+	RID world_rid = RID::from_uint64(world_id);
+	TreeItem *world_item = nullptr;
+
+	if (pending_entity_requests.has(world_id)) {
+		ObjectID world_item_id = pending_entity_requests[world_id];
+		world_item = Object::cast_to<TreeItem>(ObjectDB::get_instance(world_item_id));
+		if (!world_item || world_item->get_tree() != worlds_tree) {
+			world_item = nullptr;
+		}
 	}
 
-	ObjectID world_item_id = pending_entity_requests[world_id];
-	TreeItem *world_item = Object::cast_to<TreeItem>(ObjectDB::get_instance(world_item_id));
+	if (!world_item) {
+		world_item = _find_world_item_by_rid(worlds_tree->get_root(), world_rid);
+	}
 
-	if (!_is_pending_request_valid(world_id, world_item)) {
+	if (!world_item || world_item->get_tree() != worlds_tree) {
 		pending_entity_requests.erase(world_id);
 		return;
 	}
@@ -520,8 +641,6 @@ void FlecsWorldEditorPlugin::_handle_remote_entities(const Array &p_data) {
 		memdelete(child);
 		child = next;
 	}
-
-	RID world_rid = RID::from_uint64(world_id);
 
 	// Add entities to tree
 	if (entities.is_empty()) {
@@ -712,8 +831,13 @@ void FlecsWorldEditorPlugin::_refresh_worlds_tree() {
 	world_cache.clear();
 	world_dirty.clear();
 	pending_entity_requests.clear(); // Clear pending requests since tree items are now invalid
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
 
 	if (world_list.is_empty()) {
+		_clear_selection_state();
+		TreeItem *empty_root = worlds_tree->create_item();
+		empty_root->set_text(0, "No Worlds Found");
 		// Restore tooltip and signals before returning
 		worlds_tree->set_block_signals(false);
 		worlds_tree->set_auto_tooltip(prev_auto_tooltip);
@@ -722,6 +846,7 @@ void FlecsWorldEditorPlugin::_refresh_worlds_tree() {
 
 	root = worlds_tree->create_item();
 	root->set_text(0, "Flecs Worlds (" + itos(world_list.size()) + ")");
+	bool restored_selection = false;
 
 	for (int i = 0; i < world_list.size(); i++) {
 		RID world_rid = world_list[i];
@@ -736,6 +861,8 @@ void FlecsWorldEditorPlugin::_refresh_worlds_tree() {
 		if (world_rid == prev_selected) {
 			world_item->select(0);
 			selected_world = world_rid;
+			selected_entity_id = 0;
+			restored_selection = true;
 		}
 
 		// Add placeholder for entities
@@ -743,6 +870,12 @@ void FlecsWorldEditorPlugin::_refresh_worlds_tree() {
 		placeholder->set_text(0, "(click to load)");
 
 		world_dirty[world_rid] = true;
+	}
+
+	if (!restored_selection) {
+		_clear_selection_state();
+	} else if (entity_inspector) {
+		entity_inspector->clear_inspector();
 	}
 
 	// Restore tooltip and signals after tree manipulation is complete
@@ -773,6 +906,15 @@ void FlecsWorldEditorPlugin::_on_tree_item_expanded(TreeItem *item) {
 	RID world_rid = meta;
 	selected_world = world_rid;
 
+	if ((!active_session.is_valid() || !active_session->is_active()) && flecs_server) {
+		TypedArray<RID> world_list = flecs_server->get_world_list();
+		if (!_rid_array_has(world_list, world_rid)) {
+			_clear_selection_state();
+			_refresh_worlds_tree();
+			return;
+		}
+	}
+
 	// Check if already loaded
 	if (world_dirty.has(world_rid) && !world_dirty[world_rid]) {
 		return;
@@ -788,6 +930,18 @@ void FlecsWorldEditorPlugin::_on_tree_item_expanded(TreeItem *item) {
 
 void FlecsWorldEditorPlugin::_load_entities_batch(RID world_rid, TreeItem *world_item, int64_t batch_start) {
 	if (!flecs_server || !worlds_tree) {
+		return;
+	}
+	if (!world_item || world_item->get_tree() != worlds_tree) {
+		return;
+	}
+
+	TypedArray<RID> world_list = flecs_server->get_world_list();
+	if (!_rid_array_has(world_list, world_rid)) {
+		if (selected_world == world_rid) {
+			_clear_selection_state();
+		}
+		_refresh_worlds_tree();
 		return;
 	}
 
@@ -815,16 +969,49 @@ void FlecsWorldEditorPlugin::_load_entities_batch(RID world_rid, TreeItem *world
 		world_cache[world_rid] = Dictionary();
 	}
 
-	// Load entities - placeholder implementation
-	// In production, would use WorldInfo::dump_all_entities()
+	int max_count = ENTITIES_PER_PAGE;
+	if (batch_size_spinbox) {
+		max_count = (int)batch_size_spinbox->get_value();
+	}
 
-	// For now, add a few sample entities to show structure
-	for (int i = 0; i < 5; i++) {
-		int entity_id = batch_start + i;
-		String entity_name = vformat("Entity_%d", entity_id);
+	Array entities;
+	PackedStringArray empty_components;
+	RID query_rid = flecs_server->create_query(world_rid, empty_components);
+	if (query_rid.is_valid()) {
+		entities = flecs_server->query_get_entities_limited(world_rid, query_rid, max_count, batch_start);
+		flecs_server->free_query(world_rid, query_rid);
+	}
+
+	if (entities.is_empty()) {
+		TreeItem *empty_item = worlds_tree->create_item(world_item);
+		empty_item->set_text(0, "(no entities)");
+		empty_item->set_selectable(0, false);
+		world_dirty[world_rid] = false;
+
+		worlds_tree->set_block_signals(false);
+		worlds_tree->set_auto_tooltip(prev_auto_tooltip);
+		return;
+	}
+
+	for (int i = 0; i < entities.size(); i++) {
+		Variant entity_var = entities[i];
+		if (entity_var.get_type() != Variant::RID) {
+			continue;
+		}
+
+		RID entity_rid = entity_var;
+		if (!entity_rid.is_valid() || flecs_server->get_world_of_entity(entity_rid) != world_rid) {
+			continue;
+		}
+
+		uint64_t entity_id = entity_rid.get_id();
+		String entity_name = flecs_server->get_entity_name(entity_rid);
+		if (entity_name.is_empty() || entity_name == "ERROR") {
+			entity_name = "Entity_" + String::num_int64(entity_id, 16);
+		}
 
 		TreeItem *entity_item = worlds_tree->create_item(world_item);
-		entity_item->set_text(0, entity_name);
+		entity_item->set_text(0, _format_entity_name(entity_name, entity_id));
 		entity_item->set_selectable(0, true);
 
 		Dictionary entity_data;
@@ -841,6 +1028,7 @@ void FlecsWorldEditorPlugin::_load_entities_batch(RID world_rid, TreeItem *world
 	}
 
 	world_dirty[world_rid] = false;
+	_apply_search_filter();
 
 	// Restore tooltip and signals after tree manipulation is complete
 	worlds_tree->set_block_signals(false);
@@ -861,6 +1049,15 @@ void FlecsWorldEditorPlugin::_on_tree_item_selected() {
 		Array pair = tree_item_map[selected];
 		selected_world = pair[0];
 		selected_entity_id = pair[1];
+
+		if ((!active_session.is_valid() || !active_session->is_active()) && flecs_server) {
+			TypedArray<RID> world_list = flecs_server->get_world_list();
+			if (!_rid_array_has(world_list, selected_world)) {
+				_clear_selection_state();
+				_refresh_worlds_tree();
+				return;
+			}
+		}
 		
 		// Check if we're in remote mode
 		if (active_session.is_valid() && active_session->is_active()) {
@@ -878,6 +1075,8 @@ void FlecsWorldEditorPlugin::_on_tree_item_selected() {
 			selected_world = meta;
 			selected_entity_id = 0; // Clear entity selection when world is selected
 		}
+		pending_component_world_id = 0;
+		pending_component_entity_id = 0;
 		entity_inspector->clear_inspector();
 	}
 
@@ -980,6 +1179,17 @@ void FlecsWorldEditorPlugin::_clear_pending_requests_for_tree(Tree *p_tree) {
 		if (!item || item->get_tree() != p_tree) {
 			pending_entity_requests.erase(world_id);
 		}
+	}
+}
+
+void FlecsWorldEditorPlugin::_clear_selection_state() {
+	selected_world = RID();
+	selected_entity_id = 0;
+	pending_entity_requests.clear();
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
+	if (entity_inspector) {
+		entity_inspector->clear_inspector();
 	}
 }
 

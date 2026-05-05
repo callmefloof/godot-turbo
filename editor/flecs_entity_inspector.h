@@ -78,7 +78,8 @@ private:
 	void _build_components_section();
 
 	// Build component widget
-	Control *_build_component_widget(const String &p_component_name, const Dictionary &p_component_data);
+	Control *_build_component_widget(const String &p_component_name, const Dictionary &p_component_data,
+			const String &p_component_type = "component", const String &p_data_status = String());
 
 	// Build property tree structure
 	Tree *_build_property_tree(const String &p_component_name, const Dictionary &p_data);

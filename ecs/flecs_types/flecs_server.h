@@ -26,6 +26,10 @@
 
 
 #define CHECK_ENTITY_VALIDITY_V(entity_id, world_id, default_value, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return default_value; \
+	} \
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id); \
 	if (!entity_variant) { \
 		ERR_PRINT("FlecsServer:: " #func_name ": entity_id is not a valid entity"); \
@@ -38,82 +42,106 @@
 	if (!world_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
-	} \
-
+	}
 #define CHECK_ENTITY_VALIDITY(entity_id, world_id, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return; \
+	} \
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id); \
 	if (!entity_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": entity_id is not a valid entity"); \
 		return; \
-	} \
-
-
+	}
 #define CHECK_WORLD_VALIDITY(world_id, func_name) \
 	FlecsWorldVariant* world_variant = flecs_world_owners.get_or_null(world_id); \
 	if (!world_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
-	} \
-
-
+	}
 #define CHECK_SYSTEM_VALIDITY_V(system_id, world_id, default_value, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return default_value; \
+	} \
 	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
 	if (!system_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": system_id is not a valid system"); \
 		return default_value; \
-	} \
-
-
+	}
 #define CHECK_SYSTEM_VALIDITY(system_id, world_id, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return; \
+	} \
 	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
 	if (!system_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": system_id is not a valid system"); \
 		return; \
-	} \
-
-
+	}
 #define CHECK_SCRIPT_SYSTEM_VALIDITY_V(script_system_id, world_id, default_value, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return default_value; \
+	} \
 	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(script_system_id); \
 	if (!script_system) { \
 		ERR_PRINT("FlecsServer::" #func_name ": script_system_id is not a valid script system"); \
 		return default_value; \
-	} \
-
+	}
 #define CHECK_SCRIPT_SYSTEM_VALIDITY(script_system_id, world_id, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return; \
+	} \
 	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(script_system_id); \
 	if (!script_system) { \
 		ERR_PRINT("FlecsServer::" #func_name ": script_system_id is not a valid script system"); \
 		return; \
-	} \
+	}
 
 #define CHECK_QUERY_VALIDITY_V(query_id, world_id, default_value, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return default_value; \
+	} \
 	FlecsQuery* query = flecs_variant_owners.get(world_id).query_owner.get_or_null(query_id); \
 	if (!query) { \
 		ERR_PRINT("FlecsServer::" #func_name ": query_id is not a valid query"); \
 		return default_value; \
-	} \
+	}
 
 #define CHECK_QUERY_VALIDITY(query_id, world_id, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return; \
+	} \
 	FlecsQuery* query = flecs_variant_owners.get(world_id).query_owner.get_or_null(query_id); \
 	if (!query) { \
 		ERR_PRINT("FlecsServer::" #func_name ": query_id is not a valid query"); \
 		return; \
-	} \
+	}
 
 #define CHECK_TYPE_ID_VALIDITY_V(type_rid, world_id, default_value, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return default_value; \
+	} \
 	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(type_rid); \
 	if (!type_id_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": type_id is not a valid type ID"); \
 		return default_value; \
-	} \
-
-
+	}
 #define CHECK_TYPE_ID_VALIDITY(type_id, world_id, func_name) \
+	if (!flecs_variant_owners.has(world_id)) { \
+		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
+		return; \
+	} \
 	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(type_id); \
 	if (!type_id_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": type_id is not a valid type ID"); \
 		return; \
-	} \
+	}
 
 constexpr static int MAX_WORLD_COUNT = std::numeric_limits<uint8_t>::max() + 1;
 constexpr static int MAX_ENTITY_COUNT = std::numeric_limits<uint32_t>::max() + 1;
@@ -139,17 +167,17 @@ constexpr static int QUERY_OWNER_CHUNK_SIZE = 65536;
 /**
  * @class FlecsServer
  * @brief Central singleton server managing Flecs ECS worlds and their lifecycle
- * 
+ *
  * FlecsServer is the core interface between Godot and the Flecs ECS library.
  * It manages multiple independent ECS worlds, entities, components, systems,
  * and provides a GDScript-friendly API for all ECS operations.
- * 
+ *
  * @section Architecture
  * - **Singleton Pattern**: Single global instance accessible from GDScript
  * - **Multi-World Support**: Each world is an isolated ECS instance
  * - **RID-Based API**: All ECS objects (worlds, entities, systems) are referenced by RIDs
  * - **Thread-Safe**: Operations are mutex-protected for safe multi-threaded access
- * 
+ *
  * @section Key Features
  * - World creation and management
  * - Entity creation with components and hierarchies
@@ -160,43 +188,43 @@ constexpr static int QUERY_OWNER_CHUNK_SIZE = 65536;
  * - Command handlers for extensible systems
  * - Pipeline management for system ordering
  * - Comprehensive instrumentation and profiling
- * 
+ *
  * @section Usage from GDScript
  * @code
  * # Get singleton
  * var flecs = FlecsServer.get_singleton()
- * 
+ *
  * # Create world
  * var world = flecs.create_world()
- * 
+ *
  * # Register component type
  * var transform_type = flecs.register_component_type(world, "Transform")
- * 
+ *
  * # Create entity with component
  * var entity = flecs.create_entity_with_name(world, "Player")
  * flecs.set_component(world, entity, "Transform", {"position": Vector3.ZERO})
- * 
+ *
  * # Add script system
  * var system = flecs.add_script_system(
  *     world,
  *     PackedStringArray(["Transform", "Velocity"]),
  *     update_movement
  * )
- * 
+ *
  * # Progress world each frame
  * func _process(delta):
  *     flecs.progress_world(world, delta)
  * @endcode
- * 
+ *
  * @section Performance
  * - RID_Owner provides fast O(1) lookups for ECS objects
  * - Chunk-based allocation reduces fragmentation
  * - Multi-threaded system execution support
  * - Batched operations for reduced overhead
- * 
+ *
  * @note All RIDs must be freed with appropriate free_*() methods to prevent leaks
  * @warning Always check RID validity before use (RIDs can become invalid after free)
- * 
+ *
  * @see FlecsScriptSystem, FlecsQuery, FlecsWorldVariant, FlecsEntityVariant
  */
 class FlecsServer : public Object {
@@ -216,6 +244,7 @@ class FlecsServer : public Object {
 	double delta_time = 0.0;
 	HashMap<RID, bool> regular_system_paused; // track pause state for non-script systems
 	HashMap<uint64_t, double> native_system_prev_time_spent; // track previous time_spent for per-frame delta calculation
+	std::atomic_bool thread_diagnostics_enabled = true;
 
 protected:
 	static void _bind_methods();
@@ -237,6 +266,10 @@ public:
 	int8_t get_world_count() const;
 	TypedArray<RID> get_world_list() const;
 	void init_world(const RID& world_id);
+	void set_rest_enabled(const RID &world_id, bool p_enabled);
+	bool is_rest_enabled(const RID &world_id);
+	void set_rest_port(const RID &world_id, int p_port);
+	int get_rest_port(const RID &world_id);
 
 	bool progress_world(const RID& world_id, const double delta);
 	RID add_script_system(const RID& world_id, const Array &component_types, const Callable &callable);
@@ -245,15 +278,18 @@ public:
 	RID create_entity_with_name_and_comps(const RID& world_id, const String &name, const TypedArray<RID> &components_type_ids);
 	RID lookup(const RID& world_id, const String &entity_name);
 	flecs::world *_get_world(const RID &world_id);
+	flecs::world *_get_world_checked(const RID &world_id, const char *p_file, int p_line, const char *p_function);
 	RID get_world_of_entity(const RID &entity_id);
 	void set_log_level(const int level);
-	
+	void set_thread_diagnostics_enabled(bool p_enabled);
+	bool get_thread_diagnostics_enabled() const;
+
 #ifndef DISABLE_DEPRECATED
 	// DEPRECATED: Use create_runtime_component() instead. Will be removed in v2.0.0.
 	// This method uses heap-allocated ScriptVisibleComponent with Dictionary, which is less efficient.
 	RID register_component_type(const RID& world_id, const String &type_name, const Dictionary &script_visible_component_data);
 #endif // DISABLE_DEPRECATED
-	
+
 	// Create a component type at runtime with typed fields using Flecs reflection API.
 	// Supports all Godot Variant types (primitives, vectors, transforms, etc.)
 	// Returns component type RID on success, invalid RID on failure.
@@ -293,10 +329,14 @@ public:
 	RID get_relationship(const RID& entity_id, const String& first_entity, const String& second_entity);
 	TypedArray<RID> get_relationships(const RID& entity_id);
 	RID _create_rid_for_entity(const RID& world_id, const flecs::entity &entity);
+	RID _create_rid_for_entity_checked(const RID& world_id, const flecs::entity &entity, const char *p_file, int p_line, const char *p_function);
 	RID _create_rid_for_system(const RID& world_id, const flecs::system &system);
+	RID _create_rid_for_system_checked(const RID& world_id, const flecs::system &system, const char *p_file, int p_line, const char *p_function);
 	RID _get_rid_for_world(const flecs::world *world);
 	RID _create_rid_for_type_id(const RID& world_id, const flecs::entity_t &type_id);
+	RID _create_rid_for_type_id_checked(const RID& world_id, const flecs::entity_t &type_id, const char *p_file, int p_line, const char *p_function);
 	RID _create_rid_for_script_system(const RID& world_id, const FlecsScriptSystem &system);
+	RID _create_rid_for_script_system_checked(const RID& world_id, const FlecsScriptSystem &system, const char *p_file, int p_line, const char *p_function);
 	void free_world(const RID& world_id);
 	void free_system(const RID& world_id, const RID& system_id, const bool include_flecs_world);
 	void free_script_system(const RID& world_id, const RID& script_system_id);
@@ -310,6 +350,7 @@ public:
 	Ref<Resource> get_resource_from_ref_storage(const RID &resource_id, const RID &world_id);
 	Node *get_node_from_node_storage(const int64_t node_id, const RID &world_id);
 	RID _get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity);
+	RID _get_or_create_rid_for_entity_checked(const RID &world_id, const flecs::entity &entity, const char *p_file, int p_line, const char *p_function);
 	flecs::system _get_system(const RID &system_id, const RID &world_id);
 	flecs::entity_t _get_type_id(const RID &type_id, const RID &world_id);
 	FlecsScriptSystem _get_script_system(const RID &script_system_id, const RID &world_id);
@@ -566,6 +607,7 @@ private:
 	AHashMap<RID, NodeStorage*> node_storages = AHashMap<RID, NodeStorage*>(MAX_WORLD_COUNT);
 	AHashMap<RID, RefStorage*> ref_storages = AHashMap<RID, RefStorage*>(MAX_WORLD_COUNT);
 	AHashMap<RID, Dictionary> last_frame_summaries = AHashMap<RID, Dictionary>(MAX_WORLD_COUNT);
+	AHashMap<RID, int> rest_ports = AHashMap<RID, int>(MAX_WORLD_COUNT);
 
 };
 
@@ -620,3 +662,12 @@ public:
 	uint64_t get_total_callbacks() const;
 	uint64_t get_total_entities_processed() const;
 };
+
+#ifndef FLECS_SERVER_IMPLEMENTATION
+#define _get_world(world_id) _get_world_checked(world_id, __FILE__, __LINE__, __func__)
+#define _create_rid_for_entity(world_id, entity) _create_rid_for_entity_checked(world_id, entity, __FILE__, __LINE__, __func__)
+#define _create_rid_for_system(world_id, system) _create_rid_for_system_checked(world_id, system, __FILE__, __LINE__, __func__)
+#define _create_rid_for_type_id(world_id, type_id) _create_rid_for_type_id_checked(world_id, type_id, __FILE__, __LINE__, __func__)
+#define _create_rid_for_script_system(world_id, system) _create_rid_for_script_system_checked(world_id, system, __FILE__, __LINE__, __func__)
+#define _get_or_create_rid_for_entity(world_id, entity) _get_or_create_rid_for_entity_checked(world_id, entity, __FILE__, __LINE__, __func__)
+#endif
