@@ -7,7 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0-beta.1] - 2026-05-05
+
+### Added
+
+#### Flecs REST Controls
+- Added `FlecsServer.set_rest_enabled(world_id, enabled)` and `FlecsServer.is_rest_enabled(world_id)` to control the Flecs REST explorer per world.
+- Added `FlecsServer.set_rest_port(world_id, port)` and `FlecsServer.get_rest_port(world_id)` for runtime REST port configuration.
+- Preserved `GODOT_FLECS_REST_PORT` startup behavior while allowing explicit per-world runtime overrides.
+
+#### Thread Diagnostics
+- Added opt-in/out diagnostics for raw Flecs world access from non-main threads.
+- Added callsite-aware warnings for direct `_get_world()` and RID creation helper access from non-main threads.
+
 ### Changed
+
+#### Flecs Editor and Debugger
+- Improved debugger/editor snapshots so direct Flecs systems are included, not only systems registered through wrapper/pipeline paths.
+- Improved stale world handling when closing one world and loading another scene.
+- Made debugger world/entity access more resilient when remote scene state changes during expansion or inspection.
+- Updated the component inspector to show read-only serialized component values where reflection/serializers are available.
+- Wrapped long component value text in the inspector so large transforms and reflected structs remain readable.
+
+#### Flecs Profiler
+- Made the profiler keep its own remote world cache instead of relying only on the Flecs Worlds dock cache.
+- Added timeout recovery for remote world and profiler metric requests so scene reloads do not leave the profiler permanently waiting.
+- Allowed remote profiler metrics to handle both flat and nested debugger payloads.
+- Cleaned up profiler CSV loop typing to avoid signed/unsigned warnings.
 
 #### Documentation
 - Updated FlecsServer API docs to reflect the current RID calling conventions:
@@ -23,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed entity expansion in the debugger returning no entities after remote/world refreshes.
+- Fixed double-clicking an entity crashing when debugger state was stale.
+- Fixed unserializable Flecs component/type entries being resolved as `"struct"` and producing noisy type lookup errors.
+- Fixed component display incorrectly labeling all unserialized components as tags.
+- Fixed profiler request state getting stuck after a lost remote response.
 - Documented Flecs type RID caching behavior, which prevents duplicate component type RID creation during repeated lookups in hot loops.
 - Clarified that runtime component Dictionary data is mapped by reflected field/member name, not Dictionary key order.
 
