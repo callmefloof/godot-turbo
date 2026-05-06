@@ -281,7 +281,9 @@ public:
 	flecs::world *_get_world(const RID &world_id);
 	flecs::world *_get_world_checked(const RID &world_id, const char *p_file, int p_line, const char *p_function);
 	RID get_world_of_entity(const RID &entity_id);
+	RID _get_world_of_entity_nolock(const RID &entity_id);
 	bool is_entity_alive(const RID &entity_id);
+	bool _is_entity_alive_nolock(const RID &entity_id);
 	void set_log_level(const int level);
 	void set_thread_diagnostics_enabled(bool p_enabled);
 	bool get_thread_diagnostics_enabled() const;
@@ -314,6 +316,7 @@ public:
 	Dictionary get_component_by_name(const RID &entity_id, const String &component_type);
 	Dictionary get_component_by_id(const RID& entity_id, const RID& component_type_id);
 	RID get_component_type_by_name(const RID& entity_id, const String &component_type);
+	RID _get_component_type_by_name_nolock(const RID& entity_id, const String &component_type);
 	RID get_parent(const RID &entity_id);
 	void set_parent(const RID& entity_id, const RID& parent_id);
 	void add_component(const RID &entity_id, const RID &comp_rid);
@@ -336,6 +339,7 @@ public:
 	RID _create_rid_for_system_checked(const RID& world_id, const flecs::system &system, const char *p_file, int p_line, const char *p_function);
 	RID _get_rid_for_world(const flecs::world *world);
 	RID _create_rid_for_type_id(const RID& world_id, const flecs::entity_t &type_id);
+	RID _create_rid_for_type_id_nolock(const RID& world_id, const flecs::entity_t &type_id);
 	RID _create_rid_for_type_id_checked(const RID& world_id, const flecs::entity_t &type_id, const char *p_file, int p_line, const char *p_function);
 	RID _create_rid_for_script_system(const RID& world_id, const FlecsScriptSystem &system);
 	RID _create_rid_for_script_system_checked(const RID& world_id, const FlecsScriptSystem &system, const char *p_file, int p_line, const char *p_function);
@@ -352,6 +356,7 @@ public:
 	Ref<Resource> get_resource_from_ref_storage(const RID &resource_id, const RID &world_id);
 	Node *get_node_from_node_storage(const int64_t node_id, const RID &world_id);
 	RID _get_or_create_rid_for_entity(const RID &world_id, const flecs::entity &entity);
+	RID _get_or_create_rid_for_entity_nolock(const RID &world_id, const flecs::entity &entity);
 	RID _get_or_create_rid_for_entity_checked(const RID &world_id, const flecs::entity &entity, const char *p_file, int p_line, const char *p_function);
 	flecs::system _get_system(const RID &system_id, const RID &world_id);
 	flecs::entity_t _get_type_id(const RID &type_id, const RID &world_id);

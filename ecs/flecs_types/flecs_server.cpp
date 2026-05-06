@@ -46,7 +46,24 @@ static int _get_flecs_rest_env_port() {
 	return rest_port;
 }
 
+static bool _is_live_flecs_entity(const flecs::entity &p_entity) {
+	if (!p_entity.is_valid()) {
+		return false;
+	}
+
+	flecs::world world = p_entity.world();
+	if (!world.c_ptr()) {
+		return false;
+	}
+
+	return p_entity.is_alive() && ecs_is_alive(world.c_ptr(), p_entity.id());
+}
+
 static String _get_flecs_entity_display_name(const flecs::entity &p_entity, const String &p_fallback_prefix) {
+	if (!_is_live_flecs_entity(p_entity)) {
+		return p_fallback_prefix + itos((int64_t)p_entity.id());
+	}
+
 	flecs::string_view name_view = p_entity.name();
 	const char *name = name_view.c_str();
 	if (name && name[0] != '\0') {
@@ -63,6 +80,10 @@ static String _get_flecs_entity_display_name(const flecs::entity &p_entity, cons
 }
 
 static bool _is_builtin_flecs_entity(const flecs::entity &p_entity) {
+	if (!_is_live_flecs_entity(p_entity)) {
+		return false;
+	}
+
 	flecs::string path = p_entity.path();
 	const char *path_str = path.c_str();
 	if (!path_str) {
@@ -515,7 +536,7 @@ static constexpr int MAX_STRUCT_MEMBERS = 64;
 
 static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t comp_type_id) {
 	// Validate entity is still valid and alive before accessing
-	if (!entity.is_valid() || !entity.is_alive()) {
+	if (!_is_live_flecs_entity(entity)) {
 		ERR_PRINT("component_to_dict_cursor: entity is not valid or not alive");
 		return Dictionary();
 	}
@@ -542,7 +563,7 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 	}
 
 	flecs::entity comp_entity(world.c_ptr(), comp_type_id);
-	if (!comp_entity.is_valid() || _is_builtin_flecs_entity(comp_entity) || !comp_entity.has<EcsType>()) {
+	if (!_is_live_flecs_entity(comp_entity) || _is_builtin_flecs_entity(comp_entity) || !comp_entity.has<EcsType>()) {
 		return Dictionary();
 	}
 
@@ -558,7 +579,7 @@ static Dictionary component_to_dict_cursor(flecs::entity entity, flecs::entity_t
 	flecs::entity type = cur.get_type();
 
 	// Check if type is valid (non-zero entity ID)
-	if (type.is_valid() && type.has<EcsType>()) {
+	if (_is_live_flecs_entity(type) && type.has<EcsType>()) {
 		const EcsType& ecs_type = type.get<EcsType>();
 		if (ecs_type.kind == EcsStructType) {
 			// It's a struct, convert members to dictionary
@@ -676,8 +697,19 @@ static void _set_cursor_from_variant_impl(flecs::cursor &p_cur, const Variant &p
 
 // Helper function to set component data from Dictionary using flecs cursor
 static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t comp_type_id, const Dictionary& dict) {
-	if (!entity.is_valid() || !entity.is_alive()) {
+	if (!_is_live_flecs_entity(entity)) {
 		ERR_PRINT("component_from_dict_cursor: entity is not valid or not alive");
+		return;
+	}
+
+	if (comp_type_id == 0) {
+		ERR_PRINT("component_from_dict_cursor: comp_type_id is 0");
+		return;
+	}
+
+	flecs::entity comp_entity(entity.world().c_ptr(), comp_type_id);
+	if (!_is_live_flecs_entity(comp_entity)) {
+		ERR_PRINT("component_from_dict_cursor: component type is not valid or not alive");
 		return;
 	}
 
@@ -690,7 +722,6 @@ static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t com
 
 	// For opaque types, get the type name directly from the component entity
 	// instead of relying on cursor (which may not have type info for opaque types)
-	flecs::entity comp_entity(entity.world().c_ptr(), comp_type_id);
 	// Keep string_view alive while we use the pointer
 	flecs::string_view type_name_view = comp_entity.name();
 	const char* type_name = type_name_view.c_str();
@@ -1368,15 +1399,12 @@ int FlecsServer::get_rest_port(const RID &world_id) {
 
 bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 	bool progress = false;
+	flecs::world *world = nullptr;
+
+	// Phase 1: Pre-progress setup under lock
 	{
 		MutexLock server_lock(mutex);
-		// Log the incoming RID and snapshot owner/vector state immediately so we can
-		// detect any mismatches that occur when the value is stored in GDScript
-		// and later passed back into C++.
-		// ERR_PRINT("FlecsServer::progress_world: called with world_id=" + itos(world_id.get_id()));
-		// debug_check_rid(world_id);
-
-		flecs::world *world = _get_world(world_id);
+		world = _get_world(world_id);
 		if (!world) {
 			ERR_PRINT("FlecsServer::progress_world: world not found");
 			return false;
@@ -1388,7 +1416,18 @@ bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 		}
 
 		worlds_in_progress.insert(world_id, true);
-		progress = world->progress(delta);
+	}
+
+	// Phase 2: Tick the world WITHOUT holding the server mutex.
+	// Flecs systems (including LightingInfluence observers and multi-threaded
+	// worker systems) call back into FlecsServer methods that acquire the mutex
+	// individually.  Holding it here caused recursive lock overhead on the same
+	// thread and outright deadlocks when Flecs worker threads were involved.
+	progress = world->progress(delta);
+
+	// Phase 3: Post-progress bookkeeping under lock
+	{
+		MutexLock server_lock(mutex);
 		worlds_in_progress.insert(world_id, false);
 
 		// Aggregate per-frame summary: totals across script systems + breakdown
@@ -1438,8 +1477,6 @@ bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 		summary["dispatch_invocations"] = (int64_t)total_dispatch_invocations;
 		summary["dispatch_accum_usec"] = (int64_t)accum_dispatch_usec;
 		summary["dispatch_avg_usec"] = total_dispatch_invocations == 0 ? Variant() : Variant((int64_t)(accum_dispatch_usec / total_dispatch_invocations));
-		// For simplicity, we don't aggregate median/p99 across systems accurately (would need merge of distributions);
-		// could approximate by weighting but omitted for now. Per-system stats above carry detail.
 		summary["systems"] = systems_breakdown;
 		last_frame_summaries.insert(world_id, summary);
 	}
@@ -1494,11 +1531,11 @@ RID FlecsServer::lookup(const RID &world_id, const String &entity_name) {
 	if (world_variant) {
 		flecs::world &world = world_variant->get_world();
 		flecs::entity entity = world.lookup(entity_name.ascii().get_data());
-		if (!entity.is_valid()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::lookup: entity not found");
 			return RID();
 		}
-		return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+		return _get_or_create_rid_for_entity(world_id, entity);
 	}
 	ERR_FAIL_V_MSG(RID(), "FlecsServer::lookup: world_id is not a valid world");
 }
@@ -1535,6 +1572,10 @@ flecs::world *FlecsServer::_get_world_checked(const RID &world_id, const char *p
 
 RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 	MutexLock server_lock(mutex);
+	return _get_world_of_entity_nolock(entity_id);
+}
+
+RID FlecsServer::_get_world_of_entity_nolock(const RID &entity_id) {
 	for (auto &pair : flecs_variant_owners) {
 		FlecsEntityVariant *entity_variant = pair.value.entity_owner.get_or_null(entity_id);
 		if (entity_variant) {
@@ -1546,6 +1587,10 @@ RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 
 bool FlecsServer::is_entity_alive(const RID &entity_id) {
 	MutexLock server_lock(mutex);
+	return _is_entity_alive_nolock(entity_id);
+}
+
+bool FlecsServer::_is_entity_alive_nolock(const RID &entity_id) {
 	for (auto &pair : flecs_variant_owners) {
 		FlecsEntityVariant *entity_variant = pair.value.entity_owner.get_or_null(entity_id);
 		if (!entity_variant) {
@@ -1553,7 +1598,7 @@ bool FlecsServer::is_entity_alive(const RID &entity_id) {
 		}
 
 		flecs::entity entity = entity_variant->get_entity();
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			return false;
 		}
 
@@ -1754,13 +1799,18 @@ Ref<CommandHandler> FlecsServer::get_render_system_command_handler(const RID &wo
 
 
 void FlecsServer::remove_all_components_from_entity(const RID &entity_id) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::remove_all_components_from_entity: world_id is not valid");
 		return;
 	}
 	CHECK_ENTITY_VALIDITY(entity_id, world_id, remove_all_components_from_entity);
 	flecs::entity entity = entity_variant->get_entity();
+	if (!_is_live_flecs_entity(entity)) {
+		ERR_PRINT("FlecsServer::remove_all_components_from_entity: entity is no longer valid/alive in Flecs world");
+		return;
+	}
 	entity.clear(); // Clear all components from the entity
 }
 
@@ -1776,7 +1826,7 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 		return component_data;
 	}
 	
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_by_name: world_id is not valid");
 		return component_data;
@@ -1787,7 +1837,7 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 		flecs::entity entity = entity_variant->get_entity();
 		
 		// Validate entity is still valid and alive in Flecs world
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::get_component_by_name: entity is no longer valid/alive in Flecs world");
 			return component_data;
 		}
@@ -1799,7 +1849,7 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 		}
 
 		flecs::entity component = world->lookup(component_type.utf8().get_data());
-		if (!component.is_valid()) {
+		if (!_is_live_flecs_entity(component)) {
 			// Component lists can include scoped/internal Flecs metadata short names
 			// such as "struct". Treat unresolved names as non-serializable in the
 			// read-only inspector path instead of reporting them as user errors.
@@ -1821,7 +1871,7 @@ Dictionary FlecsServer::get_component_by_name(const RID &entity_id, const String
 }
 bool FlecsServer::has_component(const RID& entity_id, const String &component_type) {
 	MutexLock server_lock(mutex);
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::has_component: world_id is not valid");
 		return false;
@@ -1834,12 +1884,12 @@ bool FlecsServer::has_component(const RID& entity_id, const String &component_ty
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			return false;
 		}
 
 		flecs::entity comp_type = world->lookup(component_type.utf8().get_data());
-		return comp_type.is_valid() && entity.has(comp_type);
+		return _is_live_flecs_entity(comp_type) && entity.has(comp_type);
 	}
 	ERR_PRINT("FlecsServer::has_component: entity_id is not a valid entity");
 	return false;
@@ -1848,9 +1898,13 @@ bool FlecsServer::has_component(const RID& entity_id, const String &component_ty
 
 PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id) {
 	MutexLock server_lock(mutex);
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_types_as_name: world_id is not valid");
+		return PackedStringArray();
+	}
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::get_component_types_as_name: returning empty result while world is progressing");
 		return PackedStringArray();
 	}
 	flecs::world *world = _get_world(world_id);
@@ -1870,7 +1924,7 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
 		// Validate entity is still alive in Flecs world before iterating
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::get_component_types_as_name: entity is no longer valid/alive in Flecs world");
 			return PackedStringArray();
 		}
@@ -1940,7 +1994,7 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 			
 			// For regular components, get the entity directly
 			flecs::entity comp = world->entity(raw_id);
-			if (!comp.is_valid()) {
+			if (!_is_live_flecs_entity(comp)) {
 				return; // Skip invalid component entities
 			}
 			if (_is_builtin_flecs_entity(comp)) {
@@ -1964,9 +2018,13 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 
 TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
 	MutexLock server_lock(mutex);
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_types_as_id: world_id is not valid");
+		return TypedArray<RID>();
+	}
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::get_component_types_as_id: returning empty result while world is progressing");
 		return TypedArray<RID>();
 	}
 	TypedArray<RID> component_ids;
@@ -1974,7 +2032,7 @@ TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
 		// Validate entity is still alive in Flecs world before iterating
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::get_component_types_as_id: entity is no longer valid/alive in Flecs world");
 			return TypedArray<RID>();
 		}
@@ -1991,12 +2049,16 @@ TypedArray<RID> FlecsServer::get_component_types_as_id(const RID &entity_id) {
 
 String FlecsServer::get_entity_name(const RID &entity_id) {
 	MutexLock server_lock(mutex);
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_entity_name: world_id is not valid");
 		return String();
 	}
-	
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::get_entity_name: returning empty result while world is progressing");
+		return String();
+	}
+
 	// Get world and validate raw pointer
 	flecs::world *world = _get_world(world_id);
 	if (!world) {
@@ -2014,7 +2076,7 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
 		// Validate entity is still alive before accessing name
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::get_entity_name: entity is no longer valid/alive in Flecs world");
 			return String();
 		}
@@ -2045,14 +2107,19 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 	return "ERROR";
 }
  void FlecsServer::set_entity_name(const RID& entity_id, const String &p_name) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
-		ERR_PRINT("FlecsServer::set_component: world_id is not valid");
+		ERR_PRINT("FlecsServer::set_entity_name: world_id is not valid");
 		return;
 	}
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		if (!_is_live_flecs_entity(entity)) {
+			ERR_PRINT("FlecsServer::set_entity_name: entity is no longer valid/alive in Flecs world");
+			return;
+		}
 		entity.set_name(p_name.ascii().get_data());
 	} else {
 		ERR_PRINT("FlecsServer::set_entity_name: entity_id is not a valid entity");
@@ -2062,7 +2129,7 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 void FlecsServer::set_component(const RID& entity_id, const String& component_type, const Dictionary &comp_data) {
 	MutexLock server_lock(mutex);
 
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::set_component: world_id is not valid");
 		return;
@@ -2075,13 +2142,13 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::set_component: entity is no longer valid/alive in Flecs world");
 			return;
 		}
 
 		flecs::entity comp_type = world->lookup(component_type.utf8().get_data());
-		if (comp_type.is_valid()) {
+		if (_is_live_flecs_entity(comp_type)) {
 			// Trace component write for neural visualizer
 			ECS_TRACE_WRITE(entity.id(), comp_type.id(), 0);
 			
@@ -2096,7 +2163,8 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 }
 
 void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, const RID &component_id) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::remove_component_from_entity_with_id: world_id is not valid");
 		return;
@@ -2104,12 +2172,18 @@ void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, con
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::remove_component_from_entity_with_id: entity is no longer valid/alive in Flecs world");
 			return;
 		}
 
-		flecs::entity_t comp_id = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_id)->get_type();
+		FlecsTypeIDVariant *type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_id);
+		if (!type_variant) {
+			ERR_PRINT("FlecsServer::remove_component_from_entity_with_id: component_id is not valid");
+			return;
+		}
+
+		flecs::entity_t comp_id = type_variant->get_type();
 		if (comp_id) {
 			// Trace component remove for neural visualizer
 			ECS_TRACE_REMOVE(entity.id(), comp_id);
@@ -2122,7 +2196,8 @@ void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, con
 }
 
 void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, const String &component_type) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: world_id is not valid");
 		return;
@@ -2135,13 +2210,13 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		if (!entity.is_valid() || !entity.is_alive()) {
+		if (!_is_live_flecs_entity(entity)) {
 			ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: entity is no longer valid/alive in Flecs world");
 			return;
 		}
 
 		flecs::entity component = world->lookup(component_type.utf8().get_data());
-		if (component.is_valid()) {
+		if (_is_live_flecs_entity(component)) {
 			// Trace component remove for neural visualizer
 			ECS_TRACE_REMOVE(entity.id(), component.id());
 			
@@ -2155,7 +2230,7 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& component_type_id) {
 	MutexLock server_lock(mutex);
 
-	RID world_id = get_world_of_entity(entity_id);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::get_component_by_id: world_id is not valid");
 		return Dictionary();
@@ -2163,6 +2238,10 @@ Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& com
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		if (!_is_live_flecs_entity(entity)) {
+			ERR_PRINT("FlecsServer::get_component_by_id: entity is no longer valid/alive in Flecs world");
+			return Dictionary();
+		}
 		FlecsTypeIDVariant* comp_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_type_id);
 		if(comp_variant){
 			flecs::entity_t comp_id = comp_variant->get_type();
@@ -2180,30 +2259,39 @@ Dictionary FlecsServer::get_component_by_id(const RID& entity_id, const RID& com
 }
 
 RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &component_type) {
+	MutexLock server_lock(mutex);
+	return _get_component_type_by_name_nolock(entity_id, component_type);
+}
+
+RID FlecsServer::_get_component_type_by_name_nolock(const RID& entity_id, const String &component_type) {
 	bool is_world = flecs_world_owners.owns(entity_id);
-	RID world_id = is_world ? entity_id : get_world_of_entity(entity_id);
+	RID world_id = is_world ? entity_id : _get_world_of_entity_nolock(entity_id);
 	bool is_entity = false;
-	if(!is_world){
+	if(!is_world && world_id.is_valid() && flecs_variant_owners.has(world_id)){
 		is_entity = flecs_variant_owners.get(world_id).entity_owner.owns(entity_id);
 	}
 	if(is_entity){
 		CHECK_ENTITY_VALIDITY_V(entity_id, world_id, RID(), get_component_type_by_name)
+		if (!_is_live_flecs_entity(entity)) {
+			ERR_PRINT("FlecsServer::get_component_type_by_name: entity is no longer valid/alive in Flecs world");
+			return RID();
+		}
 		flecs::entity comp_type;
 		flecs::world *world = _get_world(world_id);
 		if (!world) {
 			ERR_FAIL_V_MSG(RID(), "World not found for entity");
 		}
 		comp_type = world->lookup(component_type.utf8().get_data());
-		if (comp_type.is_valid()) {
-			return _create_rid_for_type_id(world_id, comp_type.id());
+		if (_is_live_flecs_entity(comp_type)) {
+			return _create_rid_for_type_id_nolock(world_id, comp_type.id());
 		}
 		ERR_FAIL_V_MSG(RID(), "Component type not found: " + component_type);
 	}else if(is_world){
 		CHECK_WORLD_VALIDITY_V(world_id, RID(), get_component_type_by_name)
 		flecs::world &world = world_variant->get_world();
 		flecs::entity comp_type = world.lookup(component_type.utf8().get_data());
-		if (comp_type.is_valid()) {
-			return _create_rid_for_type_id(world_id, comp_type.id());
+		if (_is_live_flecs_entity(comp_type)) {
+			return _create_rid_for_type_id_nolock(world_id, comp_type.id());
 		}
 		ERR_FAIL_V_MSG(RID(), "Component type not found: " + component_type);
 	}else if (!is_world && !is_entity){
@@ -2218,25 +2306,47 @@ RID FlecsServer::get_component_type_by_name(const RID& entity_id, const String &
 }
 
 RID FlecsServer::get_parent(const RID& entity_id) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::get_parent: world_id is not valid");
+		return RID();
+	}
+
 	FlecsEntityVariant* flecs_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (flecs_entity) {
 		flecs::entity entity = flecs_entity->get_entity();
+		if (!_is_live_flecs_entity(entity)) {
+			ERR_PRINT("FlecsServer::get_parent: entity is no longer valid/alive in Flecs world");
+			return RID();
+		}
+
 		flecs::entity parent = entity.parent();
-		if (parent.is_valid()) {
-			return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(parent));
+		if (_is_live_flecs_entity(parent)) {
+			return _get_or_create_rid_for_entity(world_id, parent);
 		}
 	}
 	ERR_FAIL_V_MSG(RID(), "Parent not found for entity_id: " + itos(entity_id.get_id()));
 }
 
 void FlecsServer::set_parent(const RID& entity_id, const RID& parent_id) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::set_parent: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* flecs_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (flecs_entity && parent_variant) {
 		flecs::entity entity = flecs_entity->get_entity();
 		flecs::entity parent = parent_variant->get_entity();
+		if (!_is_live_flecs_entity(entity) || !_is_live_flecs_entity(parent)) {
+			ERR_PRINT("FlecsServer::set_parent: entity_id or parent_id is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		entity.add(flecs::ChildOf, parent);
 	} else {
 		ERR_PRINT("FlecsServer::set_parent: entity_id or parent_id is not a valid entity");
@@ -2246,26 +2356,46 @@ void FlecsServer::set_parent(const RID& entity_id, const RID& parent_id) {
 
 
 RID FlecsServer::get_child(const RID& entity_id, int index) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	if (index < 0) {
+		ERR_PRINT("FlecsServer::get_child: index must be non-negative");
+		return RID();
+	}
+
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::get_child: world_id is not valid");
+		return RID();
+	}
+
 	FlecsEntityVariant* flecs_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (flecs_entity) {
 		flecs::entity entity = flecs_entity->get_entity();
+		if (!_is_live_flecs_entity(entity)) {
+			ERR_PRINT("FlecsServer::get_child: entity is no longer valid/alive in Flecs world");
+			return RID();
+		}
+
 		int i = 0;
 		flecs::entity child;
 		entity.children([&](flecs::entity c) {
+			if (!_is_live_flecs_entity(c)) {
+				return;
+			}
 			if (i == index) {
 				child = c;
 			}
 			i++;
 		});
-		if (child.is_valid()) {
-			return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(child));
+		if (_is_live_flecs_entity(child)) {
+			return _get_or_create_rid_for_entity(world_id, child);
 		}
 	}
 	ERR_FAIL_V_MSG(RID(), "Child not found for entity_id: " + itos(entity_id.get_id()) + " at index: " + itos(index));
 }
 
 void FlecsServer::set_children(const RID &parent_id, const TypedArray<RID> &p_children) {
+	MutexLock server_lock(mutex);
 	// Clear existing children.
 	remove_all_children(parent_id);
 	//Add new children.
@@ -2276,14 +2406,32 @@ void FlecsServer::set_children(const RID &parent_id, const TypedArray<RID> &p_ch
 }
 
 RID FlecsServer::get_child_by_name(const RID &parent_id,const String &name){
-	RID world_id = get_world_of_entity(parent_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::get_child_by_name: world_id is not valid");
+		return RID();
+	}
+
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
+		if (!_is_live_flecs_entity(parent)) {
+			ERR_PRINT("FlecsServer::get_child_by_name: parent_id is no longer valid/alive in Flecs world");
+			return RID();
+		}
+
+		CharString name_ascii = name.ascii();
 		RID child_rid;
 		parent.children([&](flecs::entity child) {
-			if (child.name() == name.ascii().get_data()) {
-				child_rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(child));
+			if (!_is_live_flecs_entity(child)) {
+				return;
+			}
+
+			flecs::string_view child_name = child.name();
+			const char *child_name_str = child_name.c_str();
+			if (child_name_str && strcmp(child_name_str, name_ascii.get_data()) == 0) {
+				child_rid = _get_or_create_rid_for_entity(world_id, child);
 			}
 		});
 		return child_rid;
@@ -2292,45 +2440,112 @@ RID FlecsServer::get_child_by_name(const RID &parent_id,const String &name){
 }
 
 void FlecsServer::remove_child_by_name(const RID &parent_id, const String &name){
-	RID world_id = get_world_of_entity(parent_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::remove_child_by_name: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
+		if (!_is_live_flecs_entity(parent)) {
+			ERR_PRINT("FlecsServer::remove_child_by_name: parent_id is no longer valid/alive in Flecs world");
+			return;
+		}
+
+		CharString name_ascii = name.ascii();
+		Vector<flecs::entity> children_to_remove;
 		parent.children([&](flecs::entity child) {
-			if (child.name() == name.ascii().get_data()) {
-				child.remove(flecs::ChildOf);
+			if (!_is_live_flecs_entity(child)) {
+				return;
+			}
+
+			flecs::string_view child_name = child.name();
+			const char *child_name_str = child_name.c_str();
+			if (child_name_str && strcmp(child_name_str, name_ascii.get_data()) == 0) {
+				children_to_remove.push_back(child);
 			}
 		});
+		for (flecs::entity child : children_to_remove) {
+			if (_is_live_flecs_entity(child)) {
+				child.remove(flecs::ChildOf);
+			}
+		}
 	} else {
 		ERR_PRINT("FlecsServer::remove_child_by_name: parent_id is not a valid entity");
 	}
 
 }
 void FlecsServer::remove_child_by_index(const RID &parent_id, int index) {
-	RID world_id = get_world_of_entity(parent_id);
+	MutexLock server_lock(mutex);
+	if (index < 0) {
+		ERR_PRINT("FlecsServer::remove_child_by_index: index must be non-negative");
+		return;
+	}
+
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::remove_child_by_index: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
+		if (!_is_live_flecs_entity(parent)) {
+			ERR_PRINT("FlecsServer::remove_child_by_index: parent_id is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		int i = 0;
+		flecs::entity child_to_remove;
 		parent.children([&](flecs::entity child) {
+			if (!_is_live_flecs_entity(child)) {
+				return;
+			}
+
 			if (i == index) {
-				child.remove(flecs::ChildOf);
+				child_to_remove = child;
 			}
 			i++;
 		});
+		if (_is_live_flecs_entity(child_to_remove)) {
+			child_to_remove.remove(flecs::ChildOf);
+		}
 	} else {
 		ERR_PRINT("FlecsServer::remove_child_by_index: parent_id is not a valid entity");
 	}
 }
 
 void FlecsServer::remove_all_children(const RID &parent_id) {
-	RID world_id = get_world_of_entity(parent_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::remove_all_children: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
+		if (!_is_live_flecs_entity(parent)) {
+			ERR_PRINT("FlecsServer::remove_all_children: parent_id is no longer valid/alive in Flecs world");
+			return;
+		}
+
+		Vector<flecs::entity> children_to_remove;
 		parent.children([&](flecs::entity child) {
-			child.remove(flecs::ChildOf);
+			if (_is_live_flecs_entity(child)) {
+				children_to_remove.push_back(child);
+			}
 		});
+		for (flecs::entity child : children_to_remove) {
+			if (_is_live_flecs_entity(child)) {
+				child.remove(flecs::ChildOf);
+			}
+		}
 	} else {
 		ERR_PRINT("FlecsServer::remove_all_children: parent_id is not a valid entity");
 	}
@@ -2338,12 +2553,23 @@ void FlecsServer::remove_all_children(const RID &parent_id) {
 
 void FlecsServer::add_child(const RID &parent_id, const RID& child_id) {
 	// Implementation for adding a child entity
-	RID world_id = get_world_of_entity(parent_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::add_child: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	FlecsEntityVariant* child_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(child_id);
 	if (parent_variant && child_variant) {
 		flecs::entity parent = parent_variant->get_entity();
 		flecs::entity child = child_variant->get_entity();
+		if (!_is_live_flecs_entity(parent) || !_is_live_flecs_entity(child)) {
+			ERR_PRINT("FlecsServer::add_child: parent or child entity is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		child.add(flecs::ChildOf, parent);
 		return;
 	}
@@ -2351,12 +2577,23 @@ void FlecsServer::add_child(const RID &parent_id, const RID& child_id) {
 }
 
 void FlecsServer::remove_child(const RID& parent_id, const RID &child_id) {
-	RID world_id = get_world_of_entity(parent_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::remove_child: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	FlecsEntityVariant* child_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(child_id);
 	if (parent_variant && child_variant) {
 		flecs::entity parent = parent_variant->get_entity();
 		flecs::entity child = child_variant->get_entity();
+		if (!_is_live_flecs_entity(parent) || !_is_live_flecs_entity(child)) {
+			ERR_PRINT("FlecsServer::remove_child: parent or child entity is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		if(child.parent() != parent) {
 			ERR_PRINT("FlecsServer::remove_child: child is not a child of the specified parent");
 			return;
@@ -2368,29 +2605,60 @@ void FlecsServer::remove_child(const RID& parent_id, const RID &child_id) {
 }
 
 TypedArray<RID> FlecsServer::get_children(const RID &parent_id) {
+	MutexLock server_lock(mutex);
 	TypedArray<RID> child_array;
-	RID world_id = get_world_of_entity(parent_id);
+	RID world_id = _get_world_of_entity_nolock(parent_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::get_children: world_id is not valid");
+		return child_array;
+	}
+
 	FlecsEntityVariant *parent_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(parent_id);
 	if (parent_variant) {
 		flecs::entity parent = parent_variant->get_entity();
+		if (!_is_live_flecs_entity(parent)) {
+			ERR_PRINT("FlecsServer::get_children: parent_id is no longer valid/alive in Flecs world");
+			return child_array;
+		}
+
 		parent.children([&](flecs::entity child) {
-			child_array.push_back(flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(child)).get_id());
+			if (!_is_live_flecs_entity(child)) {
+				return;
+			}
+
+			RID child_rid = _get_or_create_rid_for_entity(world_id, child);
+			if (child_rid.is_valid()) {
+				child_array.push_back(child_rid);
+			}
 		});
 	}
 	return child_array;
 }
 
 void FlecsServer::add_component(const RID& entity_id, const RID& component_id) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::add_component: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_id);
 	if (entity_variant && type_id_variant) {
 		flecs::entity entity = entity_variant->get_entity();
-		flecs::entity component_type = entity.world().component(type_id_variant->get_type());
-		if (component_type.is_valid()) {
+		if (!_is_live_flecs_entity(entity)) {
+			ERR_PRINT("FlecsServer::add_component: entity is no longer valid/alive in Flecs world");
+			return;
+		}
+
+		flecs::entity_t type_id = type_id_variant->get_type();
+		flecs::world world = entity.world();
+		flecs::entity component_type(world.c_ptr(), type_id);
+		if (_is_live_flecs_entity(component_type)) {
 			// Trace component add for neural visualizer
 			ECS_TRACE_ADD(entity.id(), component_type.id());
-			
+
 			entity.add(component_type);
 		} else {
 			ERR_PRINT("FlecsServer::add_component: component_type is not valid");
@@ -2402,12 +2670,23 @@ void FlecsServer::add_component(const RID& entity_id, const RID& component_id) {
 }
 
 void FlecsServer::add_relationship(const RID& entity_id, const RID &relationship) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::add_relationship: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	FlecsEntityVariant* relationship_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(relationship);
 	if (entity_variant && relationship_variant) {
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity rel_entity = relationship_variant->get_entity();
+		if (!_is_live_flecs_entity(entity) || !_is_live_flecs_entity(rel_entity)) {
+			ERR_PRINT("FlecsServer::add_relationship: entity_id or relationship is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		entity.add(rel_entity);
 	} else {
 		ERR_PRINT("FlecsServer::add_relationship: entity_id or relationship is not valid");
@@ -2415,12 +2694,23 @@ void FlecsServer::add_relationship(const RID& entity_id, const RID &relationship
 }
 
 void FlecsServer::remove_relationship(const RID& entity_id, const RID &relationship) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::remove_relationship: world_id is not valid");
+		return;
+	}
+
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	FlecsEntityVariant* relationship_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(relationship);
 	if (entity_variant && relationship_variant) {
 		flecs::entity entity = entity_variant->get_entity();
 		flecs::entity rel_entity = relationship_variant->get_entity();
+		if (!_is_live_flecs_entity(entity) || !_is_live_flecs_entity(rel_entity)) {
+			ERR_PRINT("FlecsServer::remove_relationship: entity_id or relationship is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		entity.remove(rel_entity);
 	} else {
 		ERR_PRINT("FlecsServer::remove_relationship: entity_id or relationship is not valid");
@@ -2429,16 +2719,28 @@ void FlecsServer::remove_relationship(const RID& entity_id, const RID &relations
 }
 
 RID FlecsServer::get_relationship(const RID &entity_id, const String& first_entity, const String& second_entity) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::get_relationship: world_id is not valid");
+		return RID();
+	}
+
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (!entity_variant) {
 		ERR_PRINT("FlecsServer::get_relationship: entity_id is not valid");
 		return RID();
 	}
 	flecs::entity entity = entity_variant->get_entity();
-	flecs::entity first = entity.world().component(first_entity.ascii().get_data());
-	flecs::entity second = entity.world().component(second_entity.ascii().get_data());
-	if (!first.is_valid() || !second.is_valid()) {
+	if (!_is_live_flecs_entity(entity)) {
+		ERR_PRINT("FlecsServer::get_relationship: entity is no longer valid/alive in Flecs world");
+		return RID();
+	}
+
+	flecs::world world = entity.world();
+	flecs::entity first = world.lookup(first_entity.ascii().get_data());
+	flecs::entity second = world.lookup(second_entity.ascii().get_data());
+	if (!_is_live_flecs_entity(first) || !_is_live_flecs_entity(second)) {
 		ERR_PRINT("FlecsServer::get_relationship: first or second entity is not valid");
 		return RID();
 	}
@@ -2455,13 +2757,24 @@ RID FlecsServer::get_relationship(const RID &entity_id, const String& first_enti
 }
 
 TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
-	RID world_id = get_world_of_entity(entity_id);
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid() || !flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::get_relationships: world_id is not valid");
+		return TypedArray<RID>();
+	}
+
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (!entity_variant) {
 		ERR_PRINT("FlecsServer::get_relationships: entity_id is not valid");
 		return TypedArray<RID>();
 	}
 	flecs::entity entity = entity_variant->get_entity();
+	if (!_is_live_flecs_entity(entity)) {
+		ERR_PRINT("FlecsServer::get_relationships: entity is no longer valid/alive in Flecs world");
+		return TypedArray<RID>();
+	}
+
 	TypedArray<RID> relationships;
 	Vector<flecs::entity_t> relationship_ids;
 	for (const RID& rid : flecs_variant_owners.get(world_id).type_id_owner.get_owned_list()) {
@@ -2480,6 +2793,9 @@ TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
 		}
 
 	entity.children([&](flecs::entity child) {
+		if (!_is_live_flecs_entity(child)) {
+			return;
+		}
 		if(!child.is_pair()){
 			return;
 		}
@@ -2500,7 +2816,18 @@ RID FlecsServer::_create_rid_for_entity_checked(const RID& world_id, const flecs
 	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
 		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_entity", world_id, p_file, p_line, p_function);
 	}
-	return flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+	MutexLock server_lock(mutex);
+	if (!flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::_create_rid_for_entity: world_id is not a valid world");
+		return RID();
+	}
+	if (!_is_live_flecs_entity(entity)) {
+		ERR_PRINT("FlecsServer::_create_rid_for_entity: entity is not valid or not alive");
+		return RID();
+	}
+	RID rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+	flecs_variant_owners.get(world_id).entity_id_to_rid[entity.id()] = rid;
+	return rid;
 }
 
 RID FlecsServer::_create_rid_for_system(const RID& world_id, const flecs::system &system) {
@@ -2510,6 +2837,15 @@ RID FlecsServer::_create_rid_for_system(const RID& world_id, const flecs::system
 RID FlecsServer::_create_rid_for_system_checked(const RID& world_id, const flecs::system &system, const char *p_file, int p_line, const char *p_function) {
 	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
 		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_system", world_id, p_file, p_line, p_function);
+	}
+	MutexLock server_lock(mutex);
+	if (!flecs_variant_owners.has(world_id)) {
+		ERR_PRINT("FlecsServer::_create_rid_for_system: world_id is not a valid world");
+		return RID();
+	}
+	if (!_is_live_flecs_entity(system)) {
+		ERR_PRINT("FlecsServer::_create_rid_for_system: system is not valid or not alive");
+		return RID();
 	}
 	return flecs_variant_owners.get(world_id).system_owner.make_rid(FlecsSystemVariant(system));
 }
@@ -2538,6 +2874,11 @@ RID FlecsServer::_create_rid_for_type_id_checked(const RID& world_id, const flec
 	if (thread_diagnostics_enabled.load(std::memory_order_relaxed)) {
 		_warn_flecs_non_main_thread_access("FlecsServer::_create_rid_for_type_id", world_id, p_file, p_line, p_function);
 	}
+	MutexLock server_lock(mutex);
+	return _create_rid_for_type_id_nolock(world_id, type_id);
+}
+
+RID FlecsServer::_create_rid_for_type_id_nolock(const RID& world_id, const flecs::entity_t &type_id) {
 	if (type_id == 0) {
 		return RID();
 	}
@@ -2582,7 +2923,7 @@ void FlecsServer::free_world(const RID& rid) {
 		flecs::world *world = _get_world(rid);
 		if (world) {
 			world->each(flecs::System, [&](flecs::entity e) {
-				if (!e.is_valid()) {
+				if (!_is_live_flecs_entity(e)) {
 					return;
 				}
 				regular_system_paused.erase(RID::from_uint64(e.id()));
@@ -2632,10 +2973,18 @@ void FlecsServer::free_world(const RID& rid) {
 }
 
 void FlecsServer::free_system(const RID& world_id, const RID& system_id, const bool include_flecs_world) {
+	MutexLock server_lock(mutex);
 	if (flecs_variant_owners.has(world_id)) {
+		FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id);
+		if (!system_variant) {
+			ERR_PRINT("FlecsServer::free_system: system_id is not a valid system");
+			return;
+		}
 		if (include_flecs_world) {
-			FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id);
-			system_variant->get_system().destruct();
+			flecs::system system = system_variant->get_system();
+			if (_is_live_flecs_entity(system)) {
+				system.destruct();
+			}
 		}
 		flecs_variant_owners.get(world_id).system_owner.free(system_id);
 	} else {
@@ -2644,6 +2993,7 @@ void FlecsServer::free_system(const RID& world_id, const RID& system_id, const b
 }
 
 void FlecsServer::free_script_system(const RID& world_id, const RID& script_system_id) {
+	MutexLock server_lock(mutex);
 	if (flecs_variant_owners.has(world_id)) {
 		flecs_variant_owners.get(world_id).script_system_owner.free(script_system_id);
 	} else {
@@ -2652,6 +3002,7 @@ void FlecsServer::free_script_system(const RID& world_id, const RID& script_syst
 }
 
 void FlecsServer::free_entity(const RID& world_id, const RID& entity_id, bool include_flecs_world) {
+	MutexLock server_lock(mutex);
 	if (flecs_variant_owners.has(world_id)) {
 		FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 		if (entity_variant) {
@@ -2663,7 +3014,7 @@ void FlecsServer::free_entity(const RID& world_id, const RID& entity_id, bool in
 				
 				flecs_variant_owners.get(world_id).entity_id_to_rid.erase(entity.id());
 			}
-			if (include_flecs_world) {
+			if (include_flecs_world && _is_live_flecs_entity(entity)) {
 				entity.destruct();
 			}
 		} else {
@@ -2677,6 +3028,10 @@ void FlecsServer::free_entity(const RID& world_id, const RID& entity_id, bool in
 
 flecs::entity FlecsServer::_get_entity(const RID& entity_id, const RID& world_id) {
 	CHECK_ENTITY_VALIDITY_V(entity_id, world_id, flecs::entity(), _get_entity);
+	if (!_is_live_flecs_entity(entity)) {
+		ERR_PRINT("FlecsServer::_get_entity: entity is no longer valid/alive in Flecs world");
+		return flecs::entity();
+	}
 	return entity;
 }
 
@@ -2762,15 +3117,18 @@ RID FlecsServer::_get_or_create_rid_for_entity_checked(const RID &world_id, cons
 		_warn_flecs_non_main_thread_access("FlecsServer::_get_or_create_rid_for_entity", world_id, p_file, p_line, p_function);
 	}
 	MutexLock server_lock(mutex);
-	// Early validation of entity
-	if (!entity.is_valid() || !entity.is_alive()) {
+	return _get_or_create_rid_for_entity_nolock(world_id, entity);
+}
+
+RID FlecsServer::_get_or_create_rid_for_entity_nolock(const RID &world_id, const flecs::entity &entity) {
+	if (!_is_live_flecs_entity(entity)) {
 		ERR_PRINT("FlecsServer::_get_or_create_rid_for_entity: entity is not valid or not alive");
 		return RID();
 	}
-	
+
 	if (flecs_variant_owners.has(world_id)) {
 		uint64_t entity_id = entity.id();
-		
+
 		// O(1) lookup using reverse map
 		if (flecs_variant_owners.get(world_id).entity_id_to_rid.has(entity_id)) {
 			RID existing_rid = flecs_variant_owners.get(world_id).entity_id_to_rid[entity_id];
@@ -2778,14 +3136,14 @@ RID FlecsServer::_get_or_create_rid_for_entity_checked(const RID &world_id, cons
 			FlecsEntityVariant* owned_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(existing_rid);
 			if (owned_entity) {
 				flecs::entity owned_flecs_entity = owned_entity->get_entity();
-				if (owned_flecs_entity.is_valid() && owned_flecs_entity.id() == entity_id) {
+				if (_is_live_flecs_entity(owned_flecs_entity) && owned_flecs_entity.id() == entity_id) {
 					return existing_rid;
 				}
 			}
 			// RID was stale, remove from map
 			flecs_variant_owners.get(world_id).entity_id_to_rid.erase(entity_id);
 		}
-		
+
 		// Entity not found in existing RIDs, create new one
 		RID new_rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
 		// Add to reverse lookup map
@@ -2815,14 +3173,34 @@ flecs::entity_t FlecsServer::_get_type_id(const RID &entity_id, const RID &world
 }
 
 void FlecsServer::set_world_singleton_with_name(const RID &world_id, const String& comp_type, const Dictionary& comp_data){
-	RID comp_type_id = get_component_type_by_name(world_id, comp_type);
+	MutexLock server_lock(mutex);
+	RID comp_type_id = _get_component_type_by_name_nolock(world_id, comp_type);
 	if (!comp_type_id.is_valid()) {
 		ERR_PRINT("FlecsServer::set_world_singleton_with_name: Component type not found: " + comp_type);
 		return;
 	}
-	set_world_singleton_with_id(world_id, comp_type_id, comp_data);
+	// Inline the _with_id logic to avoid nested lock
+	CHECK_WORLD_VALIDITY(world_id, set_world_singleton_with_name);
+	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
+	if (!type_variant) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_name: Component type ID not found: " + itos(comp_type_id.get_id()));
+		return;
+	}
+	flecs::entity_t comp_type_e = type_variant->get_type();
+	if (!comp_type_e) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_name: Component type is not valid");
+		return;
+	}
+	flecs::world &world = world_variant->get_world();
+	flecs::entity comp_entity(world.c_ptr(), comp_type_e);
+	if (!_is_live_flecs_entity(comp_entity)) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_name: Component entity is not alive");
+		return;
+	}
+	component_from_dict_cursor(comp_entity, comp_type_e, comp_data);
 }
 void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &comp_type_id, const Dictionary& comp_data){
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, set_world_singleton_with_id);
 	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
 	if (!type_variant) {
@@ -2838,20 +3216,39 @@ void FlecsServer::set_world_singleton_with_id(const RID &world_id, const RID &co
 
 	// In Flecs, singletons are stored on the component entity itself
 	flecs::entity comp_entity(world.c_ptr(), comp_type);
+	if (!_is_live_flecs_entity(comp_entity)) {
+		ERR_PRINT("FlecsServer::set_world_singleton_with_id: Component entity is not alive");
+		return;
+	}
 
 	// Use cursor-based conversion for world singletons
 	component_from_dict_cursor(comp_entity, comp_type, comp_data);
 }
 Dictionary FlecsServer::get_world_singleton_with_name(const RID &world_id, const String& comp_type){
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_singleton_with_name);
-	RID comp_type_id = get_component_type_by_name(world_id, comp_type);
+	RID comp_type_id = _get_component_type_by_name_nolock(world_id, comp_type);
 	if (!comp_type_id.is_valid()) {
 		ERR_PRINT("FlecsServer::get_world_singleton_with_name: Component type not found: " + comp_type);
 		return Dictionary();
 	}
-	return get_world_singleton_with_id(world_id, comp_type_id);
+	// Inline the _with_id logic to avoid nested lock
+	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
+	if (!type_variant) {
+		ERR_PRINT("FlecsServer::get_world_singleton_with_name: Component type ID not found: " + itos(comp_type_id.get_id()));
+		return Dictionary();
+	}
+	flecs::world &world = world_variant->get_world();
+	flecs::entity comp_type_e = world.component(type_variant->get_type());
+	if (!_is_live_flecs_entity(comp_type_e)) {
+		ERR_PRINT("FlecsServer::get_world_singleton_with_name: Component type is not valid");
+		return Dictionary();
+	}
+	flecs::entity comp_entity(world.c_ptr(), comp_type_e);
+	return component_to_dict_cursor(comp_entity, comp_type_e);
 }
 Dictionary FlecsServer::get_world_singleton_with_id(const RID &world_id, const RID &comp_type_id){
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_world_singleton_with_id);
 	FlecsTypeIDVariant* type_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(comp_type_id);
 	if (!type_variant) {
@@ -2860,7 +3257,7 @@ Dictionary FlecsServer::get_world_singleton_with_id(const RID &world_id, const R
 	}
 	flecs::world &world = world_variant->get_world();
 	flecs::entity comp_type = world.component(type_variant->get_type());
-	if (!comp_type.is_valid()) {
+	if (!_is_live_flecs_entity(comp_type)) {
 		ERR_PRINT("FlecsServer::get_world_singleton_with_id: Component type is not valid");
 		return Dictionary();
 	}
@@ -2939,6 +3336,16 @@ Dictionary FlecsServer::get_all_systems(const RID &world_id) {
 	Array cpp_list;
 	Array script_list;
 	Array native_list;
+	result["cpp"] = cpp_list;
+	result["script"] = script_list;
+	result["native"] = native_list;
+	result["system_count"] = (int64_t)0;
+
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::get_all_systems: returning empty result while world is progressing");
+		return result;
+	}
+
 	HashSet<uint64_t> added_system_ids;
 
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
@@ -2949,7 +3356,7 @@ Dictionary FlecsServer::get_all_systems(const RID &world_id) {
 		FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(rid);
 		if (!sv) { continue; }
 		flecs::system sys = sv->get_system();
-		if (!sys.is_valid()) { continue; }
+		if (!_is_live_flecs_entity(sys)) { continue; }
 
 		added_system_ids.insert(sys.id());
 
@@ -2992,7 +3399,7 @@ Dictionary FlecsServer::get_all_systems(const RID &world_id) {
 	// that never went through PipelineManager::add_to_pipeline().
 	if (world_ptr) {
 		world_ptr->each(flecs::System, [&](flecs::entity e) {
-			if (!e.is_valid() || added_system_ids.has(e.id()) || _is_builtin_flecs_entity(e)) {
+			if (!_is_live_flecs_entity(e) || added_system_ids.has(e.id()) || _is_builtin_flecs_entity(e)) {
 				return;
 			}
 
@@ -3145,6 +3552,10 @@ Dictionary FlecsServer::get_script_system_info(const RID &world_id, const RID &s
 Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_id) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, Dictionary(), get_system_info);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::get_system_info: returning empty result while world is progressing");
+		return Dictionary();
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
 	ERR_FAIL_NULL_V(wv, Dictionary());
 	flecs::world &w = wv->get_world();
@@ -3155,7 +3566,7 @@ Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_i
 	} else {
 		e = w.entity(system_id.get_id());
 	}
-	if (!e.is_valid()) { ERR_PRINT("get_system_info: invalid system entity"); return Dictionary(); }
+	if (!_is_live_flecs_entity(e)) { ERR_PRINT("get_system_info: invalid system entity"); return Dictionary(); }
 	Dictionary d;
 	d["id"] = (int64_t)e.id();
 	// Keep string_view alive while we use the pointer
@@ -3177,6 +3588,10 @@ Dictionary FlecsServer::get_system_info(const RID &world_id, const RID &system_i
 void FlecsServer::set_system_paused(const RID &world_id, const RID &system_id, bool paused) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, set_system_paused);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::set_system_paused: ignoring request while world is progressing");
+		return;
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
 	if (!wv) { return; }
 	flecs::world &w = wv->get_world();
@@ -3187,7 +3602,7 @@ void FlecsServer::set_system_paused(const RID &world_id, const RID &system_id, b
 	} else {
 		e = w.entity(system_id.get_id());
 	}
-	if (!e.is_valid()) { ERR_PRINT("set_system_paused: invalid system"); return; }
+	if (!_is_live_flecs_entity(e)) { ERR_PRINT("set_system_paused: invalid system"); return; }
 	if (paused) { e.disable(); } else { e.enable(); }
 	regular_system_paused.insert(RID::from_uint64(e.id()), paused);
 }
@@ -3195,6 +3610,10 @@ void FlecsServer::set_system_paused(const RID &world_id, const RID &system_id, b
 bool FlecsServer::is_system_paused(const RID &world_id, const RID &system_id) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY_V(world_id, false, is_system_paused);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::is_system_paused: returning false while world is progressing");
+		return false;
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id);
 	ERR_FAIL_NULL_V(wv, false);
 	flecs::world &w = wv->get_world();
@@ -3205,19 +3624,23 @@ bool FlecsServer::is_system_paused(const RID &world_id, const RID &system_id) {
 	} else {
 		e = w.entity(system_id.get_id());
 	}
-	if (!e.is_valid()) { ERR_PRINT("is_system_paused: invalid system"); return false; }
+	if (!_is_live_flecs_entity(e)) { ERR_PRINT("is_system_paused: invalid system"); return false; }
 	return !e.enabled();
 }
 
 void FlecsServer::pause_systems(const RID &world_id, const PackedInt64Array &system_ids) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, pause_systems);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::pause_systems: ignoring request while world is progressing");
+		return;
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
 	for (int i = 0; i < system_ids.size(); ++i) {
 		uint64_t raw = (uint64_t)system_ids[i];
 		flecs::entity e = w.entity(raw);
-		if (e.is_valid()) {
+		if (_is_live_flecs_entity(e)) {
 			e.disable();
 			regular_system_paused.insert(RID::from_uint64(raw), true);
 		}
@@ -3246,7 +3669,7 @@ void FlecsServer::resume_systems(const RID &world_id, const PackedInt64Array &sy
 	for (int i = 0; i < system_ids.size(); ++i) {
 		uint64_t raw = (uint64_t)system_ids[i];
 		flecs::entity e = w.entity(raw);
-		if (e.is_valid()) {
+		if (_is_live_flecs_entity(e)) {
 			e.enable();
 			regular_system_paused.insert(RID::from_uint64(raw), false);
 		}
@@ -3271,7 +3694,7 @@ void FlecsServer::pause_all_systems(const RID &world_id) {
 	}
 
 	w.each(flecs::System, [&](flecs::entity e) {
-		if (!e.is_valid() || _is_builtin_flecs_entity(e)) {
+		if (!_is_live_flecs_entity(e) || _is_builtin_flecs_entity(e)) {
 			return;
 		}
 		e.disable();
@@ -3297,7 +3720,7 @@ void FlecsServer::resume_all_systems(const RID &world_id) {
 	}
 
 	w.each(flecs::System, [&](flecs::entity e) {
-		if (!e.is_valid() || _is_builtin_flecs_entity(e)) {
+		if (!_is_live_flecs_entity(e) || _is_builtin_flecs_entity(e)) {
 			return;
 		}
 		e.enable();
@@ -3451,10 +3874,10 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 	for (RID sys_rid : flecs_variant_owners.get(world_id).system_owner.get_owned_list()) {
 		FlecsSystemVariant *sv = flecs_variant_owners.get(world_id).system_owner.get_or_null(sys_rid);
 		if (!sv) { continue; }
-		
+
 		flecs::system sys = sv->get_system();
-		if (!sys.is_valid()) { continue; }
-		
+		if (!_is_live_flecs_entity(sys)) { continue; }
+
 		// Track this system's entity ID
 		added_system_ids.insert(sys.id());
 		
@@ -3545,7 +3968,7 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 			// Query for all entities with EcsSystem component. This catches direct
 			// world->system() creation that never touched PipelineManager.
 			world_ptr->each(flecs::System, [&](flecs::entity e) {
-				if (!e.is_valid() || added_system_ids.has(e.id()) || _is_builtin_flecs_entity(e)) {
+				if (!_is_live_flecs_entity(e) || added_system_ids.has(e.id()) || _is_builtin_flecs_entity(e)) {
 					return;
 				}
 
