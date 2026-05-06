@@ -328,6 +328,19 @@ scons tests=yes target=editor dev_build=yes
 
 ## 📝 Changelog
 
+### Version 1.4.0-beta.1 (2026-05-06)
+
+**Threading & Mutex Architecture:**
+- 🔧 **`progress_world()` no longer holds the server mutex** during `world->progress()`, eliminating deadlocks when Flecs worker threads or observer callbacks call back into FlecsServer
+- 🔧 **`_nolock` internal methods** for `get_world_of_entity`, `is_entity_alive`, `get_component_type_by_name`, `_get_or_create_rid_for_entity`, `_create_rid_for_type_id` — eliminates ~27 nested recursive mutex acquisitions per frame
+- 🔧 **`_with_name` wrappers inlined** — `set_world_singleton_with_name` and `get_world_singleton_with_name` now resolve under a single lock instead of three
+
+**Fixed:**
+- 🐛 Deadlock when multi-threaded Flecs systems called `_get_or_create_rid_for_entity` while `progress_world` held the server mutex
+- 🐛 Recursive mutex overhead of 5+ lock/unlock cycles per dirty light per frame via axiomscript LightingInfluence observer chain
+
+---
+
 ### Version 1.3.0-beta.1 (2026-05-05)
 
 **Flecs REST Controls:**
@@ -608,7 +621,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Version:** 1.3.0-beta.1  
-**Last Updated:** 2026-05-05
+**Version:** 1.4.0-beta.1  
+**Last Updated:** 2026-05-06
 **Godot Version:** 4.6+  
 **Maintainer:** [@callmefloof](https://github.com/callmefloof)
