@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1-beta.1] - 2026-05-06
+
+### Fixed
+
+- Restored the `debug/` source directory that was accidentally excluded by `.gitignore` since v1.2.1-beta.1. The `[Dd]ebug/` pattern has been removed from `.gitignore`.
+
 ## [1.3.0-beta.1] - 2026-05-05
 
 ### Added

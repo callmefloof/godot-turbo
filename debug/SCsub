@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+
+Import("env")
+Import("env_modules")
+
+env_turbo_debug = env_modules.Clone()
+
+# Module source files
+module_sources = [
+    "turbo_debug_draw.cpp",
+    "turbo_entity_picker.cpp",
+    "turbo_debug_panel.cpp",
+    "turbo_debug_system.cpp",
+]
+
+env_turbo_debug.add_source_files(env.modules_sources, module_sources)
