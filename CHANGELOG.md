@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2-beta.1] - 2026-05-06
+
+### Changed
+
+- Updated the bundled Flecs submodule to current master for compatibility with the latest Flecs APIs.
+- Replaced removed Flecs `world_info.min_id` / `max_id` access with `range_get()` in the world info editor.
+
+### Fixed
+
+- Hardened `FlecsServer::set_component()` and cursor component writes against stale or dead entity RIDs before calling Flecs `ensure()`.
+- Added `FlecsServer::is_entity_alive()` so callers can validate RID wrappers against the underlying Flecs entity lifetime.
+- Guarded live profiler/system pause introspection while a world is inside `progress_world()` to avoid re-entrant Flecs metadata access.
+
 ## [1.3.1-beta.1] - 2026-05-06
 
 ### Fixed

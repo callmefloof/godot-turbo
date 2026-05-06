@@ -71,8 +71,12 @@ WorldInfo::WorldStats WorldInfo::get_world_stats(flecs::world* world) {
     }
 
     stats.last_component_id = world_info->last_component_id;
-    stats.min_id = world_info->min_id;
-    stats.max_id = world_info->max_id;
+
+    const ecs_entity_range_t *entity_range = world->range_get();
+    if (entity_range) {
+        stats.min_id = entity_range->min;
+        stats.max_id = entity_range->max;
+    }
 
     stats.delta_time_raw = world_info->delta_time_raw;
     stats.delta_time = world_info->delta_time;

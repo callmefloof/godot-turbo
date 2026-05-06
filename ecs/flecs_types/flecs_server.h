@@ -244,6 +244,7 @@ class FlecsServer : public Object {
 	double delta_time = 0.0;
 	HashMap<RID, bool> regular_system_paused; // track pause state for non-script systems
 	HashMap<uint64_t, double> native_system_prev_time_spent; // track previous time_spent for per-frame delta calculation
+	HashMap<RID, bool> worlds_in_progress;
 	std::atomic_bool thread_diagnostics_enabled = true;
 
 protected:
@@ -280,6 +281,7 @@ public:
 	flecs::world *_get_world(const RID &world_id);
 	flecs::world *_get_world_checked(const RID &world_id, const char *p_file, int p_line, const char *p_function);
 	RID get_world_of_entity(const RID &entity_id);
+	bool is_entity_alive(const RID &entity_id);
 	void set_log_level(const int level);
 	void set_thread_diagnostics_enabled(bool p_enabled);
 	bool get_thread_diagnostics_enabled() const;

@@ -676,6 +676,11 @@ static void _set_cursor_from_variant_impl(flecs::cursor &p_cur, const Variant &p
 
 // Helper function to set component data from Dictionary using flecs cursor
 static void component_from_dict_cursor(flecs::entity entity, flecs::entity_t comp_type_id, const Dictionary& dict) {
+	if (!entity.is_valid() || !entity.is_alive()) {
+		ERR_PRINT("component_from_dict_cursor: entity is not valid or not alive");
+		return;
+	}
+
 	// Use ensure to get or create the component
 	void* comp_ptr = entity.ensure(comp_type_id);
 	if (!comp_ptr) {
@@ -1377,7 +1382,15 @@ bool FlecsServer::progress_world(const RID& world_id, const double delta) {
 			return false;
 		}
 
+		if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+			ERR_PRINT("FlecsServer::progress_world: recursive progress_world call ignored");
+			return false;
+		}
+
+		worlds_in_progress.insert(world_id, true);
 		progress = world->progress(delta);
+		worlds_in_progress.insert(world_id, false);
+
 		// Aggregate per-frame summary: totals across script systems + breakdown
 		Dictionary summary;
 		uint64_t total_entities = 0; uint64_t total_callbacks_all_time = 0; uint64_t batch_systems = 0;
@@ -1531,7 +1544,29 @@ RID FlecsServer::get_world_of_entity(const RID &entity_id) {
 	return RID();
 }
 
+bool FlecsServer::is_entity_alive(const RID &entity_id) {
+	MutexLock server_lock(mutex);
+	for (auto &pair : flecs_variant_owners) {
+		FlecsEntityVariant *entity_variant = pair.value.entity_owner.get_or_null(entity_id);
+		if (!entity_variant) {
+			continue;
+		}
 
+		flecs::entity entity = entity_variant->get_entity();
+		if (!entity.is_valid() || !entity.is_alive()) {
+			return false;
+		}
+
+		flecs::world *world = _get_world(pair.key);
+		if (!world || !world->c_ptr()) {
+			return false;
+		}
+
+		return ecs_is_alive(world->c_ptr(), entity.id());
+	}
+
+	return false;
+}
 
 void FlecsServer::set_log_level(const int level) {
 	flecs::log::set_level(level);
@@ -1799,6 +1834,10 @@ bool FlecsServer::has_component(const RID& entity_id, const String &component_ty
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		if (!entity.is_valid() || !entity.is_alive()) {
+			return false;
+		}
+
 		flecs::entity comp_type = world->lookup(component_type.utf8().get_data());
 		return comp_type.is_valid() && entity.has(comp_type);
 	}
@@ -2021,6 +2060,8 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 }
 
 void FlecsServer::set_component(const RID& entity_id, const String& component_type, const Dictionary &comp_data) {
+	MutexLock server_lock(mutex);
+
 	RID world_id = get_world_of_entity(entity_id);
 	if(!world_id.is_valid()){
 		ERR_PRINT("FlecsServer::set_component: world_id is not valid");
@@ -2034,6 +2075,11 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::set_component: entity is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		flecs::entity comp_type = world->lookup(component_type.utf8().get_data());
 		if (comp_type.is_valid()) {
 			// Trace component write for neural visualizer
@@ -2058,6 +2104,11 @@ void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, con
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::remove_component_from_entity_with_id: entity is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		flecs::entity_t comp_id = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(component_id)->get_type();
 		if (comp_id) {
 			// Trace component remove for neural visualizer
@@ -2084,6 +2135,11 @@ void FlecsServer::remove_component_from_entity_with_name(const RID &entity_id, c
 	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
 	if (entity_variant) {
 		flecs::entity entity = entity_variant->get_entity();
+		if (!entity.is_valid() || !entity.is_alive()) {
+			ERR_PRINT("FlecsServer::remove_component_from_entity_with_name: entity is no longer valid/alive in Flecs world");
+			return;
+		}
+
 		flecs::entity component = world->lookup(component_type.utf8().get_data());
 		if (component.is_valid()) {
 			// Trace component remove for neural visualizer
@@ -3181,6 +3237,10 @@ bool FlecsServer::get_script_system_change_observe_remove(const RID &world_id, c
 void FlecsServer::resume_systems(const RID &world_id, const PackedInt64Array &system_ids) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, resume_systems);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::resume_systems: ignoring request while world is progressing");
+		return;
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
 	for (int i = 0; i < system_ids.size(); ++i) {
@@ -3196,6 +3256,10 @@ void FlecsServer::resume_systems(const RID &world_id, const PackedInt64Array &sy
 void FlecsServer::pause_all_systems(const RID &world_id) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, pause_all_systems);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::pause_all_systems: ignoring request while world is progressing");
+		return;
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
 
@@ -3218,6 +3282,10 @@ void FlecsServer::pause_all_systems(const RID &world_id) {
 void FlecsServer::resume_all_systems(const RID &world_id) {
 	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, resume_all_systems);
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		WARN_PRINT("FlecsServer::resume_all_systems: ignoring request while world is progressing");
+		return;
+	}
 	FlecsWorldVariant *wv = flecs_world_owners.get_or_null(world_id); if (!wv) { return; }
 	flecs::world &w = wv->get_world();
 
@@ -3294,7 +3362,16 @@ Dictionary FlecsServer::get_system_metrics(const RID &world_id) {
 	if (!world_variant) {
 		return Dictionary();
 	}
-	
+
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		Dictionary result;
+		result["systems"] = Array();
+		result["system_count"] = 0;
+		result["total_time_usec"] = 0;
+		result["frame_count"] = Engine::get_singleton()->get_frames_drawn();
+		return result;
+	}
+
 	Dictionary result;
 	Array systems_array;
 	uint64_t total_time_usec = 0;
