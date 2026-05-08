@@ -607,6 +607,7 @@ private:
 
 	RID_Owner<FlecsWorldVariant, true> flecs_world_owners = RID_Owner<FlecsWorldVariant, true>(WORLD_OWNER_CHUNK_SIZE, MAX_WORLD_COUNT);
 	Vector<RID> worlds;
+	HashMap<ecs_world_t *, RID> world_ptr_to_rid;
 	AHashMap<RID,RID_Owner_Wrapper> flecs_variant_owners = AHashMap<RID,RID_Owner_Wrapper>(MAX_WORLD_COUNT);
 	Ref<CommandHandler> render_system_command_handler;
 	AHashMap<RID, PipelineManager> pipeline_managers = AHashMap<RID, PipelineManager>(MAX_WORLD_COUNT);

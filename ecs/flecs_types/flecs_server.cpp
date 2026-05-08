@@ -1243,6 +1243,7 @@ RID FlecsServer::create_world() {
 	ref_storages.insert(flecs_world, memnew(RefStorage()));
 	// Record the world RID in the worlds vector so _get_world can find it.
 	worlds.insert(counter++, flecs_world);
+	world_ptr_to_rid.insert(world_ref.c_ptr(), flecs_world);
 
 	auto pipeline_manager = PipelineManager();
 	pipeline_manager.set_world(flecs_world);
@@ -1980,7 +1981,7 @@ PackedStringArray FlecsServer::get_component_types_as_name(const RID &entity_id)
 					const char* first_cstr = first_name.c_str();
 					const char* second_cstr = second_name.c_str();
 					if (first_cstr && second_cstr && first_cstr[0] != '\0' && second_cstr[0] != '\0') {
-						String pair_name = String("(") + String(first_cstr) + ", " + String(second_cstr) + ")";
+						String pair_name = String("(") + first_cstr + ", " + second_cstr + ")";
 						component_types.push_back(pair_name);
 					}
 				}
@@ -2323,7 +2324,7 @@ RID FlecsServer::get_parent(const RID& entity_id) {
 
 		flecs::entity parent = entity.parent();
 		if (_is_live_flecs_entity(parent)) {
-			return _get_or_create_rid_for_entity(world_id, parent);
+			return _get_or_create_rid_for_entity_nolock(world_id, parent);
 		}
 	}
 	ERR_FAIL_V_MSG(RID(), "Parent not found for entity_id: " + itos(entity_id.get_id()));
@@ -2388,7 +2389,7 @@ RID FlecsServer::get_child(const RID& entity_id, int index) {
 			i++;
 		});
 		if (_is_live_flecs_entity(child)) {
-			return _get_or_create_rid_for_entity(world_id, child);
+			return _get_or_create_rid_for_entity_nolock(world_id, child);
 		}
 	}
 	ERR_FAIL_V_MSG(RID(), "Child not found for entity_id: " + itos(entity_id.get_id()) + " at index: " + itos(index));
@@ -2431,7 +2432,7 @@ RID FlecsServer::get_child_by_name(const RID &parent_id,const String &name){
 			flecs::string_view child_name = child.name();
 			const char *child_name_str = child_name.c_str();
 			if (child_name_str && strcmp(child_name_str, name_ascii.get_data()) == 0) {
-				child_rid = _get_or_create_rid_for_entity(world_id, child);
+				child_rid = _get_or_create_rid_for_entity_nolock(world_id, child);
 			}
 		});
 		return child_rid;
@@ -2626,7 +2627,7 @@ TypedArray<RID> FlecsServer::get_children(const RID &parent_id) {
 				return;
 			}
 
-			RID child_rid = _get_or_create_rid_for_entity(world_id, child);
+			RID child_rid = _get_or_create_rid_for_entity_nolock(world_id, child);
 			if (child_rid.is_valid()) {
 				child_array.push_back(child_rid);
 			}
@@ -2786,10 +2787,10 @@ TypedArray<RID> FlecsServer::get_relationships(const RID &entity_id) {
 			if(type_id == 0) {
 				continue;
 			}
-			if(entity.has(type_id)) {
+			entity.each(type_id, [&](flecs::entity_t) {
 				relationships.append(rid);
 				relationship_ids.push_back(type_id);
-			}
+			});
 		}
 
 	entity.children([&](flecs::entity child) {
@@ -2856,11 +2857,9 @@ RID FlecsServer::_get_rid_for_world(const flecs::world *world) {
 		ERR_PRINT("FlecsServer::_get_rid_for_world: world is null");
 		return RID();
 	}
-	for(auto it = worlds.begin(); it != worlds.end(); ++it) {
-		flecs::world *candidate = _get_world(*it);
-		if (candidate && candidate->c_ptr() == world->c_ptr()) {
-			return *it;
-		}
+	const RID *found = world_ptr_to_rid.getptr(world->c_ptr());
+	if (found) {
+		return *found;
 	}
 	ERR_PRINT("FlecsServer::_get_rid_for_world: world not found");
 	return RID();
@@ -2954,6 +2953,9 @@ void FlecsServer::free_world(const RID& rid) {
 		flecs_variant_owners.erase(rid);
 
 		worlds.erase(rid);
+		if (FlecsWorldVariant *wv = flecs_world_owners.get_or_null(rid)) {
+			world_ptr_to_rid.erase(wv->get_world().c_ptr());
+		}
 		flecs_world_owners.free(rid);
 
 		pipeline_managers.erase(rid);
@@ -3128,12 +3130,12 @@ RID FlecsServer::_get_or_create_rid_for_entity_nolock(const RID &world_id, const
 
 	if (flecs_variant_owners.has(world_id)) {
 		uint64_t entity_id = entity.id();
-
+		FlecsServer::RID_Owner_Wrapper &wrapper = flecs_variant_owners.get(world_id);
 		// O(1) lookup using reverse map
-		if (flecs_variant_owners.get(world_id).entity_id_to_rid.has(entity_id)) {
-			RID existing_rid = flecs_variant_owners.get(world_id).entity_id_to_rid[entity_id];
+		if (wrapper.entity_id_to_rid.has(entity_id)) {	
+			RID existing_rid = wrapper.entity_id_to_rid[entity_id];
 			// Verify the RID is still valid
-			FlecsEntityVariant* owned_entity = flecs_variant_owners.get(world_id).entity_owner.get_or_null(existing_rid);
+			FlecsEntityVariant *owned_entity = wrapper.entity_owner.get_or_null(existing_rid);
 			if (owned_entity) {
 				flecs::entity owned_flecs_entity = owned_entity->get_entity();
 				if (_is_live_flecs_entity(owned_flecs_entity) && owned_flecs_entity.id() == entity_id) {
@@ -3141,13 +3143,13 @@ RID FlecsServer::_get_or_create_rid_for_entity_nolock(const RID &world_id, const
 				}
 			}
 			// RID was stale, remove from map
-			flecs_variant_owners.get(world_id).entity_id_to_rid.erase(entity_id);
+			wrapper.entity_id_to_rid.erase(entity_id);
 		}
 
 		// Entity not found in existing RIDs, create new one
-		RID new_rid = flecs_variant_owners.get(world_id).entity_owner.make_rid(FlecsEntityVariant(entity));
+		RID new_rid = wrapper.entity_owner.make_rid(FlecsEntityVariant(entity));
 		// Add to reverse lookup map
-		flecs_variant_owners.get(world_id).entity_id_to_rid[entity_id] = new_rid;
+		wrapper.entity_id_to_rid[entity_id] = new_rid;
 		return new_rid;
 	} else {
 		ERR_PRINT("FlecsServer::_get_or_create_rid_for_entity: world_id is not a valid world");
