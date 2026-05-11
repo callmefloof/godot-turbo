@@ -2163,6 +2163,24 @@ void FlecsServer::set_component(const RID& entity_id, const String& component_ty
 	}
 }
 
+void FlecsServer::set_component_raw(const RID &entity_id, uint64_t comp_type_id, const Dictionary &comp_data) {
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid()) {
+		return;
+	}
+	FlecsEntityVariant *entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id);
+	if (!entity_variant) {
+		return;
+	}
+	flecs::entity entity = entity_variant->get_entity();
+	if (!_is_live_flecs_entity(entity) || comp_type_id == 0) {
+		return;
+	}
+	ECS_TRACE_WRITE(entity.id(), comp_type_id, 0);
+	component_from_dict_cursor(entity, comp_type_id, comp_data);
+}
+
 void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, const RID &component_id) {
 	MutexLock server_lock(mutex);
 	RID world_id = _get_world_of_entity_nolock(entity_id);

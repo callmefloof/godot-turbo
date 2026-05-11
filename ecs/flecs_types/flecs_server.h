@@ -311,6 +311,7 @@ public:
 	String get_entity_name(const RID &entity_id);
 	void set_entity_name(const RID& entity_id, const String &p_name);
 	void set_component(const RID& entity_id, const String& component_name, const Dictionary &comp_data);
+	void set_component_raw(const RID &entity_id, uint64_t comp_type_id, const Dictionary &comp_data);
 	void remove_component_from_entity_with_id(const RID &entity_id, const RID &component_type_id);
 	void remove_component_from_entity_with_name(const RID &entity_id,const String &component_type);
 	Dictionary get_component_by_name(const RID &entity_id, const String &component_type);
