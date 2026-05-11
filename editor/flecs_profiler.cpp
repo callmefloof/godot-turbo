@@ -238,11 +238,11 @@ void FlecsProfiler::_build_profiler_ui() {
 	metrics_tree->set_columns(6);
 	metrics_tree->set_column_titles_visible(true);
 	metrics_tree->set_column_title(0, "System/Query");
-	metrics_tree->set_column_title(1, "Time (us)");
+	metrics_tree->set_column_title(1, "Time (ms)");
 	metrics_tree->set_column_title(2, "Calls");
 	metrics_tree->set_column_title(3, "Entities");
-	metrics_tree->set_column_title(4, "Min (us)");
-	metrics_tree->set_column_title(5, "Max (us)");
+	metrics_tree->set_column_title(4, "Min (ms)");
+	metrics_tree->set_column_title(5, "Max (ms)");
 	metrics_tree->set_column_expand(0, true);
 	for (int i = 1; i < 6; i++) {
 		metrics_tree->set_column_expand(i, false);
@@ -676,18 +676,18 @@ void FlecsProfiler::_update_metrics_tree() {
 	if (instance_mgr->has_other_instance() && !instance_mgr->is_primary_instance()) {
 		instance_info = " [secondary]";
 	}
-	info_label->set_text(vformat("Frame %d - Total: %d us%s", frame.frame_number, frame.total_frame_time_usec, instance_info));
+	info_label->set_text(vformat("Frame %d - Total: %.3f ms%s", frame.frame_number, double(frame.total_frame_time_usec) / 1000.0, instance_info));
 
 	TreeItem *root = metrics_tree->create_item();
 
 	for (const SystemMetric &sys : frame.system_metrics) {
 		TreeItem *item = metrics_tree->create_item(root);
 		item->set_text(0, sys.name);
-		item->set_text(1, itos(sys.total_time_usec));
+		item->set_text(1, vformat("%.3f", double(sys.total_time_usec) / 1000.0));
 		item->set_text(2, itos(sys.call_count));
 		item->set_text(3, itos(sys.entity_count));
-		item->set_text(4, itos(sys.min_time_usec));
-		item->set_text(5, itos(sys.max_time_usec));
+		item->set_text(4, vformat("%.3f", double(sys.min_time_usec) / 1000.0));
+		item->set_text(5, vformat("%.3f", double(sys.max_time_usec) / 1000.0));
 	}
 
 	for (const QueryMetric &qry : frame.query_metrics) {
@@ -827,11 +827,7 @@ void FlecsProfiler::_update_plot() {
 		String scale_info;
 		// Format times nicely
 		auto format_time = [](float usec) -> String {
-			if (usec >= 1000.0f) {
-				return String::num(usec / 1000.0f, 2) + "ms";
-			} else {
-				return String::num(usec, 0) + "us";
-			}
+			return String::num(usec / 1000.0f, 3) + "ms";
 		};
 		
 		scale_info = "Frames: " + itos(frame_count);
@@ -879,17 +875,11 @@ void FlecsProfiler::_update_button_text() {
 }
 
 String FlecsProfiler::_get_time_as_text(uint64_t p_time_usec) {
-	if (p_time_usec < 1000) {
-		return vformat("%.1f us", float(p_time_usec));
-	} else if (p_time_usec < 1000000) {
-		return vformat("%.2f ms", float(p_time_usec) / 1000.0);
-	} else {
-		return vformat("%.3f s", float(p_time_usec) / 1000000.0);
-	}
+	return vformat("%.3f ms", double(p_time_usec) / 1000.0);
 }
 
 String FlecsProfiler::_get_metric_label(const SystemMetric &p_metric, float p_time) {
-	return vformat("%s: %.2f ms", p_metric.name, p_time);
+	return vformat("%s: %.3f ms", p_metric.name, p_time);
 }
 
 Color FlecsProfiler::_get_color_from_system_id(const RID &p_system_id) const {
