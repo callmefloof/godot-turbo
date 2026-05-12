@@ -30,7 +30,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
 	} \
-	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id); \
+	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id)->entity_owner.get_or_null(entity_id); \
 	if (!entity_variant) { \
 		ERR_PRINT("FlecsServer:: " #func_name ": entity_id is not a valid entity"); \
 		return default_value; \
@@ -48,7 +48,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id).entity_owner.get_or_null(entity_id); \
+	FlecsEntityVariant* entity_variant = flecs_variant_owners.get(world_id)->entity_owner.get_or_null(entity_id); \
 	if (!entity_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": entity_id is not a valid entity"); \
 		return; \
@@ -64,7 +64,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
 	} \
-	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
+	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id)->system_owner.get_or_null(system_id); \
 	if (!system_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": system_id is not a valid system"); \
 		return default_value; \
@@ -74,7 +74,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id).system_owner.get_or_null(system_id); \
+	FlecsSystemVariant* system_variant = flecs_variant_owners.get(world_id)->system_owner.get_or_null(system_id); \
 	if (!system_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": system_id is not a valid system"); \
 		return; \
@@ -84,7 +84,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
 	} \
-	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(script_system_id); \
+	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id)->script_system_owner.get_or_null(script_system_id); \
 	if (!script_system) { \
 		ERR_PRINT("FlecsServer::" #func_name ": script_system_id is not a valid script system"); \
 		return default_value; \
@@ -94,7 +94,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id).script_system_owner.get_or_null(script_system_id); \
+	FlecsScriptSystem* script_system = flecs_variant_owners.get(world_id)->script_system_owner.get_or_null(script_system_id); \
 	if (!script_system) { \
 		ERR_PRINT("FlecsServer::" #func_name ": script_system_id is not a valid script system"); \
 		return; \
@@ -105,7 +105,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
 	} \
-	FlecsQuery* query = flecs_variant_owners.get(world_id).query_owner.get_or_null(query_id); \
+	FlecsQuery* query = flecs_variant_owners.get(world_id)->query_owner.get_or_null(query_id); \
 	if (!query) { \
 		ERR_PRINT("FlecsServer::" #func_name ": query_id is not a valid query"); \
 		return default_value; \
@@ -116,7 +116,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	FlecsQuery* query = flecs_variant_owners.get(world_id).query_owner.get_or_null(query_id); \
+	FlecsQuery* query = flecs_variant_owners.get(world_id)->query_owner.get_or_null(query_id); \
 	if (!query) { \
 		ERR_PRINT("FlecsServer::" #func_name ": query_id is not a valid query"); \
 		return; \
@@ -127,7 +127,7 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return default_value; \
 	} \
-	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(type_rid); \
+	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id)->type_id_owner.get_or_null(type_rid); \
 	if (!type_id_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": type_id is not a valid type ID"); \
 		return default_value; \
@@ -137,30 +137,34 @@
 		ERR_PRINT("FlecsServer::" #func_name ": world_id is not a valid world"); \
 		return; \
 	} \
-	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id).type_id_owner.get_or_null(type_id); \
+	FlecsTypeIDVariant* type_id_variant = flecs_variant_owners.get(world_id)->type_id_owner.get_or_null(type_id); \
 	if (!type_id_variant) { \
 		ERR_PRINT("FlecsServer::" #func_name ": type_id is not a valid type ID"); \
 		return; \
 	}
 
-constexpr static int MAX_WORLD_COUNT = std::numeric_limits<uint8_t>::max() + 1;
-constexpr static int MAX_ENTITY_COUNT = std::numeric_limits<uint32_t>::max() + 1;
-constexpr static int MAX_COMPONENT_COUNT = std::numeric_limits<uint32_t>::max() + 1;
-constexpr static int MAX_SYSTEM_COUNT = std::numeric_limits<uint16_t>::max() + 1;
-constexpr static int MAX_SCRIPT_SYSTEM_COUNT = std::numeric_limits<uint32_t>::max() + 1;
-constexpr static int MAX_TYPE_ID_COUNT = std::numeric_limits<uint32_t>::max() + 1;
-constexpr static int MAX_COMMAND_HANDLER_COUNT = std::numeric_limits<uint32_t>::max() + 1;
-constexpr static int MAX_QUERY_COUNT = std::numeric_limits<uint32_t>::max() + 1;
+// NOTE: RID_Owner caps elements at a uint32_t, so these are uint32_t.
+// The uint8/uint16-derived values get the +1 because they fit; the uint32-derived
+// ones use numeric_limits<uint32_t>::max() directly (no +1) — anything more
+// can't be stored in RID_Owner's count anyway.
+constexpr static uint32_t MAX_WORLD_COUNT = uint32_t(std::numeric_limits<uint8_t>::max()) + 1;
+constexpr static uint32_t MAX_ENTITY_COUNT = std::numeric_limits<uint32_t>::max();
+constexpr static uint32_t MAX_COMPONENT_COUNT = std::numeric_limits<uint32_t>::max();
+constexpr static uint32_t MAX_SYSTEM_COUNT = uint32_t(std::numeric_limits<uint16_t>::max()) + 1;
+constexpr static uint32_t MAX_SCRIPT_SYSTEM_COUNT = std::numeric_limits<uint32_t>::max();
+constexpr static uint32_t MAX_TYPE_ID_COUNT = std::numeric_limits<uint32_t>::max();
+constexpr static uint32_t MAX_COMMAND_HANDLER_COUNT = std::numeric_limits<uint32_t>::max();
+constexpr static uint32_t MAX_QUERY_COUNT = std::numeric_limits<uint32_t>::max();
 
 
-constexpr static int WORLD_OWNER_CHUNK_SIZE = 65536;
-constexpr static int ENTITY_OWNER_CHUNK_SIZE = 65536;
-constexpr static int COMPONENT_OWNER_CHUNK_SIZE = 65536;
-constexpr static int SYSTEM_OWNER_CHUNK_SIZE = 65536;
-constexpr static int SCRIPT_SYSTEM_OWNER_CHUNK_SIZE = 65536;
-constexpr static int TYPE_ID_OWNER_CHUNK_SIZE = 65536;
-constexpr static int COMMAND_HANDLER_OWNER_CHUNK_SIZE = 65536;
-constexpr static int QUERY_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t WORLD_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t ENTITY_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t COMPONENT_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t SYSTEM_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t SCRIPT_SYSTEM_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t TYPE_ID_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t COMMAND_HANDLER_OWNER_CHUNK_SIZE = 65536;
+constexpr static uint32_t QUERY_OWNER_CHUNK_SIZE = 65536;
 
 
 
@@ -312,6 +316,8 @@ public:
 	void set_entity_name(const RID& entity_id, const String &p_name);
 	void set_component(const RID& entity_id, const String& component_name, const Dictionary &comp_data);
 	void set_component_raw(const RID &entity_id, uint64_t comp_type_id, const Dictionary &comp_data);
+	Dictionary get_component_raw(const RID &entity_id, const uint64_t comp_type_id);
+	void add_component_raw(const RID &entity_id, uint64_t comp_type_id);
 	void remove_component_from_entity_with_id(const RID &entity_id, const RID &component_type_id);
 	void remove_component_from_entity_with_name(const RID &entity_id,const String &component_type);
 	Dictionary get_component_by_name(const RID &entity_id, const String &component_type);
@@ -501,11 +507,11 @@ public:
 private:
 	struct RID_Owner_Wrapper {
 		RID world_id;
-		RID_Owner<FlecsEntityVariant, true> entity_owner;
-		RID_Owner<FlecsTypeIDVariant, true> type_id_owner;
-		RID_Owner<FlecsSystemVariant, true> system_owner;
-		RID_Owner<FlecsScriptSystem, true> script_system_owner;
-		RID_Owner<FlecsQuery, true> query_owner;
+		RID_Owner<FlecsEntityVariant, true> entity_owner = RID_Owner<FlecsEntityVariant, true>(ENTITY_OWNER_CHUNK_SIZE, MAX_ENTITY_COUNT);
+		RID_Owner<FlecsTypeIDVariant, true> type_id_owner = RID_Owner<FlecsTypeIDVariant, true>(TYPE_ID_OWNER_CHUNK_SIZE, MAX_TYPE_ID_COUNT);
+		RID_Owner<FlecsSystemVariant, true> system_owner = RID_Owner<FlecsSystemVariant, true>(SYSTEM_OWNER_CHUNK_SIZE, MAX_SYSTEM_COUNT);
+		RID_Owner<FlecsScriptSystem, true> script_system_owner = RID_Owner<FlecsScriptSystem, true>(SCRIPT_SYSTEM_OWNER_CHUNK_SIZE, MAX_SCRIPT_SYSTEM_COUNT);
+		RID_Owner<FlecsQuery, true> query_owner = RID_Owner<FlecsQuery, true>(QUERY_OWNER_CHUNK_SIZE, MAX_QUERY_COUNT);
 		HashMap<String, Ref<CommandHandler>> command_handlers;
 		// Reverse lookup map: Flecs entity ID -> Godot RID (for O(1) lookups)
 		HashMap<uint64_t, RID> entity_id_to_rid;
@@ -513,103 +519,12 @@ private:
 		// frequently resolved by name, so reusing RIDs prevents per-frame leaks.
 		HashMap<uint64_t, RID> type_id_to_rid;
 		RID_Owner_Wrapper() = default;
-		RID_Owner_Wrapper(RID p_world_id) : world_id(p_world_id),
-			entity_owner(ENTITY_OWNER_CHUNK_SIZE, MAX_ENTITY_COUNT),
-			type_id_owner(TYPE_ID_OWNER_CHUNK_SIZE, MAX_TYPE_ID_COUNT),
-			system_owner(SYSTEM_OWNER_CHUNK_SIZE, MAX_SYSTEM_COUNT),
-			script_system_owner(SCRIPT_SYSTEM_OWNER_CHUNK_SIZE, MAX_SCRIPT_SYSTEM_COUNT),
-			query_owner(QUERY_OWNER_CHUNK_SIZE, MAX_QUERY_COUNT) {}
-		//fun hack to get around the lack of move semantics
-		// Ensure world_id is initialized before using it when rebuilding owners from another wrapper.
-		RID_Owner_Wrapper(const RID_Owner_Wrapper& other) {
-			// Initialize world_id first to ensure lookups use the correct world
-			world_id = other.world_id;
-			for (RID rid : other.entity_owner.get_owned_list()) {
-					flecs::entity e = FlecsServer::get_singleton()->_get_entity(rid, world_id);
-					RID new_rid = entity_owner.make_rid(FlecsEntityVariant(e));
-					if (e.is_valid()) {
-						entity_id_to_rid[e.id()] = new_rid;
-					}
-			}
-			LocalVector<RID> other_type_ids = other.type_id_owner.get_owned_list();
-
-			for (RID rid : other_type_ids) {
-				flecs::entity_t type_id = FlecsServer::get_singleton()->_get_type_id(rid, world_id);
-				RID new_rid = type_id_owner.make_rid(FlecsTypeIDVariant(type_id));
-				if (type_id != 0 && new_rid.is_valid()) {
-					type_id_to_rid[type_id] = new_rid;
-				}
-			}
-
-			LocalVector<RID> other_system_ids = other.system_owner.get_owned_list();
-
-			for (RID rid : other_system_ids) {
-				system_owner.make_rid(FlecsSystemVariant(FlecsServer::get_singleton()->_get_system(rid, world_id)));
-			}
-
-			LocalVector<RID> other_script_ids = other.script_system_owner.get_owned_list();
-			for (RID rid : other_script_ids) {
-				script_system_owner.make_rid(FlecsScriptSystem(FlecsServer::get_singleton()->_get_script_system(rid, world_id)));
-			}
-
-			LocalVector<RID> other_query_ids = other.query_owner.get_owned_list();
-			for (RID rid : other_query_ids) {
-				query_owner.make_rid(FlecsQuery(FlecsServer::get_singleton()->_get_query(rid, world_id)));
-			}
-
-			command_handlers = other.command_handlers;
-		}
-		RID_Owner_Wrapper operator=(const RID_Owner_Wrapper& other) {
-			if (this != &other) {
-				world_id = other.world_id;
-				for(RID rid : other.type_id_owner.get_owned_list()) {
-					FlecsServer::get_singleton()->free_type_id(world_id, rid);
-				}
-				for (RID rid : other.system_owner.get_owned_list()) {
-					FlecsServer::get_singleton()->free_system(world_id, rid, true);
-				}
-				for (RID rid : other.script_system_owner.get_owned_list()) {
-					FlecsServer::get_singleton()->free_script_system(world_id, rid);
-				}
-
-				for (RID rid : other.entity_owner.get_owned_list()) {
-					flecs::entity e = get_singleton()->_get_entity(rid, world_id);
-					RID new_rid = entity_owner.make_rid(FlecsEntityVariant(e));
-					if (e.is_valid()) {
-						entity_id_to_rid[e.id()] = new_rid;
-					}
-				}
-
-				for (RID rid : other.type_id_owner.get_owned_list()) {
-					flecs::entity_t type_id = get_singleton()->_get_type_id(rid, world_id);
-					RID new_rid = type_id_owner.make_rid(FlecsTypeIDVariant(type_id));
-					if (type_id != 0 && new_rid.is_valid()) {
-						type_id_to_rid[type_id] = new_rid;
-					}
-				}
-
-				for (RID rid : other.system_owner.get_owned_list()) {
-					system_owner.make_rid(FlecsSystemVariant(get_singleton()->_get_system(rid, world_id)));
-				}
-
-				for (RID rid : other.script_system_owner.get_owned_list()) {
-					script_system_owner.make_rid(FlecsScriptSystem(get_singleton()->_get_script_system(rid, world_id)));
-				}
-
-				for (RID rid : other.query_owner.get_owned_list()) {
-					query_owner.make_rid(FlecsQuery(get_singleton()->_get_query(rid, world_id)));
-				}
-
-			}
-			command_handlers = other.command_handlers;
-			return *this;
-		}
 	};
 
 	RID_Owner<FlecsWorldVariant, true> flecs_world_owners = RID_Owner<FlecsWorldVariant, true>(WORLD_OWNER_CHUNK_SIZE, MAX_WORLD_COUNT);
 	Vector<RID> worlds;
 	HashMap<ecs_world_t *, RID> world_ptr_to_rid;
-	AHashMap<RID,RID_Owner_Wrapper> flecs_variant_owners = AHashMap<RID,RID_Owner_Wrapper>(MAX_WORLD_COUNT);
+	AHashMap<RID, RID_Owner_Wrapper *> flecs_variant_owners = AHashMap<RID, RID_Owner_Wrapper*>(MAX_WORLD_COUNT);
 	Ref<CommandHandler> render_system_command_handler;
 	AHashMap<RID, PipelineManager> pipeline_managers = AHashMap<RID, PipelineManager>(MAX_WORLD_COUNT);
 	Callable command_handler_callback;
