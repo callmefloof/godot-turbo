@@ -850,6 +850,14 @@ FlecsServer *FlecsServer::get_singleton() {
 }
 
 
+void FlecsServer::lock() {
+	mutex.lock();
+}
+
+void FlecsServer::unlock() {
+	mutex.unlock();
+}
+
 void FlecsServer::finish() {
 	exit_thread = true;
 	thread.wait_to_finish();
@@ -1132,6 +1140,10 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_script_system_name", "world_id", "script_system_id", "name"), &FlecsServer::set_script_system_name);
 	ClassDB::bind_method(D_METHOD("get_script_system_name", "world_id", "script_system_id"), &FlecsServer::get_script_system_name);
 
+	// Raw component methods
+	ClassDB::bind_method(D_METHOD("add_component_raw", "entity_id", "component_type_id"), &FlecsServer::add_component_raw);
+	ClassDB::bind_method(D_METHOD("set_component_raw", "entity_id", "component_type_id"), &FlecsServer::set_component_raw);
+	ClassDB::bind_method(D_METHOD("get_component_raw", "entity_id", "component_type_id"), &FlecsServer::get_component_raw);
 
 
 	// Debug helpers
@@ -1163,7 +1175,7 @@ FlecsServer::~FlecsServer() {
 }
 
 RID FlecsServer::create_world() {
-	MutexLock(mutex);
+	MutexLock server_lock(mutex);
 	if(counter >= std::numeric_limits<uint8_t>::max()) {
 		ERR_PRINT("FlecsServer::create_world: Maximum number of worlds " + itos(std::numeric_limits<uint8_t>::max()) + " reached");
 		return RID();
@@ -2170,6 +2182,42 @@ void FlecsServer::set_component_raw(const RID &entity_id, uint64_t comp_type_id,
 	component_from_dict_cursor(entity, comp_type_id, comp_data);
 }
 
+Dictionary FlecsServer::get_component_raw(const RID &entity_id, const uint64_t comp_type_id) {
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid()) {
+		return Dictionary();
+	}
+	FlecsEntityVariant *entity_variant = flecs_variant_owners.get(world_id)->entity_owner.get_or_null(entity_id);
+	if (!entity_variant) {
+		return Dictionary();
+	}
+	flecs::entity entity = entity_variant->get_entity();
+	if (!_is_live_flecs_entity(entity) || comp_type_id == 0) {
+		return Dictionary();
+	}
+	ECS_TRACE_READ(entity.id(), comp_type_id, 0);
+	return component_to_dict_cursor(entity, comp_type_id);
+}
+
+void FlecsServer::add_component_raw(const RID &entity_id, uint64_t comp_type_id) {
+	MutexLock server_lock(mutex);
+	RID world_id = _get_world_of_entity_nolock(entity_id);
+	if (!world_id.is_valid()) {
+		return;
+	}
+	FlecsEntityVariant *entity_variant = flecs_variant_owners.get(world_id)->entity_owner.get_or_null(entity_id);
+	if (!entity_variant) {
+		return;
+	}
+	flecs::entity entity = entity_variant->get_entity();
+	if (!_is_live_flecs_entity(entity) || comp_type_id == 0) {
+		return;
+	}
+
+	ECS_TRACE_ADD(entity.id(), comp_type_id);
+	entity.add(comp_type_id);
+
+}
 void FlecsServer::remove_component_from_entity_with_id(const RID &entity_id, const RID &component_id) {
 	MutexLock server_lock(mutex);
 	RID world_id = _get_world_of_entity_nolock(entity_id);
