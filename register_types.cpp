@@ -1,6 +1,7 @@
 #include "register_types.h"
 
 #include "../../core/object/class_db.h"
+#include "core/config/engine.h"
 #include "core/os/memory.h"
 #include "modules/godot_turbo/ecs/systems/utility/world_utility.h"
 #include "modules/godot_turbo/ecs/systems/utility/scene_object_utility.h"

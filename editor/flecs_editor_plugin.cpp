@@ -2,6 +2,7 @@
 #include "flecs_profiler.h"
 #include "instance_manager.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "core/object/callable_mp.h"
 
 #include "core/string/print_string.h"
 #include "editor/editor_interface.h"

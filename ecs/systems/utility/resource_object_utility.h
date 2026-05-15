@@ -116,8 +116,7 @@ private:
 		rc.resource_name = resource->get_name();
 		
 		// Check if this resource is a Script
-		const Ref<Script> scr = resource->get_script();
-		rc.is_script_type = scr.is_valid();
+		rc.is_script_type = resource->is_class("Script");
 
 		// Create entity with resource name and component
 		String entity_name = resource->get_name();

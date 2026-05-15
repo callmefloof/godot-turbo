@@ -31,6 +31,7 @@
 
 #include "core/config/engine.h"
 #include "core/io/marshalls.h"
+#include "core/object/callable_mp.h"
 #include "core/os/os.h"
 #include "core/variant/variant.h"
 #include "scene/main/multiplayer_peer.h"

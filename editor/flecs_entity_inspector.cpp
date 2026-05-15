@@ -1,5 +1,7 @@
 #include "flecs_entity_inspector.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "core/config/engine.h"
+#include "core/object/callable_mp.h"
 #include "scene/gui/tree.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/panel_container.h"

@@ -31,6 +31,7 @@
 #include "instance_manager.h"
 
 #include "core/config/engine.h"
+#include "core/object/callable_mp.h"
 #include "editor/editor_node.h"
 #include "scene/gui/separator.h"
 #include "scene/main/timer.h"

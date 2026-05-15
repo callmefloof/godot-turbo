@@ -173,7 +173,7 @@ RID RenderUtility3D::create_multi_mesh(const RID &world_id,
 		ERR_FAIL_V(RID());
 	}
 	RS::get_singleton()->multimesh_set_mesh(multi_mesh_id, mesh_id);
-	RS::get_singleton()->multimesh_allocate_data(multi_mesh_id, size, RS::MULTIMESH_TRANSFORM_3D, use_colors, use_custom_data, use_indirect);
+	RS::get_singleton()->multimesh_allocate_data(multi_mesh_id, size, RSE::MULTIMESH_TRANSFORM_3D, use_colors, use_custom_data, use_indirect);
 	auto mesh_component = MeshComponent();
 	Vector<RID> material_ids_vector;
 	for (int i = 0; i < material_ids.size(); i++) {
@@ -187,7 +187,7 @@ RID RenderUtility3D::create_multi_mesh(const RID &world_id,
 	multi_mesh_component.has_color = use_colors;
 	multi_mesh_component.has_data = use_custom_data;
 	multi_mesh_component.is_instanced = use_indirect;
-	multi_mesh_component.transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_3D;
+	multi_mesh_component.transform_format = RSE::MultimeshTransformFormat::MULTIMESH_TRANSFORM_3D;
 
 
 	RID instance_id = RS::get_singleton()->instance_create2(multi_mesh_id, scenario_id);
@@ -267,7 +267,7 @@ TypedArray<RID> RenderUtility3D::create_multi_mesh_with_object(const RID &world_
 	MultiMeshComponent multi_mesh_component;
 	multi_mesh_component.multi_mesh_id = multi_mesh_id;
 	multi_mesh_component.instance_count = size;
-	multi_mesh_component.transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_3D;
+	multi_mesh_component.transform_format = RSE::MultimeshTransformFormat::MULTIMESH_TRANSFORM_3D;
 	MeshComponent mesh_component;
 	mesh_component.mesh_id = mesh_id;
 	mesh_component.material_ids = material_ids;

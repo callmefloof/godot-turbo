@@ -4,6 +4,7 @@
 #include "scene/resources/texture.h"
 #include "servers/rendering/rendering_server.h"
 #include "core/math/vector2i.h"
+#include "core/os/os.h"
 #include "modules/godot_turbo/ecs/systems/pipeline_manager.h"
 #include "modules/godot_turbo/ecs/systems/command.h"
 
@@ -137,13 +138,13 @@ void BadAppleSystem::start() {
     const RID cached_mm_rid = mm_comp.multi_mesh_id;
     const bool uses_colors = mm_comp.has_color;
     const bool uses_custom_data = mm_comp.has_data;
-    const RS::MultimeshTransformFormat transform_format = mm_comp.transform_format;
+    const RSE::MultimeshTransformFormat transform_format = mm_comp.transform_format;
 
     // Calculate multimesh buffer stride
     // Format: [Transform Data][Color (if enabled)][Custom Data (if enabled)]
     // Transform3D = 12 floats, Transform2D = 8 floats
     // Color = 4 floats, Custom Data = 4 floats
-    const uint32_t transform_stride = (transform_format == RS::MULTIMESH_TRANSFORM_2D) ? 8 : 12;
+    const uint32_t transform_stride = (transform_format == RSE::MULTIMESH_TRANSFORM_2D) ? 8 : 12;
     const uint32_t color_offset = transform_stride;
     const uint32_t total_stride = transform_stride + (uses_colors ? 4 : 0) + (uses_custom_data ? 4 : 0);
 

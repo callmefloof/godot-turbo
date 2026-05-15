@@ -117,7 +117,7 @@ RID RenderUtility2D::create_mesh_instance_with_object(const RID &world_id, MeshI
 RID RenderUtility2D::create_multi_mesh(const RID &world_id, const Transform2D &transform, const uint32_t size, const Ref<Mesh> mesh, const String &name, const RID &texture_id, const bool use_colors, const bool use_custom_data, const bool use_indirect)  {
     const RID& multi_mesh_id = RS::get_singleton()->multimesh_create();
     const RID& canvas_item = RS::get_singleton()->canvas_item_create();
-    RS::get_singleton()->multimesh_allocate_data(multi_mesh_id, size, RS::MULTIMESH_TRANSFORM_2D, use_colors, use_custom_data, use_indirect);
+    RS::get_singleton()->multimesh_allocate_data(multi_mesh_id, size, RSE::MULTIMESH_TRANSFORM_2D, use_colors, use_custom_data, use_indirect);
     RS::get_singleton()->canvas_item_add_multimesh(canvas_item, multi_mesh_id, texture_id);
     RS::get_singleton()->multimesh_set_mesh(multi_mesh_id, mesh->get_rid());
     Vector<RID> material_ids;
@@ -138,7 +138,7 @@ RID RenderUtility2D::create_multi_mesh(const RID &world_id, const Transform2D &t
     mmc.has_color = use_colors;
     mmc.has_data = use_custom_data;
     mmc.is_instanced = use_indirect;
-    mmc.transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_2D;
+    mmc.transform_format = RSE::MultimeshTransformFormat::MULTIMESH_TRANSFORM_2D;
 
     MeshComponent mc;
     mc.mesh_id = mesh->get_rid();
@@ -212,7 +212,7 @@ TypedArray<RID> RenderUtility2D::create_multi_mesh_with_object(const RID &world_
     mmc.has_color = multi_mesh_ref->is_using_colors();
     mmc.has_data = multi_mesh_ref->is_using_custom_data();
     mmc.is_instanced = false; //couldn't figure out what this should default to
-    mmc.transform_format = RS::MultimeshTransformFormat::MULTIMESH_TRANSFORM_2D;
+    mmc.transform_format = RSE::MultimeshTransformFormat::MULTIMESH_TRANSFORM_2D;
     MeshComponent mc;
     mc.mesh_id = mesh->get_rid();
     mc.material_ids = material_ids;
@@ -349,7 +349,7 @@ RID RenderUtility2D::create_directional_light_with_id(const RID &world_id, const
         ERR_FAIL_COND_V(!world->has<World2DComponent>(),RID());
     }
     RS::get_singleton()->canvas_light_attach_to_canvas(light_id, world->get<World2DComponent>().canvas_id);
-    RS::get_singleton()->canvas_light_set_mode(light_id, RS::CanvasLightMode::CANVAS_LIGHT_MODE_DIRECTIONAL);
+    RS::get_singleton()->canvas_light_set_mode(light_id, RSE::CanvasLightMode::CANVAS_LIGHT_MODE_DIRECTIONAL);
 
     flecs::entity e = world->entity();
     DirectionalLight2DComponent dlc;
@@ -388,16 +388,16 @@ RID RenderUtility2D::create_directional_light_with_object(const RID &world_id, D
     RS::get_singleton()->canvas_light_set_item_cull_mask(light_id, directional_light->get_item_cull_mask());
     RS::get_singleton()->canvas_light_set_item_shadow_cull_mask(light_id, directional_light->get_item_shadow_cull_mask());
     RS::get_singleton()->canvas_light_set_directional_distance(light_id, directional_light->get_max_distance());
-    RS::get_singleton()->canvas_light_set_blend_mode(light_id, static_cast<RS::CanvasLightBlendMode>(directional_light->get_blend_mode()));
+    RS::get_singleton()->canvas_light_set_blend_mode(light_id, static_cast<RSE::CanvasLightBlendMode>(directional_light->get_blend_mode()));
     RS::get_singleton()->canvas_light_set_shadow_enabled(light_id, directional_light->is_shadow_enabled());
-    RS::get_singleton()->canvas_light_set_shadow_filter(light_id, static_cast<RS::CanvasLightShadowFilter>(directional_light->get_shadow_filter()));
+    RS::get_singleton()->canvas_light_set_shadow_filter(light_id, static_cast<RSE::CanvasLightShadowFilter>(directional_light->get_shadow_filter()));
     RS::get_singleton()->canvas_light_set_shadow_color(light_id, directional_light->get_shadow_color());
     RS::get_singleton()->canvas_light_set_shadow_smooth(light_id, directional_light->get_shadow_smooth());
     RS::get_singleton()->canvas_light_set_transform(light_id, directional_light->get_transform());
     RS::get_singleton()->canvas_light_set_interpolated(light_id, directional_light->is_physics_interpolated());
     RS::get_singleton()->canvas_light_reset_physics_interpolation(light_id);
     RS::get_singleton()->canvas_light_transform_physics_interpolation(light_id, directional_light->get_transform());
-    RS::get_singleton()->canvas_light_set_mode(light_id, RS::CanvasLightMode::CANVAS_LIGHT_MODE_DIRECTIONAL);
+    RS::get_singleton()->canvas_light_set_mode(light_id, RSE::CanvasLightMode::CANVAS_LIGHT_MODE_DIRECTIONAL);
 
     if (const Node2D *parent = Object::cast_to<Node2D>(directional_light->get_parent()); parent != nullptr) {
         RS::get_singleton()->canvas_item_set_parent(light_id, parent->get_canvas_item());
@@ -442,7 +442,7 @@ RID RenderUtility2D::create_point_light(const RID &world_id, const Transform2D &
         ERR_FAIL_COND_V(!world->has<World2DComponent>(),RID());
     }
     RS::get_singleton()->canvas_light_attach_to_canvas(light_id, world->get<World2DComponent>().canvas_id);
-    RS::get_singleton()->canvas_light_set_mode(light_id, RS::CanvasLightMode::CANVAS_LIGHT_MODE_POINT);
+    RS::get_singleton()->canvas_light_set_mode(light_id, RSE::CanvasLightMode::CANVAS_LIGHT_MODE_POINT);
     flecs::entity e = world->entity();
     PointLightComponent plc2;
     plc2.light_id = light_id;
@@ -479,16 +479,16 @@ RID RenderUtility2D::create_point_light_with_object(const RID &world_id, PointLi
     RS::get_singleton()->canvas_light_set_layer_range(light_id, point_light->get_layer_range_min(), point_light->get_layer_range_max());
     RS::get_singleton()->canvas_light_set_item_cull_mask(light_id, point_light->get_item_cull_mask());
     RS::get_singleton()->canvas_light_set_item_shadow_cull_mask(light_id, point_light->get_item_shadow_cull_mask());
-    RS::get_singleton()->canvas_light_set_blend_mode(light_id, static_cast<RenderingServer::CanvasLightBlendMode>(point_light->get_blend_mode()));
+    RS::get_singleton()->canvas_light_set_blend_mode(light_id, static_cast<RSE::CanvasLightBlendMode>(point_light->get_blend_mode()));
     RS::get_singleton()->canvas_light_set_shadow_enabled(light_id, point_light->is_shadow_enabled());
-    RS::get_singleton()->canvas_light_set_shadow_filter(light_id, static_cast<RenderingServer::CanvasLightShadowFilter>(point_light->get_shadow_filter()));
+    RS::get_singleton()->canvas_light_set_shadow_filter(light_id, static_cast<RSE::CanvasLightShadowFilter>(point_light->get_shadow_filter()));
     RS::get_singleton()->canvas_light_set_shadow_color(light_id, point_light->get_shadow_color());
     RS::get_singleton()->canvas_light_set_shadow_smooth(light_id, point_light->get_shadow_smooth());
     RS::get_singleton()->canvas_light_set_transform(light_id, point_light->get_transform());
     RS::get_singleton()->canvas_light_set_interpolated(light_id, point_light->is_physics_interpolated());
     RS::get_singleton()->canvas_light_reset_physics_interpolation(light_id);
     RS::get_singleton()->canvas_light_transform_physics_interpolation(light_id, point_light->get_transform());
-    RS::get_singleton()->canvas_light_set_mode(light_id, RenderingServer::CanvasLightMode::CANVAS_LIGHT_MODE_POINT);
+    RS::get_singleton()->canvas_light_set_mode(light_id, RSE::CanvasLightMode::CANVAS_LIGHT_MODE_POINT);
 
     if (const Node2D *parent = Object::cast_to<Node2D>(point_light->get_parent()); parent != nullptr) {
         RS::get_singleton()->canvas_item_set_parent(light_id, parent->get_canvas_item());
@@ -852,14 +852,14 @@ RID RenderUtility2D::create_gpu_particles_with_object(const RID &world_id, GPUPa
             }
 
             Array arr;
-            arr.resize(RS::ARRAY_MAX);
-            arr[RS::ARRAY_VERTEX] = points;
-            arr[RS::ARRAY_TEX_UV] = uvs;
-            arr[RS::ARRAY_BONES] = bone_indices;
-            arr[RS::ARRAY_WEIGHTS] = bone_weights;
-            arr[RS::ARRAY_INDEX] = indices;
+            arr.resize(RSE::ARRAY_MAX);
+            arr[RSE::ARRAY_VERTEX] = points;
+            arr[RSE::ARRAY_TEX_UV] = uvs;
+            arr[RSE::ARRAY_BONES] = bone_indices;
+            arr[RSE::ARRAY_WEIGHTS] = bone_weights;
+            arr[RSE::ARRAY_INDEX] = indices;
 
-            RS::get_singleton()->mesh_add_surface_from_arrays(mesh_id, RS::PRIMITIVE_TRIANGLES, arr, Array(), Dictionary(), RS::ARRAY_FLAG_USE_2D_VERTICES);
+            RS::get_singleton()->mesh_add_surface_from_arrays(mesh_id, RSE::PRIMITIVE_TRIANGLES, arr, Array(), Dictionary(), RSE::ARRAY_FLAG_USE_2D_VERTICES);
 
             Vector<Transform3D> xforms;
             for (int i = 0; i <= trail_sections; i++) {
@@ -875,7 +875,7 @@ RID RenderUtility2D::create_gpu_particles_with_object(const RID &world_id, GPUPa
     RS::get_singleton()->particles_set_fixed_fps(new_particles_id,gpu_particles->get_fixed_fps());
     RS::get_singleton()->particles_set_fractional_delta(new_particles_id,gpu_particles->get_fractional_delta());
     RS::get_singleton()->particles_set_interpolate(new_particles_id,gpu_particles->get_interpolate());
-    RS::get_singleton()->particles_set_draw_order(new_particles_id, static_cast<RS::ParticlesDrawOrder>(gpu_particles->get_draw_order()));
+    RS::get_singleton()->particles_set_draw_order(new_particles_id, static_cast<RSE::ParticlesDrawOrder>(gpu_particles->get_draw_order()));
 
     RID texture_id = RID();
     if (texture.is_valid() && !texture.is_null()) {

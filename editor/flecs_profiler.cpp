@@ -47,7 +47,7 @@
 #include "scene/gui/texture_rect.h"
 #include "scene/main/timer.h"
 #include "core/string/print_string.h"
-#include "core/object/callable_method_pointer.h"
+#include "core/object/callable_mp.h"
 #include "core/io/image.h"
 #include "core/os/os.h"
 #include "scene/resources/image_texture.h"

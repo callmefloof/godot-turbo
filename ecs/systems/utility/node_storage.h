@@ -4,6 +4,7 @@
 #include "core/string/ustring.h"
 #include "core/os/mutex.h"
 #include "scene/main/node.h"
+#include "scene/main/scene_tree.h"
 #include "scene/2d/node_2d.h"
 #include "scene/3d/node_3d.h"
 #include "scene/3d/physics/rigid_body_3d.h"

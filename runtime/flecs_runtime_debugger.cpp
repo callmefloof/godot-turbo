@@ -1,6 +1,7 @@
 #include "flecs_runtime_debugger.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
 #include "core/debugger/engine_debugger.h"
+#include "core/object/callable_mp.h"
 #include "core/variant/typed_array.h"
 #include "core/string/ustring.h"
 #include "core/string/print_string.h"

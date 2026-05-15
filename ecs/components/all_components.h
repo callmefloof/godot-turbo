@@ -164,7 +164,7 @@ struct MultiMeshComponent {
 	bool has_data = false;
 	bool has_color = false;
 	bool is_instanced = false;
-	RS::MultimeshTransformFormat transform_format = RS::MULTIMESH_TRANSFORM_3D;
+	RSE::MultimeshTransformFormat transform_format = RSE::MULTIMESH_TRANSFORM_3D;
 };
 
 struct MultiMeshInstanceComponent {
@@ -807,7 +807,7 @@ inline void register_all(flecs::world& world, bool enable_serialization = false)
 		.member<bool>("has_data")
 		.member<bool>("has_color")
 		.member<bool>("is_instanced")
-		.member<RS::MultimeshTransformFormat>("transform_format");
+		.member<RSE::MultimeshTransformFormat>("transform_format");
 	
 	world.component<MultiMeshInstanceComponent>()
 		.member<uint32_t>("index")

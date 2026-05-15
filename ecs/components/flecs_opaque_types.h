@@ -533,7 +533,7 @@ inline void register_opaque_types(flecs::world &world) {
 	world.component<int32_t>();
 
 	// RenderingServer enums
-	world.component<RS::MultimeshTransformFormat>();
+	world.component<RSE::MultimeshTransformFormat>();
 }
 
 } // namespace FlecsOpaqueTypes
