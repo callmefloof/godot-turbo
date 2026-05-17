@@ -31,6 +31,7 @@ protected:
 
 public:
 	void set_editor_plugin(FlecsWorldEditorPlugin *p_plugin) { editor_plugin = p_plugin; }
+	virtual void setup_session(int p_idx) override;
 	virtual bool has_capture(const String &p_capture) const override { return _has_capture(p_capture); }
 	virtual bool capture(const String &p_message, const Array &p_data, int p_session) override { return _capture(p_message, p_data, p_session); }
 
@@ -73,9 +74,11 @@ protected:
 
 public:
 	// Called by FlecsDebuggerBridge
-	bool capture_remote_message(const String &p_message, const Array &p_data);
+	bool capture_remote_message(const String &p_message, const Array &p_data, int p_session_id);
+	void register_debugger_session(int p_session_id, bool p_force_remote, bool p_request_worlds);
 
 private:
+	void _adopt_debugger_session(const Ref<EditorDebuggerSession> &p_session, bool p_force_remote, bool p_request_worlds);
 	void _request_remote_worlds();
 	void _handle_remote_worlds(const Array &p_data);
 	void _request_remote_entities(uint64_t p_world_id, TreeItem *p_world_item);

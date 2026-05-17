@@ -55,6 +55,13 @@ static bool _rid_array_has(const TypedArray<RID> &p_array, const RID &p_rid) {
 }
 
 // FlecsDebuggerBridge implementation (bridge registered via EditorDebuggerNode)
+void FlecsDebuggerBridge::setup_session(int p_idx) {
+	EditorDebuggerPlugin::setup_session(p_idx);
+	if (editor_plugin) {
+		editor_plugin->register_debugger_session(p_idx, false, true);
+	}
+}
+
 bool FlecsDebuggerBridge::_has_capture(const String &p_capture) const {
 	return (p_capture == "flecs");
 }
@@ -63,7 +70,7 @@ bool FlecsDebuggerBridge::_capture(const String &p_message, const Array &p_data,
 	if (!editor_plugin) {
 		return false;
 	}
-	return editor_plugin->capture_remote_message(p_message, p_data);
+	return editor_plugin->capture_remote_message(p_message, p_data, p_session);
 }
 
 // FlecsWorldEditorPlugin implementation
@@ -100,6 +107,65 @@ TypedArray<RID> FlecsWorldEditorPlugin::get_available_worlds() const {
 	}
 	
 	return result;
+}
+
+void FlecsWorldEditorPlugin::register_debugger_session(int p_session_id, bool p_force_remote, bool p_request_worlds) {
+	if (!debugger_plugin.is_valid() || p_session_id < 0) {
+		return;
+	}
+
+	Ref<EditorDebuggerSession> session = debugger_plugin->get_session(p_session_id);
+	_adopt_debugger_session(session, p_force_remote, p_request_worlds);
+}
+
+void FlecsWorldEditorPlugin::_adopt_debugger_session(const Ref<EditorDebuggerSession> &p_session, bool p_force_remote, bool p_request_worlds) {
+	if (!p_session.is_valid()) {
+		return;
+	}
+
+	Callable started_callable = callable_mp(this, &FlecsWorldEditorPlugin::_on_session_started);
+	if (!p_session->is_connected("started", started_callable)) {
+		p_session->connect("started", started_callable);
+	}
+
+	Callable stopped_callable = callable_mp(this, &FlecsWorldEditorPlugin::_on_debugger_session_stopped);
+	if (!p_session->is_connected("stopped", stopped_callable)) {
+		p_session->connect("stopped", stopped_callable);
+	}
+
+	remote_session = p_session;
+
+	if (!p_force_remote && !p_session->is_active()) {
+		debugger_connected = true;
+		return;
+	}
+
+	const bool session_changed = !active_session.is_valid() || active_session.ptr() != p_session.ptr();
+	const bool was_remote = remote_mode;
+	active_session = p_session;
+	remote_mode = true;
+	debugger_connected = true;
+
+	if (!session_changed && was_remote) {
+		return;
+	}
+
+	if (world_refresh_timer && world_refresh_timer->is_stopped() == false) {
+		world_refresh_timer->stop();
+	}
+
+	selected_world = RID();
+	selected_entity_id = 0;
+	world_cache.clear();
+	world_dirty.clear();
+	tree_item_map.clear();
+	pending_entity_requests.clear();
+	pending_component_world_id = 0;
+	pending_component_entity_id = 0;
+
+	if (p_request_worlds) {
+		_request_remote_worlds();
+	}
 }
 
 void FlecsWorldEditorPlugin::_bind_methods() {
@@ -206,6 +272,16 @@ void FlecsWorldEditorPlugin::_setup_remote_debugger() {
 		debugger_node->add_debugger_plugin(debugger_plugin);
 	}
 
+	if (debugger_plugin.is_valid()) {
+		Array sessions = debugger_plugin->get_sessions();
+		for (int i = 0; i < sessions.size(); i++) {
+			register_debugger_session(i, false, true);
+			if (active_session.is_valid() && active_session->is_active()) {
+				return;
+			}
+		}
+	}
+
 	// Try to attach to existing debugger sessions
 	if (!debugger_connected) {
 		int session_count = debugger_node->get_child_count();
@@ -263,29 +339,8 @@ void FlecsWorldEditorPlugin::_attach_to_session(ScriptEditorDebugger *p_debugger
 	}
 
 	remote_session = Ref<EditorDebuggerSession>(memnew(EditorDebuggerSession(p_debugger)));
-	
-	// Connect to debugger signals
-	p_debugger->connect("started", callable_mp(this, &FlecsWorldEditorPlugin::_on_session_started));
-	p_debugger->connect("stopped", callable_mp(this, &FlecsWorldEditorPlugin::_on_debugger_session_stopped));
 	debugger_connected = true;
-	
-	// If already active, switch to remote mode immediately
-	if (p_debugger->is_session_active()) {
-		active_session = remote_session;
-		remote_mode = true;
-		if (world_refresh_timer && world_refresh_timer->is_stopped() == false) {
-			world_refresh_timer->stop();
-		}
-		selected_world = RID();
-		selected_entity_id = 0;
-		world_cache.clear();
-		world_dirty.clear();
-		tree_item_map.clear();
-		pending_entity_requests.clear();
-		pending_component_world_id = 0;
-		pending_component_entity_id = 0;
-		_request_remote_worlds();
-	}
+	_adopt_debugger_session(remote_session, p_debugger->is_session_active(), true);
 }
 
 void FlecsWorldEditorPlugin::_on_session_started() {
@@ -333,7 +388,8 @@ void FlecsWorldEditorPlugin::_on_debugger_session_stopped() {
 	_refresh_worlds_tree();
 }
 
-bool FlecsWorldEditorPlugin::capture_remote_message(const String &p_message, const Array &p_data) {
+bool FlecsWorldEditorPlugin::capture_remote_message(const String &p_message, const Array &p_data, int p_session_id) {
+	register_debugger_session(p_session_id, true, false);
 	
 	if (p_message == "flecs:worlds") {
 		_handle_remote_worlds(p_data);

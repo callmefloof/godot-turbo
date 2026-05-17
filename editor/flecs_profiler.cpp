@@ -386,6 +386,9 @@ void FlecsProfiler::_refresh_world_list() {
 		world_selector->add_item("No worlds available");
 		world_selector->set_disabled(true);
 		selected_world = RID();
+		if (info_label) {
+			info_label->set_text(is_remote ? "No profiling data (remote - waiting for worlds)" : "No profiling data");
+		}
 		return;
 	}
 
@@ -509,6 +512,9 @@ void FlecsProfiler::_collect_frame_metrics() {
 		// Try to refresh and select a world if none selected
 		// In remote mode, request more frequently initially (every 10 frames = ~1 second)
 		// In local mode, every 50 frames (~5 seconds)
+		if (is_profiling && info_label) {
+			info_label->set_text(is_remote ? "No profiling data (remote - waiting for world)" : "No profiling data");
+		}
 		int refresh_interval = is_remote ? 10 : 50;
 		if (frame_counter % refresh_interval == 0) {
 			_refresh_world_list();
@@ -558,6 +564,9 @@ void FlecsProfiler::_request_remote_metrics() {
 	if (!session.is_valid() || !session->is_active()) {
 		waiting_for_remote_metrics = false;
 		remote_metrics_request_usec = 0;
+		if (info_label) {
+			info_label->set_text("No profiling data (remote debugger inactive)");
+		}
 		return;
 	}
 
@@ -566,6 +575,9 @@ void FlecsProfiler::_request_remote_metrics() {
 	session->send_message("flecs:request_profiler_metrics", args);
 	waiting_for_remote_metrics = true;
 	remote_metrics_request_usec = OS::get_singleton()->get_ticks_usec();
+	if (frame_metrics.is_empty() && info_label) {
+		info_label->set_text("No profiling data (remote - waiting for metrics)");
+	}
 }
 
 void FlecsProfiler::handle_remote_metrics(const Dictionary &p_data) {
@@ -652,15 +664,29 @@ void FlecsProfiler::_update_metrics_tree() {
 	metrics_tree->clear();
 
 	if (frame_metrics.is_empty()) {
-		InstanceManager *instance_mgr = InstanceManager::get_singleton();
-		if (instance_mgr->has_other_instance()) {
-			if (instance_mgr->is_primary_instance()) {
-				info_label->set_text("No profiling data (primary instance)");
+		FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
+		const bool is_remote = world_plugin && world_plugin->is_remote_mode();
+		if (is_remote) {
+			if (!selected_world.is_valid()) {
+				info_label->set_text("No profiling data (remote - waiting for world)");
+			} else if (waiting_for_remote_metrics) {
+				info_label->set_text("No profiling data (remote - waiting for metrics)");
+			} else if (is_profiling) {
+				info_label->set_text("No profiling data (remote - waiting for profiler metrics)");
 			} else {
-				info_label->set_text("No profiling data (secondary instance - remote debugging limited)");
+				info_label->set_text("No profiling data (remote)");
 			}
 		} else {
-			info_label->set_text("No profiling data");
+			InstanceManager *instance_mgr = InstanceManager::get_singleton();
+			if (instance_mgr->has_other_instance()) {
+				if (instance_mgr->is_primary_instance()) {
+					info_label->set_text("No profiling data (primary instance)");
+				} else {
+					info_label->set_text("No profiling data (secondary instance)");
+				}
+			} else {
+				info_label->set_text("No profiling data");
+			}
 		}
 		return;
 	}
@@ -671,9 +697,11 @@ void FlecsProfiler::_update_metrics_tree() {
 	}
 
 	const FrameMetric &frame = frame_metrics[current_frame];
+	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
+	const bool is_remote = world_plugin && world_plugin->is_remote_mode();
 	InstanceManager *instance_mgr = InstanceManager::get_singleton();
-	String instance_info = "";
-	if (instance_mgr->has_other_instance() && !instance_mgr->is_primary_instance()) {
+	String instance_info = is_remote ? " [remote]" : "";
+	if (!is_remote && instance_mgr->has_other_instance() && !instance_mgr->is_primary_instance()) {
 		instance_info = " [secondary]";
 	}
 	info_label->set_text(vformat("Frame %d - Total: %.3f ms%s", frame.frame_number, double(frame.total_frame_time_usec) / 1000.0, instance_info));
