@@ -52,6 +52,10 @@
 #include "core/os/os.h"
 #include "scene/resources/image_texture.h"
 #include "core/input/input_event.h"
+#ifdef __unix__
+#include <cfloat>
+#endif // __unix__
+
 
 static constexpr uint64_t REMOTE_REQUEST_TIMEOUT_USEC = 2000000;
 
