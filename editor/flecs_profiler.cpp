@@ -52,9 +52,8 @@
 #include "core/os/os.h"
 #include "scene/resources/image_texture.h"
 #include "core/input/input_event.h"
-#ifdef __unix__
 #include <cfloat>
-#endif // __unix__
+
 
 
 static constexpr uint64_t REMOTE_REQUEST_TIMEOUT_USEC = 2000000;
@@ -68,13 +67,13 @@ void FlecsProfiler::_notification(int p_what) {
 		case NOTIFICATION_ENTER_TREE: {
 			// Initialize instance manager if needed
 			InstanceManager::get_singleton()->initialize();
-			
+
 			if (!frame_delay) {
 				_build_profiler_ui();
 			}
 			// Refresh world list on enter
 			_refresh_world_list();
-			
+
 			if (frame_delay) {
 				frame_delay->connect("timeout", callable_mp(this, &FlecsProfiler::_collect_frame_metrics));
 				// Only start if already profiling (don't auto-start)
@@ -463,12 +462,12 @@ void FlecsProfiler::_on_world_refresh_timer() {
 void FlecsProfiler::handle_remote_worlds(const Array &p_data) {
 	waiting_for_remote_worlds = false;
 	remote_worlds_request_usec = 0;
-	
-	
+
+
 	if (p_data.is_empty()) {
 		return;
 	}
-	
+
 	Dictionary response = p_data[0];
 	Array worlds_array = response.get("worlds", Array());
 	remote_worlds_cache.clear();
@@ -480,8 +479,8 @@ void FlecsProfiler::handle_remote_worlds(const Array &p_data) {
 		}
 		remote_worlds_cache.push_back(RID::from_uint64(world_id));
 	}
-	
-	
+
+
 	// The worlds will be added to world_dirty in the world plugin's handler
 	// which will be called before or alongside this handler.
 	// Just trigger a refresh of our world list to pick up any new worlds.
@@ -605,7 +604,7 @@ void FlecsProfiler::_process_metrics_dictionary(const Dictionary &metrics) {
 	if (metrics.is_empty()) {
 		return;
 	}
-	
+
 	if (!metrics.has("systems")) {
 		return;
 	}
@@ -620,7 +619,7 @@ void FlecsProfiler::_process_metrics_dictionary(const Dictionary &metrics) {
 		Dictionary sys = systems[i];
 		SystemMetric metric;
 		metric.system_id = sys.get("rid", RID());
-		
+
 		// Get system type and append suffix for clarity
 		String sys_type = sys.get("type", "unknown");
 		String name = sys.get("name", "Unknown");
@@ -628,7 +627,7 @@ void FlecsProfiler::_process_metrics_dictionary(const Dictionary &metrics) {
 			name += " [C++]";
 		}
 		metric.name = name;
-		
+
 		metric.total_time_usec = sys.get("time_usec", 0);
 		metric.call_count = sys.get("call_count", 0);
 		metric.entity_count = sys.get("entity_count", 0);
@@ -638,7 +637,7 @@ void FlecsProfiler::_process_metrics_dictionary(const Dictionary &metrics) {
 		metric.on_set = sys.get("onset_count", 0);
 		metric.on_remove = sys.get("onremove_count", 0);
 		metric.is_paused = sys.get("paused", false);
-		
+
 		// Optional detailed timing
 		if (sys.has("median_usec")) {
 			metric.median_usec = sys.get("median_usec", 0.0);
@@ -646,7 +645,7 @@ void FlecsProfiler::_process_metrics_dictionary(const Dictionary &metrics) {
 		if (sys.has("stddev_usec")) {
 			metric.stddev_usec = sys.get("stddev_usec", 0.0);
 		}
-		
+
 		frame.system_metrics.push_back(metric);
 		frame.total_frame_time_usec += metric.total_time_usec;
 	}
@@ -753,12 +752,12 @@ void FlecsProfiler::_update_plot() {
 	}
 
 	int frame_count = MIN(frame_metrics.size(), width);
-	
+
 	// Relative scaling: find actual max and min time in visible frames
 	float actual_max_time = 0.0f;
 	float actual_min_time = FLT_MAX;
 	float total_time = 0.0f;
-	
+
 	for (int i = 0; i < frame_count; i++) {
 		float frame_time = float(frame_metrics[i].total_frame_time_usec);
 		actual_max_time = MAX(actual_max_time, frame_time);
@@ -767,7 +766,7 @@ void FlecsProfiler::_update_plot() {
 		}
 		total_time += frame_time;
 	}
-	
+
 	// Handle edge cases
 	if (actual_max_time <= 0.0f) {
 		actual_max_time = 1.0f;
@@ -775,19 +774,19 @@ void FlecsProfiler::_update_plot() {
 	if (actual_min_time == FLT_MAX || actual_min_time <= 0.0f) {
 		actual_min_time = 0.0f;
 	}
-	
+
 	// Calculate average for reference
 	float avg_time = frame_count > 0 ? total_time / frame_count : 0.0f;
-	
+
 	// Use relative scaling: max_time is based purely on actual data
 	// Add 20% headroom above the actual max so bars don't always hit the ceiling
 	float max_time = actual_max_time * 1.2f;
-	
+
 	// Optional: Use a floor based on minimum value to spread out the bars more
 	// This makes small variations more visible
 	float display_floor = 0.0f;
 	float range = actual_max_time - actual_min_time;
-	
+
 	// If the range is less than 50% of max, use min as a floor to spread bars
 	// This makes the graph more readable when values are clustered
 	if (range > 0.0f && range < actual_max_time * 0.5f && frame_count > 10) {
@@ -827,7 +826,7 @@ void FlecsProfiler::_update_plot() {
 		} else {
 			bar_color = Color(0.8, 0.3, 0.2); // Red - spike (2x+ average)
 		}
-		
+
 		// Draw bar with proper width
 		for (int bx = 0; bx < bar_width && (x + bx) < width; bx++) {
 			for (int y = height - bar_height; y < height; y++) {
@@ -861,7 +860,7 @@ void FlecsProfiler::_update_plot() {
 		auto format_time = [](float usec) -> String {
 			return String::num(usec / 1000.0f, 3) + "ms";
 		};
-		
+
 		scale_info = "Frames: " + itos(frame_count);
 		scale_info += " | Avg: " + format_time(avg_time);
 		scale_info += " | Min: " + format_time(actual_min_time);
@@ -870,7 +869,7 @@ void FlecsProfiler::_update_plot() {
 		if (display_floor > 0.0f) {
 			scale_info += " (floor: " + format_time(display_floor) + ")";
 		}
-		
+
 		info_label->set_text(scale_info);
 	}
 }
