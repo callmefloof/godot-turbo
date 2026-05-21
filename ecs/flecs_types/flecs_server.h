@@ -246,6 +246,7 @@ class FlecsServer : public Object {
 	Mutex mutex;
 
 	double delta_time = 0.0;
+	HashMap<RID, bool> stats_enabled;
 	HashMap<RID, bool> regular_system_paused; // track pause state for non-script systems
 	HashMap<uint64_t, double> native_system_prev_time_spent; // track previous time_spent for per-frame delta calculation
 	HashMap<RID, bool> worlds_in_progress;
@@ -271,6 +272,9 @@ public:
 	int8_t get_world_count() const;
 	TypedArray<RID> get_world_list() const;
 	void init_world(const RID& world_id);
+	void import_stats(const RID &world_id);
+	void set_stats_enabled(const RID &world_id, bool p_enabled);
+	bool is_stats_enabled(const RID &world_id);
 	void set_rest_enabled(const RID &world_id, bool p_enabled);
 	bool is_rest_enabled(const RID &world_id);
 	void set_rest_port(const RID &world_id, int p_port);

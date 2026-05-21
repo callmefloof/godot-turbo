@@ -39,6 +39,7 @@
 #include <vector>
 #include "modules/godot_turbo/ecs/components/all_components.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_server.h"
+#include "modules/godot_turbo/ecs/systems/utility/flecs_entity_name_utils.h"
 
 RenderUtility3D::~RenderUtility3D() {
 }
@@ -150,9 +151,8 @@ RID RenderUtility3D::create_mesh_instance_with_object(const RID &world_id, MeshI
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set<VisibilityComponent>(visibility_component)
 			.set<ObjectInstanceComponent>(object_instance_component)
-			.add<DirtyTransform>()
-
-			.set_name(String(mesh->get_name()).ascii().get_data());
+			.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, String(mesh_instance_3d->get_name()) + "_" + String::num_uint64(mesh_instance_3d->get_instance_id()));
 	FlecsServer::get_singleton()->add_to_node_storage(mesh_instance_3d, world_id);
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
@@ -485,14 +485,14 @@ RID RenderUtility3D::create_particles_with_object(const RID &world_id, GPUPartic
 	VisibilityComponent visibility_component;
 	visibility_component.visible = true;
 
-	auto &particles = world->entity()
+	flecs::entity particles = world->entity()
 							.set<ParticlesComponent>(particles_component)
 							.set<RenderInstanceComponent>(render_instance_component)
 							.set<Transform3DComponent>(transform_component)
 							.set<VisibilityComponent>(visibility_component)
 							.set<ObjectInstanceComponent>(object_instance_component)
-							.add<DirtyTransform>()
-							.set_name(String(gpu_particles_3d->get_name()).ascii().get_data());
+							.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, particles, String(gpu_particles_3d->get_name()) + "_" + String::num_uint64(gpu_particles_3d->get_instance_id()));
 	FlecsServer::get_singleton()->add_to_node_storage(gpu_particles_3d, world_id);
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, particles);
 }
@@ -561,8 +561,8 @@ RID RenderUtility3D::create_skeleton_with_object(const RID &world_id, Skeleton3D
 			.set<Transform3DComponent>(transform_component)
 			.set<RenderInstanceComponent>(render_instance_component)
 			.set<ObjectInstanceComponent>(object_instance_component)
-			.add<DirtyTransform>()
-			.set_name(String(skeleton_3d->get_name()).ascii().get_data());
+			.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, String(skeleton_3d->get_name()) + "_" + String::num_uint64(skeleton_3d->get_instance_id()));
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -659,8 +659,8 @@ RID RenderUtility3D::create_camera_with_object(const RID &world_id, Camera3D *ca
 		.set<CameraComponent>(camera_component)
 		.set<Transform3DComponent>(transform_component)
 		.set<RenderInstanceComponent>(render_instance_component)
-		.set<ObjectInstanceComponent>(object_instance_component)
-		.set_name(String(camera_3d->get_name()).ascii().get_data());
+		.set<ObjectInstanceComponent>(object_instance_component);
+	FlecsEntityNameUtils::set_unique_name(world, e, String(camera_3d->get_name()) + "_" + String::num_uint64(camera_3d->get_instance_id()));
 	const RID camera = FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 
 	if (camera_3d->get_compositor().is_null() || camera_3d->get_compositor().is_valid()) {
@@ -727,8 +727,8 @@ RID RenderUtility3D::create_directional_light_with_id(const RID &world_id, const
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.add<DirtyTransform>()
-			.set<RenderInstanceComponent>(render_instance_component)
-			.set_name(name.ascii().get_data());
+			.set<RenderInstanceComponent>(render_instance_component);
+	FlecsEntityNameUtils::set_unique_name(world, e, name);
 
 
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
@@ -753,8 +753,8 @@ RID RenderUtility3D::create_directional_light(const RID &world_id, const Transfo
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.set<RenderInstanceComponent>(render_instance_component)
-			.add<DirtyTransform>()
-			.set_name(name.ascii().get_data());
+			.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, name);
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -781,8 +781,8 @@ RID RenderUtility3D::create_directional_light_with_object(const RID &world_id, D
 										.set<VisibilityComponent>(visibility_component)
 										.set<ObjectInstanceComponent>(object_instance_component)
 										.set<RenderInstanceComponent>(render_instance_component)
-										.add<DirtyTransform>()
-										.set_name(String(directional_light->get_name()).ascii().get_data());
+										.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, String(directional_light->get_name()) + "_" + String::num_uint64(directional_light->get_instance_id()));
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -802,8 +802,8 @@ RID RenderUtility3D::create_omni_light_with_id(const RID &world_id, const RID &l
 			.set<VisibilityComponent>(visibility_component)
 			.add<DirtyTransform>()
 
-			.set<RenderInstanceComponent>(render_instance_component)
-			.set_name(name.ascii().get_data());
+			.set<RenderInstanceComponent>(render_instance_component);
+	FlecsEntityNameUtils::set_unique_name(world, e, name);
 
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
@@ -847,14 +847,15 @@ RID RenderUtility3D::create_omni_light_with_object(const RID &world_id, OmniLigh
 	visibility_component.visible = true;
 
 
-	const flecs::entity e = FlecsServer::get_singleton()->_get_world(world_id)->entity()
+	flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
+	const flecs::entity e = world->entity()
 										 .set<OmniLightComponent>(omni_light_component)
 										 .set<Transform3DComponent>(transform_component)
 										 .set<RenderInstanceComponent>(render_instance_component)
 										 .set<ObjectInstanceComponent>(object_instance_component)
 										 .set<VisibilityComponent>(visibility_component)
-										.add<DirtyTransform>()
-										 .set_name(String(omni_light->get_name()).ascii().get_data());
+										.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, String(omni_light->get_name()) + "_" + String::num_uint64(omni_light->get_instance_id()));
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -876,9 +877,8 @@ RID RenderUtility3D::create_spot_light_with_id(const RID &world_id, const RID &l
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.set<RenderInstanceComponent>(render_instance_component)
-			.add<DirtyTransform>()
-
-			.set_name(name.ascii().get_data());
+			.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, name);
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -901,8 +901,8 @@ RID RenderUtility3D::create_spot_light(const RID &world_id, const Transform3D &t
 			.set<Transform3DComponent>(transform_component)
 			.set<VisibilityComponent>(visibility_component)
 			.set<RenderInstanceComponent>(render_instance_component)
-			.add<DirtyTransform>()
-			.set_name(name.ascii().get_data());
+			.add<DirtyTransform>();
+	FlecsEntityNameUtils::set_unique_name(world, e, name);
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 
 }
@@ -940,8 +940,8 @@ RID RenderUtility3D::create_spot_light_with_object(const RID &world_id, SpotLigh
 										 .set<VisibilityComponent>(visibility_component)
 										 .set<RenderInstanceComponent>(render_instance_component)
 										.add<DirtyTransform>()
-										 .set<ObjectInstanceComponent>(object_instance_component)
-										 .set_name(String(spot_light->get_name()).ascii().get_data());
+										 .set<ObjectInstanceComponent>(object_instance_component);
+	FlecsEntityNameUtils::set_unique_name(world, e, String(spot_light->get_name()) + "_" + String::num_uint64(spot_light->get_instance_id()));
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -964,9 +964,11 @@ RID RenderUtility3D::create_viewport_with_object(const RID &world_id, Viewport *
 	FlecsServer::get_singleton()->add_to_node_storage(viewport, world_id);
 	ViewportComponent viewport_component;
 	viewport_component.viewport_id = viewport->get_viewport_rid();
-	const flecs::entity e = FlecsServer::get_singleton()->_get_world(world_id)->entity()
+	flecs::world *world = FlecsServer::get_singleton()->_get_world(world_id);
+	const flecs::entity e = world->entity()
 										 .set<ViewportComponent>(viewport_component)
-										 .set<ObjectInstanceComponent>(object_instance_component).set_name(String(viewport->get_name()).ascii().get_data());
+										 .set<ObjectInstanceComponent>(object_instance_component);
+	FlecsEntityNameUtils::set_unique_name(world, e, String(viewport->get_name()) + "_" + String::num_uint64(viewport->get_instance_id()));
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 
@@ -1037,14 +1039,14 @@ RID RenderUtility3D::create_voxel_gi_with_object(const RID &world_id, VoxelGI *v
 	VisibilityComponent visibility_component;
 	visibility_component.visible = true;
 
-	const flecs::entity e = world->entity(String(voxel_gi->get_name()).ascii().get_data())
+	const flecs::entity e = world->entity()
 										 .set<VoxelGIComponent>(voxel_gi_component)
 										 .set<Transform3DComponent>(transform_component)
 										 .set<RenderInstanceComponent>(render_instance_component)
 										 .set<VisibilityComponent>(visibility_component)
 										.add<DirtyTransform>()
-										 .set<ObjectInstanceComponent>(object_instance_component)
-										 .set_name(String(voxel_gi->get_name()).ascii().get_data());
+										 .set<ObjectInstanceComponent>(object_instance_component);
+	FlecsEntityNameUtils::set_unique_name(world, e, String(voxel_gi->get_name()) + "_" + String::num_uint64(voxel_gi->get_instance_id()));
 	return FlecsServer::get_singleton()->_create_rid_for_entity(world_id, e);
 }
 

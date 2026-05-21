@@ -986,6 +986,9 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("create_world"), &FlecsServer::create_world);
 	ClassDB::bind_method(D_METHOD("get_world_list"), &FlecsServer::get_world_list);
 	ClassDB::bind_method(D_METHOD("init_world", "world_id"), &FlecsServer::init_world);
+	ClassDB::bind_method(D_METHOD("import_stats", "world_id"), &FlecsServer::import_stats);
+	ClassDB::bind_method(D_METHOD("set_stats_enabled", "world_id", "enabled"), &FlecsServer::set_stats_enabled);
+	ClassDB::bind_method(D_METHOD("is_stats_enabled", "world_id"), &FlecsServer::is_stats_enabled);
 	ClassDB::bind_method(D_METHOD("set_rest_enabled", "world_id", "enabled"), &FlecsServer::set_rest_enabled);
 	ClassDB::bind_method(D_METHOD("is_rest_enabled", "world_id"), &FlecsServer::is_rest_enabled);
 	ClassDB::bind_method(D_METHOD("set_rest_port", "world_id", "port"), &FlecsServer::set_rest_port);
@@ -1235,6 +1238,7 @@ RID FlecsServer::create_world() {
 
 	ecs_measure_frame_time(world_ref.c_ptr(), true);
 	ecs_measure_system_time(world_ref.c_ptr(), true);
+	stats_enabled.insert(flecs_world, true);
 
 
 
@@ -1293,11 +1297,18 @@ TypedArray<RID> FlecsServer::get_world_list() const {
 }
 
 void FlecsServer::init_world(const RID& world_id) {
+	MutexLock server_lock(mutex);
 	CHECK_WORLD_VALIDITY(world_id, init_world);
 	flecs::world &world = world_variant->get_world();
-	world.import<flecs::stats>();
-	ecs_measure_frame_time(world.c_ptr(), true);
-	ecs_measure_system_time(world.c_ptr(), true);
+	if (!stats_enabled.has(world_id) || stats_enabled.get(world_id)) {
+		world.import<flecs::stats>();
+		ecs_measure_frame_time(world.c_ptr(), true);
+		ecs_measure_system_time(world.c_ptr(), true);
+		stats_enabled.insert(world_id, true);
+	} else {
+		ecs_measure_frame_time(world.c_ptr(), false);
+		ecs_measure_system_time(world.c_ptr(), false);
+	}
 
 	int rest_port = rest_ports.has(world_id) ? rest_ports.get(world_id) : _get_flecs_rest_env_port();
 	if (rest_port <= 0) {
@@ -1319,6 +1330,28 @@ void FlecsServer::init_world(const RID& world_id) {
 	auto threads = std::thread::hardware_concurrency();
 	print_verbose("Detected hardware concurrency: " + itos(threads));
 	world.set_threads(threads);
+}
+
+void FlecsServer::import_stats(const RID &world_id) {
+	set_stats_enabled(world_id, true);
+}
+
+void FlecsServer::set_stats_enabled(const RID &world_id, bool p_enabled) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY(world_id, set_stats_enabled);
+	flecs::world &world = world_variant->get_world();
+	if (p_enabled) {
+		world.import<flecs::stats>();
+	}
+	ecs_measure_frame_time(world.c_ptr(), p_enabled);
+	ecs_measure_system_time(world.c_ptr(), p_enabled);
+	stats_enabled.insert(world_id, p_enabled);
+}
+
+bool FlecsServer::is_stats_enabled(const RID &world_id) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY_V(world_id, false, is_stats_enabled);
+	return stats_enabled.has(world_id) ? stats_enabled.get(world_id) : false;
 }
 
 void FlecsServer::set_rest_enabled(const RID &world_id, bool p_enabled) {
@@ -1506,10 +1539,24 @@ RID FlecsServer::create_entity(const RID &world_id) {
 
 RID FlecsServer::create_entity_with_name(const RID &world_id, const String &p_name) {
 	CHECK_WORLD_VALIDITY_V(world_id, RID(), create_entity_with_name);
+	flecs::world &world = world_variant->get_world();
+	String entity_name = p_name;
+	if (!entity_name.is_empty()) {
+		for (int suffix = 1; suffix < 1024; suffix++) {
+			CharString name_utf8 = entity_name.utf8();
+			flecs::entity existing = world.lookup(name_utf8.get_data());
+			if (!_is_live_flecs_entity(existing)) {
+				break;
+			}
+			entity_name = vformat("%s_%d", p_name, suffix);
+		}
+	}
+
 	RID flecs_entity = create_entity(world_id);
 	FlecsEntityVariant *flecs_entity_variant = flecs_variant_owners.get(world_id)->entity_owner.get_or_null(flecs_entity);
-	if (flecs_entity_variant) {
-		flecs_entity_variant->get_entity().set_name(p_name.ascii().get_data());
+	if (flecs_entity_variant && !entity_name.is_empty()) {
+		CharString name_utf8 = entity_name.utf8();
+		flecs_entity_variant->get_entity().set_name(name_utf8.get_data());
 	}
 	return flecs_entity;
 }
@@ -2122,7 +2169,20 @@ String FlecsServer::get_entity_name(const RID &entity_id) {
 			ERR_PRINT("FlecsServer::set_entity_name: entity is no longer valid/alive in Flecs world");
 			return;
 		}
-		entity.set_name(p_name.ascii().get_data());
+		String entity_name = p_name;
+		if (!entity_name.is_empty()) {
+			flecs::world world = entity.world();
+			for (int suffix = 1; suffix < 1024; suffix++) {
+				CharString name_utf8 = entity_name.utf8();
+				flecs::entity existing = world.lookup(name_utf8.get_data());
+				if (!_is_live_flecs_entity(existing) || existing == entity) {
+					break;
+				}
+				entity_name = vformat("%s_%d", p_name, suffix);
+			}
+		}
+		CharString name_utf8 = entity_name.utf8();
+		entity.set_name(name_utf8.get_data());
 	} else {
 		ERR_PRINT("FlecsServer::set_entity_name: entity_id is not a valid entity");
 	}
@@ -3016,6 +3076,7 @@ void FlecsServer::free_world(const RID& rid) {
 
 		pipeline_managers.erase(rid);
 		rest_ports.erase(rid);
+		stats_enabled.erase(rid);
 
 		if (node_storages.has(rid)) {
 			memdelete(node_storages.get(rid));

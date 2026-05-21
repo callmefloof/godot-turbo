@@ -13,6 +13,7 @@
 #include "physics3d_utility.h"
 #include "render_utility_2d.h"
 #include "render_utility_3d.h"
+#include "flecs_entity_name_utils.h"
 #include "resource_object_utility.h"
 #include "scene/main/scene_tree.h"
 #include "scene/main/window.h"
@@ -461,7 +462,7 @@ TypedArray<RID> SceneObjectUtility::create_entity(const RID &world_id, Node *nod
     String name = node->get_name();
     name = name + "_" + itos(Math::rand());
     flecs::entity e = flecs_world->entity();
-    e.set_name(name.ascii().get_data());
+    FlecsEntityNameUtils::set_unique_name(flecs_world, e, name);
     SceneNodeComponent scene_node_component;
     scene_node_component.node_id = node->get_instance_id();
     scene_node_component.class_name = node->get_class();
