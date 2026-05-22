@@ -587,12 +587,10 @@ void FlecsWorldEditorPlugin::_request_remote_entities(uint64_t p_world_id, TreeI
 	// Store the world item for when we get the response
 	pending_entity_requests[p_world_id] = p_world_item->get_instance_id();
 
-	int batch_size = int(batch_size_spinbox->get_value());
-	
 	Array args;
 	args.push_back(p_world_id);
-	args.push_back(0); // offset
-	args.push_back(batch_size); // count
+	args.push_back(0); // offset (unused, kept for protocol compat)
+	args.push_back(0); // count 0 = all entities
 
 	active_session->send_message("flecs:request_entities", args);
 }
@@ -765,19 +763,6 @@ void FlecsWorldEditorPlugin::_build_dock_ui() {
 	collapse_btn->set_custom_minimum_size(Vector2(100, 0));
 	collapse_btn->connect(SceneStringName(pressed), callable_mp(this, &FlecsWorldEditorPlugin::_on_collapse_all_pressed));
 	toolbar->add_child(collapse_btn);
-
-	toolbar->add_child(memnew(VSeparator));
-
-	Label *batch_label = memnew(Label);
-	batch_label->set_text("Batch:");
-	toolbar->add_child(batch_label);
-
-	batch_size_spinbox = memnew(SpinBox);
-	batch_size_spinbox->set_min(10);
-	batch_size_spinbox->set_max(1000);
-	batch_size_spinbox->set_value(ENTITIES_PER_PAGE);
-	batch_size_spinbox->set_custom_minimum_size(Vector2(80, 0));
-	toolbar->add_child(batch_size_spinbox);
 
 	toolbar->add_spacer(false);
 
@@ -1026,16 +1011,11 @@ void FlecsWorldEditorPlugin::_load_entities_batch(RID world_rid, TreeItem *world
 		world_cache[world_rid] = Dictionary();
 	}
 
-	int max_count = ENTITIES_PER_PAGE;
-	if (batch_size_spinbox) {
-		max_count = (int)batch_size_spinbox->get_value();
-	}
-
 	Array entities;
 	PackedStringArray empty_components;
 	RID query_rid = flecs_server->create_query(world_rid, empty_components);
 	if (query_rid.is_valid()) {
-		entities = flecs_server->query_get_entities_limited(world_rid, query_rid, max_count, batch_start);
+		entities = flecs_server->query_get_entities(world_rid, query_rid);
 		flecs_server->free_query(world_rid, query_rid);
 	}
 

@@ -243,6 +243,7 @@ Error FlecsRuntimeDebugger::_handle_request_worlds(const Array &p_args) {
 		world_dict["id"] = world_id;
 		world_dict["name"] = String("World_") + String::num_int64(world_id, 16);
 		world_dict["entity_count"] = 0; // Will be updated when entities are requested
+		world_dict["rest_port"] = (int)server->get_rest_port(world_rid);
 
 		worlds_array.push_back(world_dict);
 	}
@@ -294,32 +295,24 @@ Error FlecsRuntimeDebugger::_handle_request_entities(const Array &p_args) {
 
 
 
-	if (query_rid.is_valid() && count > 0) {
-		Array limited_entities = server->query_get_entities_limited(world_rid, query_rid, count, offset);
-	
-		int entities_size = limited_entities.size();
+	if (query_rid.is_valid()) {
+		Array all_entities = server->query_get_entities(world_rid, query_rid);
 
-		for (int i = 0; i < entities_size; i++) {
-			// Safely access array element with bounds check
-			if (i >= limited_entities.size()) {
-				break;
+		for (int i = 0; i < all_entities.size(); i++) {
+			Variant entity_var = all_entities[i];
+			if (entity_var.get_type() != Variant::RID) {
+				continue;
 			}
-			
-			Variant entity_var = limited_entities[i];
-			Variant::Type var_type = entity_var.get_type();
-			
-			if (var_type == Variant::RID) {
-				RID entity_rid = entity_var;
-				if (!entity_rid.is_valid()) {
-					continue;
-				}
-				
-				uint64_t entity_id = entity_rid.get_id();
-				Dictionary entity_dict = _serialize_entity_info(world_rid, entity_id);
-				
-				if (!entity_dict.is_empty()) {
-					entities_array.push_back(entity_dict);
-				}
+
+			RID entity_rid = entity_var;
+			if (!entity_rid.is_valid()) {
+				continue;
+			}
+
+			uint64_t entity_id = entity_rid.get_id();
+			Dictionary entity_dict = _serialize_entity_info(world_rid, entity_id);
+			if (!entity_dict.is_empty()) {
+				entities_array.push_back(entity_dict);
 			}
 		}
 

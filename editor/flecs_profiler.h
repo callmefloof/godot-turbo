@@ -52,6 +52,7 @@ class FlecsServer;
 class ItemList;
 class EditorDebuggerSession;
 class FlecsWorldEditorPlugin;
+class HTTPRequest;
 
 /**
  * @class FlecsProfiler
@@ -120,6 +121,9 @@ private:
 	bool is_profiling = false;
 	bool seeking = false;
 
+	HTTPRequest *rest_http_request = nullptr;
+	HashMap<uint64_t, int> world_rest_ports;
+
 	// World selector
 	OptionButton *world_selector = nullptr;
 	Vector<RID> available_worlds;
@@ -183,6 +187,9 @@ private:
 	void _on_world_refresh_timer();
 	void _collect_frame_metrics();
 	void _request_remote_metrics();
+	void _on_rest_request_completed(int p_result, int p_code,
+			const PackedStringArray &p_headers, const PackedByteArray &p_body);
+	void _process_rest_response(const PackedByteArray &p_body);
 	void _process_metrics_dictionary(const Dictionary &metrics);
 	void _update_metrics_tree();
 	void _update_plot();

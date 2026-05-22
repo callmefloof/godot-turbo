@@ -46,6 +46,8 @@
 #include "scene/gui/spin_box.h"
 #include "scene/gui/texture_rect.h"
 #include "scene/main/timer.h"
+#include "scene/main/http_request.h"
+#include "core/io/json.h"
 #include "core/string/print_string.h"
 #include "core/object/callable_mp.h"
 #include "core/io/image.h"
@@ -266,6 +268,11 @@ void FlecsProfiler::_build_profiler_ui() {
 	world_refresh_timer = memnew(Timer);
 	add_child(world_refresh_timer);
 	world_refresh_timer->set_wait_time(2.0); // Refresh every 2 seconds
+
+	rest_http_request = memnew(HTTPRequest);
+	add_child(rest_http_request);
+	rest_http_request->connect("request_completed",
+			callable_mp(this, &FlecsProfiler::_on_rest_request_completed));
 }
 
 void FlecsProfiler::set_flecs_server(FlecsServer *p_server) {
@@ -478,6 +485,8 @@ void FlecsProfiler::handle_remote_worlds(const Array &p_data) {
 			continue;
 		}
 		remote_worlds_cache.push_back(RID::from_uint64(world_id));
+		int port = world_dict.get("rest_port", 27750);
+		world_rest_ports[world_id] = port;
 	}
 
 
@@ -555,32 +564,94 @@ void FlecsProfiler::_request_remote_metrics() {
 		if (remote_metrics_request_usec != 0 && now - remote_metrics_request_usec < REMOTE_REQUEST_TIMEOUT_USEC) {
 			return; // Already waiting for a recent response.
 		}
+		// Timed out — cancel and retry.
+		rest_http_request->cancel_request();
 		waiting_for_remote_metrics = false;
 	}
 
-	FlecsWorldEditorPlugin *world_plugin = FlecsWorldEditorPlugin::get_singleton();
-	if (!world_plugin) {
-		return;
+	int port = 27750;
+	if (world_rest_ports.has(selected_world.get_id())) {
+		port = world_rest_ports[selected_world.get_id()];
 	}
 
-	Ref<EditorDebuggerSession> session = world_plugin->get_active_session();
-	if (!session.is_valid() || !session->is_active()) {
-		waiting_for_remote_metrics = false;
-		remote_metrics_request_usec = 0;
+	String url = "http://127.0.0.1:" + itos(port) + "/stats/pipeline";
+	Error err = rest_http_request->request(url);
+	if (err != OK) {
 		if (info_label) {
-			info_label->set_text("No profiling data (remote debugger inactive)");
+			info_label->set_text("No profiling data (REST request error)");
 		}
 		return;
 	}
 
-	Array args;
-	args.push_back(selected_world.get_id());
-	session->send_message("flecs:request_profiler_metrics", args);
 	waiting_for_remote_metrics = true;
 	remote_metrics_request_usec = OS::get_singleton()->get_ticks_usec();
 	if (frame_metrics.is_empty() && info_label) {
 		info_label->set_text("No profiling data (remote - waiting for metrics)");
 	}
+}
+
+void FlecsProfiler::_on_rest_request_completed(int p_result, int p_code,
+		const PackedStringArray &p_headers, const PackedByteArray &p_body) {
+	waiting_for_remote_metrics = false;
+	remote_metrics_request_usec = 0;
+
+	if (!is_profiling) {
+		return;
+	}
+	if (p_result != HTTPRequest::RESULT_SUCCESS || p_code != 200) {
+		if (info_label) {
+			info_label->set_text("No profiling data (REST: " + itos(p_code) + ")");
+		}
+		return;
+	}
+	_process_rest_response(p_body);
+}
+
+void FlecsProfiler::_process_rest_response(const PackedByteArray &p_body) {
+	String json_text = String::utf8((const char *)p_body.ptr(), p_body.size());
+
+	Variant parsed = JSON::parse_string(json_text);
+	if (parsed.get_type() != Variant::ARRAY) {
+		return;
+	}
+
+	Array systems_arr = parsed;
+	if (systems_arr.is_empty()) {
+		return;
+	}
+
+	FrameMetric frame;
+	frame.frame_number = total_metrics;
+	frame.total_frame_time_usec = 0;
+
+	for (int i = 0; i < systems_arr.size(); i++) {
+		if (systems_arr[i].get_type() != Variant::DICTIONARY) {
+			continue;
+		}
+		Dictionary sys = systems_arr[i];
+		SystemMetric m;
+
+		m.name = sys.get("name", "Unknown");
+		m.is_paused = (bool)sys.get("disabled", false);
+
+		// time_spent rolling avg in seconds; last slot is most recent
+		Dictionary ts = sys.get("time_spent", Dictionary());
+		Array ts_avg = ts.get("avg", Array());
+		double time_sec = ts_avg.is_empty() ? 0.0 : (double)ts_avg[ts_avg.size() - 1];
+		m.total_time_usec = (uint64_t)(time_sec * 1e6);
+
+		Dictionary ec = sys.get("query.matched_entity_count", Dictionary());
+		Array ec_avg = ec.get("avg", Array());
+		m.entity_count = ec_avg.is_empty() ? 0 : (int)(double)ec_avg[ec_avg.size() - 1];
+
+		m.call_count = 1;
+
+		frame.system_metrics.push_back(m);
+		frame.total_frame_time_usec += m.total_time_usec;
+	}
+
+	add_frame_metric(frame);
+	_update_metrics_tree();
 }
 
 void FlecsProfiler::handle_remote_metrics(const Dictionary &p_data) {

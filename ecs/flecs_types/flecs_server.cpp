@@ -24,6 +24,7 @@
 #include "core/variant/variant.h"
 #include "modules/godot_turbo/thirdparty/flecs/distr/flecs.h"
 #include "modules/godot_turbo/ecs/flecs_types/flecs_script_system.h"
+#include "modules/godot_turbo/ecs/flecs_types/flecs_serializer.h"
 #include "modules/godot_turbo/ecs/systems/utility/node_storage.h"
 #include "modules/godot_turbo/ecs/systems/utility/ref_storage.h"
 #include "core/string/ustring.h"
@@ -986,6 +987,8 @@ void FlecsServer::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("create_world"), &FlecsServer::create_world);
 	ClassDB::bind_method(D_METHOD("get_world_list"), &FlecsServer::get_world_list);
 	ClassDB::bind_method(D_METHOD("init_world", "world_id"), &FlecsServer::init_world);
+	ClassDB::bind_method(D_METHOD("serialize_world", "world_id"), &FlecsServer::serialize_world);
+	ClassDB::bind_method(D_METHOD("deserialize_world", "world_id", "state"), &FlecsServer::deserialize_world);
 	ClassDB::bind_method(D_METHOD("import_stats", "world_id"), &FlecsServer::import_stats);
 	ClassDB::bind_method(D_METHOD("set_stats_enabled", "world_id", "enabled"), &FlecsServer::set_stats_enabled);
 	ClassDB::bind_method(D_METHOD("is_stats_enabled", "world_id"), &FlecsServer::is_stats_enabled);
@@ -1202,38 +1205,9 @@ RID FlecsServer::create_world() {
 	// Use the world reference from the initialized variant
 	flecs::world &world_ref = immediate->get_world();
 
-
-	world_ref.component<Variant>();
-	world_ref.component<Dictionary>();
-	world_ref.component<Array>();
-	world_ref.component<Vector2>();
-	world_ref.component<Vector3>();
-	world_ref.component<Rect2>();
-	world_ref.component<Quaternion>();
-	world_ref.component<Plane>();
-	world_ref.component<Basis>();
-	world_ref.component<Transform2D>();
-	world_ref.component<Transform3D>();
-	world_ref.component<PackedInt64Array>();
-	world_ref.component<PackedInt32Array>();
-	world_ref.component<PackedByteArray>();
-	world_ref.component<PackedColorArray>();
-	world_ref.component<PackedStringArray>();
-	world_ref.component<PackedVector2Array>();
-	world_ref.component<PackedVector3Array>();
-	world_ref.component<PackedVector4Array>();
-	world_ref.component<PackedFloat32Array>();
-	world_ref.component<PackedFloat64Array>();
-	world_ref.component<String>();
-	world_ref.component<StringName>();
-	world_ref.component<NodePath>();
-	world_ref.component<Callable>();
-	world_ref.component<Signal>();
-	world_ref.component<RID>();
-
-
 	// Register all components using the new reflection system.
-	// Enable serializers so editor/debugger snapshots can show read-only values.
+	// This first registers Godot Variant-family opaque types so Flecs REST and
+	// JSON save/load can serialize them as actual values instead of size/alignment.
 	AllComponents::register_all(world_ref, true);
 
 	ecs_measure_frame_time(world_ref.c_ptr(), true);
@@ -1330,6 +1304,47 @@ void FlecsServer::init_world(const RID& world_id) {
 	auto threads = std::thread::hardware_concurrency();
 	print_verbose("Detected hardware concurrency: " + itos(threads));
 	world.set_threads(threads);
+}
+
+String FlecsServer::serialize_world(const RID &world_id) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY_V(world_id, String(), serialize_world);
+
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		ERR_PRINT("FlecsServer::serialize_world: cannot serialize while world is progressing");
+		return String();
+	}
+
+	flecs::world &world = world_variant->get_world();
+	String result = FlecsSerializer::serialize_world(world);
+	if (result.is_empty()) {
+		ERR_PRINT("FlecsServer::serialize_world: failed to serialize world");
+		return String();
+	}
+	return result;
+}
+
+bool FlecsServer::deserialize_world(const RID &world_id, const String &state) {
+	MutexLock server_lock(mutex);
+	CHECK_WORLD_VALIDITY_V(world_id, false, deserialize_world);
+
+	if (state.is_empty()) {
+		ERR_PRINT("FlecsServer::deserialize_world: state is empty");
+		return false;
+	}
+
+	if (worlds_in_progress.has(world_id) && worlds_in_progress[world_id]) {
+		ERR_PRINT("FlecsServer::deserialize_world: cannot deserialize while world is progressing");
+		return false;
+	}
+
+	flecs::world &world = world_variant->get_world();
+	if (!FlecsSerializer::deserialize_world(world, state)) {
+		ERR_PRINT("FlecsServer::deserialize_world: failed to deserialize world state");
+		return false;
+	}
+
+	return true;
 }
 
 void FlecsServer::import_stats(const RID &world_id) {
@@ -1723,6 +1738,8 @@ RID FlecsServer::create_runtime_component(const RID& world_id, const String &com
 				return world->component<String>();
 			case Variant::STRING_NAME:
 				return world->component<StringName>();
+			case Variant::NODE_PATH:
+				return world->component<NodePath>();
 			case Variant::VECTOR2:
 				return world->component<Vector2>();
 			case Variant::VECTOR3:
@@ -1733,6 +1750,10 @@ RID FlecsServer::create_runtime_component(const RID& world_id, const String &com
 				return world->component<Color>();
 			case Variant::RID:
 				return world->component<RID>();
+			case Variant::CALLABLE:
+				return world->component<Callable>();
+			case Variant::SIGNAL:
+				return world->component<Signal>();
 			case Variant::ARRAY:
 				return world->component<Array>();
 			case Variant::DICTIONARY:
@@ -1761,6 +1782,26 @@ RID FlecsServer::create_runtime_component(const RID& world_id, const String &com
 				return world->component<Rect2>();
 			case Variant::RECT2I:
 				return world->component<Rect2i>();
+			case Variant::PACKED_BYTE_ARRAY:
+				return world->component<PackedByteArray>();
+			case Variant::PACKED_INT32_ARRAY:
+				return world->component<PackedInt32Array>();
+			case Variant::PACKED_INT64_ARRAY:
+				return world->component<PackedInt64Array>();
+			case Variant::PACKED_FLOAT32_ARRAY:
+				return world->component<PackedFloat32Array>();
+			case Variant::PACKED_FLOAT64_ARRAY:
+				return world->component<PackedFloat64Array>();
+			case Variant::PACKED_STRING_ARRAY:
+				return world->component<PackedStringArray>();
+			case Variant::PACKED_VECTOR2_ARRAY:
+				return world->component<PackedVector2Array>();
+			case Variant::PACKED_VECTOR3_ARRAY:
+				return world->component<PackedVector3Array>();
+			case Variant::PACKED_COLOR_ARRAY:
+				return world->component<PackedColorArray>();
+			case Variant::PACKED_VECTOR4_ARRAY:
+				return world->component<PackedVector4Array>();
 			default:
 				// Default to Variant for unsupported types
 				return world->component<Variant>();

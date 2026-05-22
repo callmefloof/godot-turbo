@@ -102,8 +102,6 @@ private:
 	String current_search_filter;
 	FlecsEntityInspector *entity_inspector = nullptr;
 	Timer *world_refresh_timer = nullptr;
-	SpinBox *batch_size_spinbox = nullptr;
-
 	// Remote debugging
 	Ref<EditorDebuggerSession> remote_session;
 	Ref<EditorDebuggerSession> active_session;
@@ -124,8 +122,6 @@ private:
 
 	RID selected_world;
 	uint64_t selected_entity_id = 0;
-
-	static constexpr int ENTITIES_PER_PAGE = 200;
 
 	// UI Building
 	void _build_dock_ui();

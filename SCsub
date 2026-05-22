@@ -7,6 +7,7 @@ base_sources = [
     "register_types.cpp",
     "thirdparty/flecs/distr/flecs.c",
     "ecs/flecs_types/flecs_query.cpp",
+    "ecs/flecs_types/flecs_serializer.cpp",
     "ecs/flecs_types/flecs_script_system.cpp",
     "ecs/systems/pipeline_manager.cpp",
     "ecs/systems/gdscript_runner_system.cpp",

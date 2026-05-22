@@ -272,6 +272,8 @@ public:
 	int8_t get_world_count() const;
 	TypedArray<RID> get_world_list() const;
 	void init_world(const RID& world_id);
+	String serialize_world(const RID &world_id);
+	bool deserialize_world(const RID &world_id, const String &state);
 	void import_stats(const RID &world_id);
 	void set_stats_enabled(const RID &world_id, bool p_enabled);
 	bool is_stats_enabled(const RID &world_id);

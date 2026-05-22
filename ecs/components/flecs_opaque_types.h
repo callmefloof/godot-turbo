@@ -14,15 +14,75 @@
 #include "core/math/rect2.h"
 #include "core/math/quaternion.h"
 #include "core/object/object_id.h"
+#include "core/string/node_path.h"
 #include "core/string/string_name.h"
 #include "core/templates/rid.h"
+#include "core/variant/callable.h"
 #include "core/variant/variant.h"
 #include "core/variant/dictionary.h"
 #include "core/variant/array.h"
+
+#ifdef near
+#undef near
+#endif
+#ifdef far
+#undef far
+#endif
+#ifdef FAR
+#undef FAR
+#endif
+
+#include "core/variant/variant_parser.h"
 #include "core/io/json.h"
 #include "servers/rendering/rendering_server.h"
 
 namespace FlecsOpaqueTypes {
+
+template <typename T>
+inline int serialize_variant_text(const flecs::serializer* s, const T* data) {
+	Variant value = *data;
+	String text;
+	Error err = VariantWriter::write_to_string(value, text);
+	if (err != OK) {
+		return -1;
+	}
+
+	CharString utf8 = text.utf8();
+	const char* str = utf8.get_data();
+	return s->value(ecs_id(ecs_string_t), &str);
+}
+
+inline bool parse_variant_text(const char *p_text, Variant &r_value) {
+	VariantParser::StreamString stream;
+	stream.s = String::utf8(p_text ? p_text : "");
+	String error;
+	int error_line = 0;
+	return VariantParser::parse(&stream, r_value, error, error_line) == OK;
+}
+
+template <typename T>
+inline void assign_variant_text(T *dst, const char *value) {
+	Variant parsed;
+	if (parse_variant_text(value, parsed)) {
+		*dst = parsed;
+	}
+}
+
+inline void assign_variant_text_value(Variant *dst, const char *value) {
+	Variant parsed;
+	if (parse_variant_text(value, parsed)) {
+		*dst = parsed;
+	}
+}
+
+#define GODOT_VARIANT_OPAQUE(TYPE) \
+	world.component<TYPE>() \
+		.opaque([](flecs::world& w) { \
+			return flecs::opaque<TYPE>() \
+				.as_type(ecs_id(ecs_string_t)) \
+				.serialize(serialize_variant_text<TYPE>) \
+				.assign_string(assign_variant_text<TYPE>); \
+		})
 
 // ============================================================================
 // SERIALIZATION HELPERS
@@ -225,6 +285,62 @@ inline int serialize_object_id(const flecs::serializer* s, const ObjectID* data)
 	return s->value(ecs_id(ecs_u64_t), &id);
 }
 
+inline void assign_object_id_uint(ObjectID *dst, uint64_t value) {
+	*dst = ObjectID(value);
+}
+
+inline int serialize_vector_rid_text(const flecs::serializer* s, const Vector<RID>* data) {
+	Array array;
+	for (int i = 0; i < data->size(); i++) {
+		array.push_back((*data)[i]);
+	}
+	String text;
+	if (VariantWriter::write_to_string(array, text) != OK) {
+		return -1;
+	}
+	CharString utf8 = text.utf8();
+	const char* str = utf8.get_data();
+	return s->value(ecs_id(ecs_string_t), &str);
+}
+
+inline void assign_vector_rid_text(Vector<RID> *dst, const char *value) {
+	Variant parsed;
+	if (!parse_variant_text(value, parsed) || parsed.get_type() != Variant::ARRAY) {
+		return;
+	}
+	Array array = parsed;
+	dst->resize(array.size());
+	for (int i = 0; i < array.size(); i++) {
+		dst->write[i] = array[i];
+	}
+}
+
+inline int serialize_vector_plane_text(const flecs::serializer* s, const Vector<Plane>* data) {
+	Array array;
+	for (int i = 0; i < data->size(); i++) {
+		array.push_back((*data)[i]);
+	}
+	String text;
+	if (VariantWriter::write_to_string(array, text) != OK) {
+		return -1;
+	}
+	CharString utf8 = text.utf8();
+	const char* str = utf8.get_data();
+	return s->value(ecs_id(ecs_string_t), &str);
+}
+
+inline void assign_vector_plane_text(Vector<Plane> *dst, const char *value) {
+	Variant parsed;
+	if (!parse_variant_text(value, parsed) || parsed.get_type() != Variant::ARRAY) {
+		return;
+	}
+	Array array = parsed;
+	dst->resize(array.size());
+	for (int i = 0; i < array.size(); i++) {
+		dst->write[i] = array[i];
+	}
+}
+
 // Helper to serialize Variant (unwrap the variant)
 inline int serialize_variant(const flecs::serializer* s, const Variant* data) {
 	// Serialize variant as its string representation for simplicity
@@ -326,201 +442,73 @@ inline int serialize_rect2i(const flecs::serializer* s, const Rect2i* data) {
 
 // Register all common Godot types as opaque to Flecs with proper serialization
 inline void register_opaque_types(flecs::world &world) {
-	// Vector2 - struct with x, y
-	world.component<Vector2>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Vector2>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector2);
-		});
-
-	// Vector3 - struct with x, y, z
-	world.component<Vector3>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Vector3>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector3);
-		});
-
-	// Vector4 - struct with x, y, z, w
-	world.component<Vector4>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Vector4>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector4);
-		});
-
-	// Color - struct with r, g, b, a
-	world.component<Color>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Color>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_color);
-		});
-
-	// Quaternion - struct with x, y, z, w
-	world.component<Quaternion>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Quaternion>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_quaternion);
-		});
-
-	// Plane - struct with normal (Vector3) and d (float)
-	world.component<Plane>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Plane>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_plane);
-		});
-
-	// AABB - struct with position and size (both Vector3)
-	world.component<AABB>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<AABB>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_aabb);
-		});
-
-	// Rect2 - struct with position and size (both Vector2)
-	world.component<Rect2>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Rect2>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_rect2);
-		});
-
-	// Transform2D - 2x3 matrix
-	world.component<Transform2D>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Transform2D>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_transform2d);
-		});
-
-	// Basis - 3x3 matrix
-	world.component<Basis>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Basis>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_basis);
-		});
-
-	// Transform3D - Basis + origin
-	world.component<Transform3D>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Transform3D>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_transform3d);
-		});
-
-	// Projection - 4x4 matrix
-	world.component<Projection>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Projection>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_projection);
-		});
-
-	// String - Godot string type
-	world.component<String>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<String>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_string);
-		});
-
-	// StringName - Godot interned string
-	world.component<StringName>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<StringName>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_string_name);
-		});
-
-	// RID - Resource ID (read-only, serialize as uint64)
-	world.component<RID>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<RID>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_rid);
-		});
-
-	// ObjectID - Godot object identifier
-	world.component<ObjectID>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<ObjectID>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_object_id);
-		});
-
-	// Variant - Godot's universal type (unwrap on serialize)
+	// Store Godot values in Flecs JSON as Godot Variant text. This is less
+	// inspectable than per-member math structs, but it round-trips the full
+	// Variant family including packed arrays and nested containers.
 	world.component<Variant>()
 		.opaque([](flecs::world& w) {
 			return flecs::opaque<Variant>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_variant);
+				.as_type(ecs_id(ecs_string_t))
+				.serialize(serialize_variant_text<Variant>)
+				.assign_string(assign_variant_text_value);
 		});
+	GODOT_VARIANT_OPAQUE(String);
+	GODOT_VARIANT_OPAQUE(StringName);
+	GODOT_VARIANT_OPAQUE(NodePath);
+	GODOT_VARIANT_OPAQUE(RID);
+	GODOT_VARIANT_OPAQUE(Callable);
+	GODOT_VARIANT_OPAQUE(Signal);
+	GODOT_VARIANT_OPAQUE(Dictionary);
+	GODOT_VARIANT_OPAQUE(Array);
+	GODOT_VARIANT_OPAQUE(Vector2);
+	GODOT_VARIANT_OPAQUE(Vector2i);
+	GODOT_VARIANT_OPAQUE(Rect2);
+	GODOT_VARIANT_OPAQUE(Rect2i);
+	GODOT_VARIANT_OPAQUE(Vector3);
+	GODOT_VARIANT_OPAQUE(Vector3i);
+	GODOT_VARIANT_OPAQUE(Transform2D);
+	GODOT_VARIANT_OPAQUE(Vector4);
+	GODOT_VARIANT_OPAQUE(Vector4i);
+	GODOT_VARIANT_OPAQUE(Plane);
+	GODOT_VARIANT_OPAQUE(Quaternion);
+	GODOT_VARIANT_OPAQUE(AABB);
+	GODOT_VARIANT_OPAQUE(Basis);
+	GODOT_VARIANT_OPAQUE(Transform3D);
+	GODOT_VARIANT_OPAQUE(Projection);
+	GODOT_VARIANT_OPAQUE(Color);
+	GODOT_VARIANT_OPAQUE(PackedByteArray);
+	GODOT_VARIANT_OPAQUE(PackedInt32Array);
+	GODOT_VARIANT_OPAQUE(PackedInt64Array);
+	GODOT_VARIANT_OPAQUE(PackedFloat32Array);
+	GODOT_VARIANT_OPAQUE(PackedFloat64Array);
+	GODOT_VARIANT_OPAQUE(PackedStringArray);
+	GODOT_VARIANT_OPAQUE(PackedVector2Array);
+	GODOT_VARIANT_OPAQUE(PackedVector3Array);
+	GODOT_VARIANT_OPAQUE(PackedColorArray);
+	GODOT_VARIANT_OPAQUE(PackedVector4Array);
 
-	// Dictionary - Godot's hash map
-	world.component<Dictionary>()
+	world.component<ObjectID>()
 		.opaque([](flecs::world& w) {
-			return flecs::opaque<Dictionary>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_dictionary);
+			return flecs::opaque<ObjectID>()
+				.as_type(ecs_id(ecs_u64_t))
+				.serialize(serialize_object_id)
+				.assign_uint(assign_object_id_uint);
 		});
 
-	// Array - Godot's dynamic array
-	world.component<Array>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Array>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_array);
-		});
-
-	// Vector<RID> - Godot's templated vector with RID
 	world.component<Vector<RID>>()
 		.opaque([](flecs::world& w) {
 			return flecs::opaque<Vector<RID>>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector_rid);
+				.as_type(ecs_id(ecs_string_t))
+				.serialize(serialize_vector_rid_text)
+				.assign_string(assign_vector_rid_text);
 		});
 
-	// Vector<Plane> - Godot's templated vector with Plane
 	world.component<Vector<Plane>>()
 		.opaque([](flecs::world& w) {
 			return flecs::opaque<Vector<Plane>>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector_plane);
-		});
-
-	// Vector2i, Vector3i, Vector4i, Rect2i
-	world.component<Vector2i>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Vector2i>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector2i);
-		});
-
-	world.component<Vector3i>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Vector3i>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector3i);
-		});
-
-	world.component<Vector4i>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Vector4i>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_vector4i);
-		});
-
-	world.component<Rect2i>()
-		.opaque([](flecs::world& w) {
-			return flecs::opaque<Rect2i>()
-				.as_type(ecs_id(EcsOpaque))
-				.serialize(serialize_rect2i);
+				.as_type(ecs_id(ecs_string_t))
+				.serialize(serialize_vector_plane_text)
+				.assign_string(assign_vector_plane_text);
 		});
 
 	// Primitive types (register for completeness)
@@ -537,3 +525,5 @@ inline void register_opaque_types(flecs::world &world) {
 }
 
 } // namespace FlecsOpaqueTypes
+
+#undef GODOT_VARIANT_OPAQUE
